@@ -1,0 +1,3184 @@
+<meta charset="utf-8">
+<title>BN 編輯器（定位版）</title>
+<!-- 載入順序契約：tokens.css → ui.css → xd-core → history → bn-workorder → packs → 頁面腳本 -->
+<link rel="stylesheet" href="../core/tokens.css">
+<link rel="stylesheet" href="../core/ui.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="../core/xd-core.js"></script>
+<script src="../core/history.js"></script>
+<script src="../core/bn-workorder.js"></script>
+<script src="../core/export-png.js"></script>
+<script src="../core/export-package.js"></script>
+<script src="../core/bg-remove.js"></script>
+<script src="../core/logo-editor.js"></script>
+<script src="../packs/bn/placements.js"></script>
+<script src="../packs/bn/themes.js"></script>
+<script src="../packs/bn/master-placements.js"></script>
+<script src="../packs/bn/stock-placements.js"></script>
+<script src="../packs/bn/photo-assets.js"></script>
+<script src="../packs/bn/logo-assets.js"></script>
+<style>
+/* ---------- 頂列：總覽／畫布切換 ---------- */
+.viewtabs{display:flex;gap:2px;background:var(--ui-surface);border:1px solid var(--ui-line2);
+          border-radius:var(--ui-r);padding:2px}
+.vtab{height:24px;padding:0 12px;border:none;border-radius:calc(var(--ui-r) - 3px);
+      background:transparent;color:var(--ui-dim);font-size:12px;cursor:pointer;font-weight:500}
+.vtab.on{background:var(--ui-accent);color:#fff;font-weight:600}
+.vtab:hover:not(.on){color:var(--ui-text)}
+
+/* ---------- 左欄：版位清單 ---------- */
+.pane-head{font-size:12px;font-weight:700;color:var(--ui-text);padding:14px 14px 8px;
+           display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pane-head .mini{font-size:10px;font-weight:500;color:var(--ui-dim2)}
+/* 版位列：名稱獨佔一行避免被擠掉；選取只用左側細條標示，不整圈橘框（14 個全亮太吵） */
+.bd{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;padding:7px 9px;margin:0 10px 5px;
+    border:1px solid transparent;border-left:3px solid transparent;border-radius:var(--ui-rf);
+    font-size:12px;cursor:pointer;background:var(--ui-surface);transition:.13s}
+.bd:hover{border-color:var(--ui-line2);border-left-color:var(--ui-line2)}
+.bd.on{border-left-color:var(--ui-accent);background:#37302E}
+.bd.on:hover{border-color:var(--ui-line2);border-left-color:var(--ui-accent)}
+.bd input{margin:0;accent-color:var(--ui-accent);flex:none}
+.bd .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-text)}
+.bd .meta{flex-basis:100%;display:flex;gap:8px;padding-left:22px;font-size:10px;color:var(--ui-dim2)}
+.bd .miss{color:var(--ui-warn)}
+.pane-acts{display:flex;gap:6px;padding:0 10px 10px}
+.pane-acts button{flex:1;height:26px;padding:0;font-size:11px;justify-content:center}
+
+/* ---------- 畫布區：兩種模式共用 #stage / #world ---------- */
+#stage.ov-mode{overflow:auto;cursor:default}
+#world{position:absolute;left:0;top:0;transform-origin:0 0;
+       display:flex;flex-direction:column;align-items:center;gap:28px;padding:28px 36px}
+#stage.grabbing{cursor:grabbing}
+#stage{cursor:grab}
+.bncard{position:relative;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:12px;padding:10px}
+.bncard .cap{font-size:11px;color:var(--ui-dim);margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.bncard .cap b{color:var(--ui-text);font-size:12px}
+.bncard .cap .kb{margin-left:auto;color:var(--ui-dim2);font-size:10px}
+.cv{position:relative;border-radius:6px;overflow:hidden;background:#DCE4F2;font-family:var(--font-ms);
+    /* 字型還沒下載完（三支 ttf 各 18MB）時 font-display:swap 會先用備援字繪製；
+       備援的微軟正黑體沒有 Medium，瀏覽器預設會「合成」一個假字重，讓小字(500)
+       看起來跟 Regular 一樣、主副標(700)卻因為正黑體真的有 Bold 而看起來正常
+       ——這正是「只有小字看起來不是 Medium」的成因。禁掉合成，寧可備援期看得出
+       差異，也不要假裝；開機時另外主動 preload 500/700 兩個字重（見頁面腳本結尾）。 */
+    font-synthesis:none;-webkit-font-synthesis:none;
+    background-image:linear-gradient(45deg,rgba(255,255,255,.35) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.35) 75%),
+                     linear-gradient(45deg,rgba(255,255,255,.35) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.35) 75%);
+    background-size:22px 22px;background-position:0 0,11px 11px;background-color:#DCE4F2}
+/* slot 一律不吃滑鼠事件——只有人物照片需要被點選/拖曳，文字/CTA/LOGO/徽章疊在
+   照片上面的話會把點擊擋掉（照片現在是最底層）。空的照片佔位也不吃，讓畫布可以拖曳平移。 */
+.slot{position:absolute;display:flex;align-items:center;overflow:hidden;pointer-events:none}
+/* 字重（2026-09-03 使用者指定）：主標＝Medium(500)、副標＝Bold(700)、小字＝Regular(400)。
+   字型檔 fonts/ShopeeNotoSans(content)-*.woff2 由 core/tokens.css 以 @font-face 綁定三個字重，
+   400/500/700 分別對到 Regular/Medium/Bold
+   （量過 canvas advance width：Regular 1222 / Medium 1235.3 / Bold 1295.2，確實是三支不同的字）。
+   定位虛線框（原本 outline:1px dashed）已整批拿掉——使用者要的是編輯畫面也乾淨，
+   位置對不對用底圖對就好，不需要輔助線。 */
+/* 置中補償：.slot 是 align-items:center，flex 置中的是「行框」不是「墨迹」。
+   單行文字的 baseline 固定落在「容器中心 +(ascent-descent)/2」（跟 line-height 無關），
+   而視覺上要的是「墨迹中心＝容器中心」，兩者差 (A-D)/2-(abA-abD)/2
+   ——Shopee Noto Sans content 量出來是 0.045em，恆定比例（fs17→0.76px、fs42→1.89px）。
+   CTA 的 ▶ 箭頭是幾何置中的，所以文字比箭頭低，一眼就看得出來。
+   補償值由 applyInkFix() 開機用 canvas 量實際字型後寫進 --ink-fix，換字型會自己跟著對；
+   單位是 em，所以自動隨字級／畫布倍率縮放。
+   實作用 margin-bottom：flex 置中的是「margin 盒」，給下緣 m 會讓內容往上移 m/2。 */
+.slot > .ink{margin-bottom:calc(var(--ink-fix, 0em) * 2)}
+/* 下行字（q p j g y、括號、逗號）不准被裁掉。
+   為什麼會被裁：文字滿版的慣例是「字級＝定位框高度」，而上面的置中補償是把
+   **漢字**的墨迹置中（漢字幾乎沒有下伸部：墨迹 0.844 上 / 0.094 下），
+   所以基線會落在框高的 0.875 處；拉丁下伸部大約還要 0.212em，
+   0.875+0.212＝1.087 ⇒ 超出框底約 0.09em（主標 fs56 就是 4.9px），
+   再被 .slot 共用的 overflow:hidden 切掉，看起來就是 q 的尾巴被削平。
+   修法是讓這四種純文字的 slot 不裁切——PS 的文字圖層本來也不會被自己的
+   定位框裁掉，位置與尺寸都不變（overflow 不影響版面），只是尾巴畫得出來。
+   刻意不改 .slot.cta：它有底色藥丸與圓角，那個邊界是「按鈕」的真實邊界，
+   而且 CTA 的字級遠小於框高（實測餘裕 3px 以上），本來就不會被裁。
+   .slot.logo/.slot.badge 也維持裁切（那是圖片區，超出就是排版錯了）。 */
+.slot.title,.slot.sub,.slot.small,.slot.ar{overflow:visible}
+.slot.title{font-weight:500;color:#16277F;white-space:pre}
+.slot.sub{font-weight:700;color:#2357E6;white-space:pre}
+.slot.small{font-weight:400;color:#666;white-space:pre}
+/* AR 版位專用文案：上下兩排、置中；Bold 是因為 AR 版位只有 100×100，
+   每個字實際只有二十幾 px，字重輕了在小圖上會糊成一團。 */
+.slot.ar{font-weight:700;color:#16277F;white-space:pre;justify-content:center;text-align:center}
+/* 版位下方的「微笑遮罩」（見 arcHTML 的說明）：實際是一塊 inline <svg>，曲線、
+   陰影與模糊都在 SVG 內，這裡只放共同的定位屬性。 */
+.arcdeco{position:absolute;pointer-events:none}
+.logo-row{display:flex;align-items:center;justify-content:space-evenly;width:100%;height:100%;gap:6%}
+.logo-slot{flex:1 1 0;height:100%;min-width:0;display:flex;align-items:center;justify-content:center}
+.logo-slot img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+/* .ink＝這張 LOGO 的透明留白已被量掉，img 會被放大到「圖案剛好填滿格子」，
+   多出來的透明邊由 overflow:hidden 藏掉（見 inkImgStyle）。 */
+.logo-slot.ink{position:relative;overflow:hidden}
+/* 廠商 LOGO 的虛線「廠商」缺件提示已移除（2026-09-11）：LOGO 條現在是「上傳幾顆
+   畫幾格」，不預留空位，所以不存在「空的那一格」了。 */
+.logo-circle{background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+.logo-circle img{max-width:76%;max-height:76%;object-fit:contain;display:block}
+/* 分隔線的圓角與陰影原本寫在這裡（1px / 2px），但版位內的長度一律不能寫固定 px
+   ——畫布是「座標×倍率重新排版」，固定 px 不會跟著倍率走，同一塊板在 64% 與 400%
+   看起來就不一樣（第十六輪的 padding:max(1,s) 是同一種錯）。改由 logoRowHTML 內嵌 ×s。 */
+.logo-div{flex:none;align-self:center;background:rgba(255,255,255,.95)}
+/* border-radius 同理移到 ctaHTML 內嵌（CTA_RADIUS×s）。不能用 em：em 綁的是字級，
+   而每塊板的 CTA 字級都不同（360×186 是 17px、800×720 是 42px），用 em 會讓同一顆
+   按鈕在不同版位圓角不一樣；使用者確認圓角是「固定半徑」的設計值，所以要綁原生 px。 */
+.slot.cta{background:#16277F;color:#fff;justify-content:center;
+          font-weight:500;white-space:nowrap}
+.cta-arrow{display:inline-block;width:0;height:0;flex:none;margin-left:.32em;
+           border-top:.32em solid transparent;border-bottom:.32em solid transparent;
+           border-left:.42em solid currentColor}
+/* 廠商 LOGO 環繞徽章（orbit 模式）：圓形、白底、細白框＋淡陰影，讓徽章在深色
+   人物照片上仍然看得清楚邊界，跟 LOGO 條的 .logo-slot.vendor 是兩套獨立樣式
+   （這裡每個位置都是 PSD 各自標記的絕對座標，不是等分出來的）。 */
+/* 白框 3px 與陰影 0 2px 8px 也移到 vendorBadgeHTML 內嵌 ×s（原本固定 px，
+   結果 800×720 與 1200×346 的白框一樣粗，連匯出都不對）。 */
+.slot.badge{border-radius:50%;background:#fff;justify-content:center}
+.slot.badge img{max-width:78%;max-height:78%;object-fit:contain;margin:0 auto;display:block}
+.slot.badge.empty{background:rgba(0,0,0,.25);border:1px dashed rgba(255,255,255,.6);
+                   color:rgba(255,255,255,.85);text-align:center;letter-spacing:.06em}
+/* 蝦皮購物 LOGO（公版定位的「蝦皮購物LOGO範圍」）：固定素材、沒有底色也沒有缺件狀態，
+   img 的寬高由 shopeeLogoHTML 算好（html2canvas 不畫 object-fit）。 */
+.slot.shopee-logo img{display:block;object-fit:contain}
+/* .slot 本來就 overflow:hidden，這裡只要 position:relative 讓放大的 img 有定位基準 */
+.slot.shopee-logo.ink{position:relative}
+/* 人物照片：改用 contain——上傳當下「整張固定在定位框內」（去背人像不會被切掉手腳），
+   之後可以手動縮放/位移，而且不再鎖在框內，所以這個 slot 必須 overflow:visible
+   （.slot 共用規則是 hidden）。真正的邊界是 .cv 本身（版位外框仍然會裁掉），
+   所以照片再怎麼拖也不會跑到版位外面。
+   半透明底色只在「還沒上傳照片」時當佔位提示——之前寫在共用的 .slot.photo，
+   導致上傳去背 PNG（人像四周透明）時，透明區塊會露出這層底色，變成看起來
+   照片外圍有一圈灰底範圍框，連下載的圖都一起烤進去。只留在 .empty 才不會這樣。
+   ⚠ pointer-events:none 是刻意的——定位框是固定的（雙人時就是左右兩塊），照片卻是
+   用 transform 位移的，位移一大影像就跑出自己的框、甚至跑進另一位的框裡。讓框吃滑鼠
+   等於「點框裡的空白也會抓到照片、點影像本身反而抓到另一位」。命中測試改由 JS 照
+   實際畫出來的影像＋alpha 遮罩判斷，見 photoHitAt()。 */
+.slot.photo{justify-content:center;overflow:visible;pointer-events:none}
+/* 尺寸/位置一律由 photoImgStyle 算好寫 inline（html2canvas 不支援 object-fit，
+   而且圖素貼合的是「墨迹」，img 會比框大）。left/top:50%＋負 margin＝中心對齊框心。 */
+.slot.photo img{position:absolute;left:50%;top:50%;object-fit:contain;display:block}
+.slot.photo.empty{border:2px dashed rgba(255,255,255,.5);color:rgba(255,255,255,.85);
+                   font-size:14px;text-align:center;background:rgba(0,0,0,.2)}
+/* 下載整包時套用在離屏擷取節點的 .cv 上。主副標/小字的虛線框現在編輯畫面本來就
+   不畫了，這裡改成負責另一件事：沒上傳的人物照片佔位框（虛線＋「人物照片」字樣）
+   是給編輯時看的缺件提示，不該印在交付的圖上。
+   ⚠ 這條只能「藏起來」不能「移除版面」——它塗掉的框仍然佔位。廠商 LOGO 的空位
+   因此曾經在匯出圖裡留下一塊看不見但推歪版面的空白，現在改成根本不畫那一格。 */
+.cv.export{border-radius:0}   /* 版位邊框的 6px 圓角是編輯畫面的視覺，不該烤進交付的 PNG */
+.cv.export .slot.photo.empty,.cv.export .slot.badge.empty{
+  border:none;background:none;color:transparent;box-shadow:none}
+#empty{color:var(--ui-dim2);font-size:14px;padding:80px 40px;text-align:center;
+       border:2px dashed var(--ui-line2);border-radius:14px}
+
+/* ---------- 右欄：AR 斷行選擇（只有奇數字才有兩種分法可選） ---------- */
+.ar-split{display:flex;align-items:center;gap:6px;margin-top:6px}
+.ar-split button{flex:1;justify-content:center;height:24px;font-size:11px;padding:0}
+.ar-split button.on{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff}
+
+/* ---------- 右欄：人物圖層面板（雙人版才出現） ----------
+   由上而下＝從最上層排到最底層，跟 PS 的圖層面板一致（state 的 photoOrder
+   第一個是最底下，所以畫的時候要反過來）。點一列＝選取那一位（共編器與畫布
+   都跟著切），● 是顯示/不顯示，↑ 是往上疊一層。 */
+.ph-layers{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
+.ph-lay{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:var(--ui-rf);
+        border:1px solid var(--ui-line2);background:var(--ui-surface);cursor:pointer}
+.ph-lay:hover{background:var(--ui-surface2)}
+.ph-lay.on{border-color:var(--ui-accent);background:#37302E}
+.ph-lay .th{width:26px;height:26px;flex:none;border-radius:4px;object-fit:contain;
+        background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/8px 8px}
+.ph-lay .nm{flex:1;min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-lay .tag{font-size:9px;color:var(--ui-dim2);flex:none}
+.ph-lay button{width:22px;height:22px;padding:0;justify-content:center;flex:none;font-size:11px}
+.ph-lay.off .th,.ph-lay.off .nm{opacity:.4}
+
+/* ---------- 右欄：廠商 LOGO 縮圖＋編輯 ---------- */
+.vp-row{display:flex;gap:8px;margin-top:8px}
+.vp-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;
+         background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:var(--ui-rf);
+         padding:6px}
+.vp-item .vp-thumb{width:100%;height:44px;display:flex;align-items:center;justify-content:center;
+         background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/12px 12px}
+.vp-item img{max-width:100%;max-height:100%;object-fit:contain}
+.vp-item button{width:100%;justify-content:center;height:22px;font-size:10px;padding:0 6px}
+
+/* ---------- 右欄：縮圖選擇器（主題底圖／人物框圖素共用同一套積木） ----------
+   一顆 .thumb ＝ 格紋底縮圖 ＋ 標籤；外層 .thumb-grid 只決定幾欄。
+   格紋是為了看得出「去背 PNG 的透明範圍」（圖素）與「還沒選主題」（無主題那顆）。
+   ⚠ 兩個選擇器都用「簽名比對」才重建 innerHTML（見 paintThumbs）：
+   右欄每次狀態改變都會重畫，若每次都重建，主題那格自己的捲動位置會被歸零，
+   打一個字就跳回最上面。 */
+.thumb-grid{display:grid;gap:6px}
+.thumb{display:flex;flex-direction:column;align-items:center;gap:3px;height:auto;padding:4px;
+       background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:var(--ui-rf);cursor:pointer}
+.thumb:hover{border-color:var(--ui-dim2);background:var(--ui-surface2)}
+.thumb.on{border-color:var(--ui-accent);background:#37302E}
+.thumb .th{width:100%;display:flex;align-items:center;justify-content:center;border-radius:3px;
+       background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/8px 8px;overflow:hidden}
+.thumb .th img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.thumb .nm{font-size:9px;line-height:1.1;color:var(--ui-dim);max-width:100%;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb.on .nm{color:var(--ui-text)}
+/* 主題：20 個＋無主題＝21 顆。4 欄＋自己的捲軸，不然會把下面的東西整批推下去
+   （使用者回報右欄太擠，這一格刻意鎖高度）。縮圖用方型版位（608×608，每張約 9KB）。 */
+#themeRow{grid-template-columns:repeat(4,1fr);max-height:234px;overflow-y:auto;padding-right:2px}
+#themeRow .th{aspect-ratio:1/1}
+/* 圖素：5 張 1200×700 的橫圖，3 欄還看得出構圖差異 */
+#stockRow{grid-template-columns:repeat(3,1fr)}
+#stockRow .th{height:36px}
+/* 人物框的兩個模式（圖素／人物照片）：沿用頂列那組 tab 的外觀，只是撐滿欄寬 */
+.viewtabs.full{width:100%}
+.viewtabs.full .vtab{flex:1;padding:0;justify-content:center}
+
+/* ---------- 右欄：人物照片位置/縮放調整（拖曳平移＋滾輪縮放） ----------
+   照片現在可以移出定位框，所以這個預覽也要看得到「跑出框外多少」：
+   外層 .photo-adjust 留 13% 內距當作「框外空間」，裡面的 .photo-adjust-frame
+   才是真正的定位框（虛線，長寬比由 JS 依目前勾選版位的人物框設定）。
+   照片超出虛線框的部分會畫在內距區、超過外層才被裁掉，跟畫布上「超出定位框但
+   仍被版位邊界裁掉」是同一個觀感。 */
+/* 上方留 30px：旋轉把手畫在照片上緣外 26px，而且刻意不被 .photo-adjust 的
+   overflow:hidden 裁掉（才點得到），照片放大時會頂到上面的說明文字。 */
+.photo-adjust-wrap{position:relative;margin-top:30px}
+.photo-adjust{position:relative;width:100%;border-radius:var(--ui-rf);
+              overflow:hidden;cursor:grab;user-select:none;touch-action:none;
+              background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/12px 12px}
+.photo-adjust.grabbing{cursor:grabbing}
+/* 每個人物框各自一個絕對定位的框（位置/大小由 panelLayout() 依預覽版位算），
+   雙人版因此看得到兩人的實際相對位置；目前選取的那一位虛線比較亮。 */
+.photo-adjust-frame{position:absolute;outline:1px dashed rgba(255,255,255,.32)}
+.photo-adjust-frame.on{outline:1px dashed rgba(255,255,255,.9)}
+/* 同 .slot.photo img：尺寸與位置由 photoImgStyle 寫 inline（兩邊共用同一套數學） */
+.photo-adjust img{position:absolute;left:50%;top:50%;object-fit:contain;pointer-events:none}
+.photo-adjust-hint{position:absolute;left:6px;bottom:6px;font-size:10px;line-height:1.2;
+                    color:rgba(255,255,255,.85);background:rgba(0,0,0,.5);
+                    padding:3px 6px;border-radius:5px;pointer-events:none}
+.photo-adjust-zoom{position:absolute;right:6px;bottom:6px;display:flex;gap:4px}
+.photo-adjust-zoom button{width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.3);
+                    background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:1;cursor:pointer;
+                    display:flex;align-items:center;justify-content:center;padding:0}
+
+/* ---------- 畫布上的人物照片變形（選取框＋四角等比縮放＋旋轉把手） ----------
+   .ph-layer 掛在 .bncard（不是 .cv）上並覆蓋 .cv 的範圍：.cv 是 overflow:hidden，
+   把手擺在照片邊緣、旋轉把手還要再往外 26px，掛在 .cv 裡會被裁掉點不到。
+   .ph-ov 自己旋轉（跟照片同角度），把手當它的子節點就自動貼在四角上；
+   .ph-hud 刻意留在外面不旋轉，不然讀數會跟著歪掉看不清楚。 */
+.ph-layer,.ph-layer2{position:absolute;pointer-events:none;z-index:20}
+/* 右欄那層蓋在 .photo-adjust 上，但刻意放在它外面當兄弟節點——.photo-adjust 是
+   overflow:hidden（照片要被裁在框外空間內），把手（尤其框外 26px 的旋轉把手）
+   放進去會被一起裁掉點不到。用不同 class 是因為畫布那層每次 render 都整批 remove。 */
+.ph-layer2{left:0;top:0;right:0;bottom:0}
+.ph-ov{position:absolute;transform-origin:50% 50%;pointer-events:none;
+       outline:1px solid var(--ui-accent);outline-offset:0;
+       box-shadow:0 0 0 1px rgba(0,0,0,.45)}
+.ph-ov i{position:absolute;width:11px;height:11px;margin:-6px;border-radius:2px;
+         background:var(--ui-accent);border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);
+         pointer-events:auto;touch-action:none}
+.ph-ov i.nw{left:0;top:0;cursor:nwse-resize}
+.ph-ov i.ne{left:100%;top:0;cursor:nesw-resize}
+.ph-ov i.sw{left:0;top:100%;cursor:nesw-resize}
+.ph-ov i.se{left:100%;top:100%;cursor:nwse-resize}
+.ph-ov i.rot{left:50%;top:-26px;width:13px;height:13px;margin:-7px;border-radius:50%;
+             background:#fff;border:2px solid var(--ui-accent);cursor:grab}
+.ph-ov .ph-stem{position:absolute;left:50%;top:-26px;width:1px;height:26px;margin-left:-.5px;
+                background:var(--ui-accent);opacity:.8}
+.ph-hud{position:absolute;transform:translate(-50%,0);white-space:nowrap;pointer-events:none;
+        display:flex;align-items:center;gap:7px;font-size:10px;line-height:1;padding:5px 8px;
+        border-radius:6px;background:rgba(0,0,0,.78);color:#fff}
+.ph-hud b{color:var(--ui-accent);font-weight:600;max-width:140px;overflow:hidden;
+          text-overflow:ellipsis}
+.ph-hud .dim{color:rgba(255,255,255,.5)}
+.ph-hud button{pointer-events:auto;height:18px;padding:0 7px;font-size:10px;line-height:1;
+               border-radius:5px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);
+               color:#fff;cursor:pointer}
+.ph-hud button:hover{background:var(--ui-accent);border-color:var(--ui-accent)}
+
+/* 「套用至所有版位」是會蓋掉別人手動成果的動作，用警示黃跟其他按鈕區分開 */
+#btnPhotoApplyAll{background:var(--ui-warn);border-color:var(--ui-warn);color:#2A1D07;font-weight:600}
+#btnPhotoApplyAll:hover:not(:disabled){background:#F2AE47;border-color:#F2AE47}
+.ph-confirm{position:fixed;inset:0;z-index:100060;background:rgba(0,0,0,.62);
+            display:flex;align-items:center;justify-content:center}
+.ph-confirm[hidden]{display:none}
+.ph-confirm-box{width:min(92vw,380px);background:var(--ui-panel);border:1px solid var(--ui-line2);
+                border-radius:12px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.ph-confirm-box h4{margin:0 0 8px;font-size:14px;color:var(--ui-text)}
+.ph-confirm-box p{margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--ui-dim)}
+.ph-confirm-box p b{color:var(--ui-warn)}
+.ph-confirm-acts{display:flex;flex-direction:column;gap:6px}
+.ph-confirm-acts button{width:100%;justify-content:center;height:32px}
+.ph-confirm-acts button.danger{background:var(--ui-warn);border-color:var(--ui-warn);
+                               color:#2A1D07;font-weight:600}
+.ph-confirm-acts button.danger:hover{background:#F2AE47;border-color:#F2AE47}
+
+/* ---------- 總覽模式：contact sheet ---------- */
+.ov-grid{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-content:flex-start;width:100%}
+.ovcard{cursor:pointer;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:10px;
+        padding:8px;display:flex;flex-direction:column;align-items:center;gap:6px;transition:.12s}
+.ovcard:hover{border-color:var(--ui-accent);transform:translateY(-2px)}
+.ovcap{font-size:10px;color:var(--ui-dim);text-align:center;line-height:1.3;white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis;max-width:200px}
+/* 縮圖外殼：裡面的 .cv 是原生尺寸＋transform:scale，transform 不佔版面，
+   所以外殼要自己撐出縮小後的尺寸，並把溢出的部分裁掉。 */
+.ovthumb{position:relative;overflow:hidden;border-radius:6px;flex:none}
+.ovthumb > .cv{position:absolute;left:0;top:0;transform-origin:0 0}
+</style>
+
+<header>
+  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
+  <h1>BN 編輯器<small>定位版</small></h1>
+  <div class="viewtabs">
+    <button class="vtab" id="tabOverview">總覽</button>
+    <button class="vtab" id="tabCanvas">畫布</button>
+  </div>
+  <label class="btn">📄 匯入工單文案<input type="file" id="fWo" accept=".xlsx"></label>
+  <label class="btn">📦 上傳素材包<input type="file" id="fAssets" webkitdirectory multiple></label>
+  <button id="btnUndo" title="復原 (Ctrl+Z)">↶</button>
+  <button id="btnRedo" title="重做 (Ctrl+Shift+Z)">↷</button>
+  <span class="spacer"></span>
+  <button class="primary" id="btnDownload">⬇ 下載整包</button>
+  <span class="hint" id="src"></span>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <div class="pane-head">版位<span class="mini" id="cntBoards"></span></div>
+    <div class="pane-acts">
+      <button id="selAll">全選</button>
+      <button id="selNone">全不選</button>
+    </div>
+    <div class="pane-scroll" id="boards"></div>
+  </aside>
+
+  <section id="stage">
+    <div id="world"></div>
+    <div class="zoombar" id="zoombar"></div>
+  </section>
+
+  <aside class="right-panel">
+    <div class="pane-scroll">
+      <div class="sg">
+        <div class="sg-label">文案<span class="mini hint" style="font-size:10px">連動所有版位</span></div>
+        <div class="sg-body">
+          <div class="field">
+            <div class="field-label"><span>主標</span><span class="cc" id="ccTitle"></span></div>
+            <input class="fi" id="inTitle" type="text">
+          </div>
+          <div class="field">
+            <div class="field-label"><span>副標</span><span class="cc" id="ccSub"></span></div>
+            <input class="fi" id="inSub" type="text">
+          </div>
+          <div class="field">
+            <div class="field-label"><span>CTA 文字</span><span class="cc" id="ccCta"></span></div>
+            <input class="fi" id="inCta" type="text">
+          </div>
+          <div class="field">
+            <div class="field-label"><span>小字</span><span class="cc" id="ccSmall"></span></div>
+            <input class="fi" id="inSmall" type="text" placeholder="部分版位才有（如日期時間），沒有就留空">
+          </div>
+          <div class="field">
+            <div class="field-label"><span>AR 文案</span><span class="cc" id="ccAr"></span></div>
+            <input class="fi" id="inAr" type="text" placeholder="AR 版位專用（工單「AR案型」），5 字內；4 字以上排兩排，含 $ 金額不斷行">
+            <div class="ar-split" id="arSplitRow" style="display:none">
+              <span class="mini hint">斷行</span>
+              <button type="button" data-arsplit="less"></button>
+              <button type="button" data-arsplit="more"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sg">
+        <div class="sg-label">主題背景</div>
+        <div class="sg-body">
+          <div class="field">
+            <div class="field-label"><span>底圖主題</span><span class="mini hint" id="themeCur"></span></div>
+            <div class="thumb-grid" id="themeRow"></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><span>廠商 LOGO</span><span class="mini hint" id="vendorCount"></span></div>
+            <div class="mini hint">用頂列的「📦 上傳素材包」匯入</div>
+            <div id="vendorPreview" class="vp-row"></div>
+            <button id="btnClearVendor" style="width:100%;justify-content:center;margin-top:6px">清除廠商 LOGO</button>
+          </div>
+          <div class="field">
+            <div class="field-label"><span>蝦皮直播 LOGO</span></div>
+            <label class="mini" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="chkLive"> 在 LOGO 條顯示蝦皮直播
+            </label>
+            <div class="mini hint" style="margin-top:6px;line-height:1.5">
+              預設不顯示。工單若有「蝦皮直播」欄且填 Y／是，匯入時會自動打開。
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 人物框自己一組（使用者 2026-09-16：不要跟主題/LOGO 全擠在一塊）。
+           「圖素」與「人物照片」是兩個模式，用上面那排鈕切換；下面的位置調整兩個模式共用。 -->
+      <div class="sg">
+        <div class="sg-label">人物框</div>
+        <div class="sg-body">
+          <div class="viewtabs full" id="frameTabs" style="margin-bottom:8px">
+            <button type="button" class="vtab" data-fmode="stock">圖素</button>
+            <button type="button" class="vtab" data-fmode="photo">人物照片</button>
+          </div>
+          <div class="mini hint" id="frameNow" style="margin-bottom:8px"></div>
+          <div id="paneStock">
+            <div class="thumb-grid" id="stockRow"></div>
+            <div class="mini hint" style="margin-top:6px;line-height:1.5">
+              點縮圖套進所有版位。圖素放在 <b>img/圖素版/</b>，
+              位置用設計端另外標的<b>圖素定位框</b>（照插畫實際大小貼合）。
+            </div>
+          </div>
+          <div id="panePhoto" style="display:none">
+            <div class="ph-layers" id="phLayers" style="display:none"></div>
+            <label class="btn" style="width:100%;justify-content:center">🖼 上傳照片<span id="fPhotoWho"></span><input type="file" id="fPhoto" accept="image/*"></label>
+            <button id="btnEditPhoto" style="width:100%;justify-content:center;margin-top:6px">✎ 去背／裁切編輯</button>
+            <button id="btnClearPhoto" style="width:100%;justify-content:center;margin-top:6px">清除這張照片</button>
+            <button id="btnAddPerson2" style="width:100%;justify-content:center;margin-top:10px">+ 新增人物2（左右並排）</button>
+            <div class="mini hint" style="margin-top:6px;line-height:1.5">
+              兩個都是自己上傳的照片才會自動左右分割（重疊約 8%）：<b>人物1在左</b>、
+              <b>人物2在右</b>，預設<b>人物1的圖層在上面</b>（可在上面的圖層列用 ↑ 調整）。
+              圖素模式不會拆——插畫本身已經是完整構圖。
+            </div>
+          </div>
+          <label class="fl" id="pvBoardRow" style="display:none;margin:6px 0 0">
+            <span class="mini hint">共編預覽版位</span>
+            <select id="selPvBoard" style="width:100%;margin-top:4px"></select>
+          </label>
+          <div id="photoAdjustWrap" class="photo-adjust-wrap" style="display:none">
+            <div id="photoAdjust" class="photo-adjust"></div>
+            <div id="photoAdjustOv" class="ph-layer2"></div>
+            <div class="photo-adjust-hint" id="photoAdjustHint">整體：拖曳位置・拉四角等比縮放</div>
+            <div class="photo-adjust-zoom">
+              <button type="button" id="photoZoomOut" title="縮小">−</button>
+              <button type="button" id="photoZoomReset" title="重設位置/縮放/角度">⟲</button>
+              <button type="button" id="photoZoomIn" title="放大">＋</button>
+            </div>
+          </div>
+          <div id="photoScope" class="mini hint" style="margin-top:8px;line-height:1.5"></div>
+          <button id="btnPhotoApplyAll" style="width:100%;justify-content:center;margin-top:6px">套用至所有版位</button>
+          <div class="mini hint" style="margin-top:8px;line-height:1.5">
+            上面調的是<b>整體</b>（一次套用到所有版位）；要單獨調某一塊板，切到<b>畫布</b>模式直接點它的人物框。
+          </div>
+        </div>
+      </div>
+      <div class="sg">
+        <div class="sg-label">說明</div>
+        <div class="sg-body">
+          <div class="hint">文字／CTA 位置都照 PSD 量測值擺放（深藍圓角＝CTA）。
+          格紋底＝未選主題時的視覺佔位（KV／講師視覺本階段不處理，選了主題會換成底圖）。<br><br>
+          <b>總覽</b>：不用捲動看到所有勾選的版位縮圖，點一下放大檢視。<br>
+          <b>畫布</b>：可縮放/平移，仔細檢查或編輯用。<br><br>
+          <b>LOGO 位置</b>：依主題而定——有的主題是固定橫排（蝦大／蝦皮直播＋分隔線＋
+          最多 3 個廠商 LOGO 位，由素材包自動帶入，等距等比排列），有的主題改成圍繞
+          人物照片的圓圈徽章，數量/位置各版位自己決定。橫式版位齊左、直式／方形版位置中。<br>
+          蝦皮／直播 LOGO 有橘、白兩版，依主題底色自動挑（工單配色表指定）。<br><br>
+          <b>人物框</b>：所有主題都有人物框，預設就放第一張<b>圖素</b>（img/圖素版/ 的
+          1200×700 去背 PNG）。點右欄的縮圖換一張，或改上傳自己的照片蓋掉；
+          換圖素／換照片時，位置縮放角度都會一起歸零。<br>
+          <b>兩種來源共用同一個<b>圖素定位框</b></b>（照插畫實際大小標的框，比公版人物框更貼合，
+          下緣超出版位是設計上的出血）：圖素貼的是「插畫實際看得到的範圍」（去背 PNG 四周的
+          透明邊不算）；自己上傳的照片沒有已知的透明邊界可貼合，整張 contain 進同一個框。<br>
+          新增圖素＝把 png 丟進 img/圖素版/，再在 packs/bn/photo-assets.js 加一行。<br><br>
+          <b>雙人上傳照片</b>：按「人物照片」分頁的「+ 新增人物2」，兩邊都上傳自己的照片
+          後會自動把圖素定位框拆成左右兩塊（重疊約 8%）——<b>人物1在左、人物2在右</b>，
+          預設<b>人物1的圖層在上面</b>。圖素模式不會拆，插畫本身已經是完整構圖。<br><br>
+          <b>位置調整（兩層）</b>：套進來的時候整張固定在定位框內（不會被裁到）。<br>
+          ① <b>整體</b>＝右欄那個小預覽框，一次套用到所有版位。<br>
+          ② <b>單一版位</b>＝切到畫布模式直接點該版位的人物照片。<br>
+          兩邊的操作完全一樣：<b>拖曳</b>移動、拉<b>四角</b>等比縮放（固定對角，跟 PS
+          自由變形一樣）、拉<b>上方圓把手</b>旋轉（按住 Shift 吸附 15°），
+          倍率 20%～500%。右欄另有 ±／⟲ 按鈕可以微調與重設。<br>
+          （<b>不用滾輪縮放</b>——右欄捲動時太容易誤觸，已改成只靠選取框與按鈕。）<br>
+          單獨調過的版位<b>不會</b>再被①的整體調整覆蓋；要讓它跟回整體，按選取框下方的
+          ⟲ 還原，或按右欄黃色的「套用至所有版位」再選「覆蓋手動調整的版位」。<br><br>
+          兩層都<b>不受定位框限制</b>——可以放大到超出框、也可以拖到框外，只受版位邊界裁切。<br><br>
+          小預覽框裡的虛線＝定位框，虛線外那圈是框外空間，方便看照片溢出多少；
+          虛線與畫布上的選取框都只是編輯輔助，不會印進下載的圖。<br><br>
+          字數為軟性提示：超過仍可輸入，只是提醒版面會被撐開。</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="ph-confirm" id="phConfirm" hidden>
+  <div class="ph-confirm-box">
+    <h4>套用至所有版位</h4>
+    <p>有 <b id="phConfirmN">0</b> 個版位在畫布上單獨調整過（位置／縮放／角度）。<br>
+       要連這些版位一起覆蓋成目前的整體設定嗎？</p>
+    <div class="ph-confirm-acts">
+      <button id="phcAll" class="danger">覆蓋手動調整的版位</button>
+      <button id="phcSafe">僅覆蓋未手動調整版位</button>
+      <button id="phcCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span id="footMode"></span>
+  <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原（文案、版位勾選、主題、廠商LOGO與人物照片）</span>
+  <span id="footSrc"></span>
+</footer>
+<div id="msg"></div>
+
+<script>
+(function () {
+  'use strict';
+  const XD = window.XD, $ = XD.$, esc = XD.esc;
+  const PACK = XD.packs.bn;
+  const STORE = 'bn_copy_v1';
+  /* 人物照片單獨一個 key。理由：1800px 的去背 PNG 光 dataURL 就 1～2MB，
+     跟文案/勾選/主題塞在同一筆時只要超過瀏覽器額度，setItem 會整筆丟
+     QuotaExceededError——而 XD.store.set 是靜靜吞掉例外的，結果就是「連文案跟
+     勾選都沒被存下來」而且完全沒有跡象。拆開存之後，照片存不下最多就是照片沒存到，
+     其餘狀態照常，而且會明確跳一則提示，不會無聲失敗。 */
+  const PHOTO_STORE = 'xd_bn_photo_v1';
+  const MAX = { title: 8, sub: 7, cta: 4, small: 12, ar: 5 };
+  /* 文字字級＝定位框高 × 這個比例。定位框位置與大小都不動，只有字變小；
+     .slot 本來就 align-items:center，所以字會留在框的垂直中線上＝往中心縮。
+     小字一直是 85%；主標 2026-09-11 由 100% 改成 90%；
+     副標同日先改 90%、使用者看過後又改回 100%（滿版＝框高）。 */
+  const TITLE_FS_RATIO = 0.9, SUB_FS_RATIO = 1, SMALL_FS_RATIO = 0.85;
+  /* 廠商 LOGO 的**上限**（2026-09-11 由 2 → 3，使用者指定），不是固定格數——
+     實際畫幾格看上傳了幾顆，0 顆就連分隔線都不畫（見 logoRowHTML）。
+     每格 flex:1 1 0 等分剩餘寬度＝等距，圖 object-fit:contain＝等比不變形。 */
+  const VENDOR_SLOTS = 3;
+  /* LOGO 條各元素的間距＝LOGO 條高度 × 這個比例。
+     演進過程（兩次都是「看起來不一致」，但成因不同）：
+     ① 最早是 CSS 的 gap:6%——百分比相對**整條帶的寬度**算，而帶寬與 LOGO 大小無關
+        （同樣 57px 高的框，Shopee HBN 寬 449、SUBN 方型 615），所以窄版位 11px、
+        LINE 撐到 48px，鬆緊差很多。
+     ② 改成絕對值 8→12px 後每塊板數字一致，但**相對於 LOGO 本身**又不一致了：
+        12px 在 Seller EDM_300x250（LOGO 高 25px）佔了 48%，在 LINE（104px）只佔 12%，
+        小版位看起來就特別鬆。
+     ③ 現在綁 LOGO 高度：間距會跟旁邊的 LOGO 一起縮放，視覺比例才一致。
+     比例錨在「LOGO 高 55px 的版位剛好是 12px」——那幾塊（Shopee HBN／image Popup／
+     SUBN 方型／APP-Marketing／課程首圖長型）正是使用者看過覺得剛好的，數值不變。
+     innerH 已經含倍率，所以這裡不用再乘 s。 */
+  const LOGO_GAP_RATIO = 12 / 55;
+  /* 蝦皮購物 LOGO 畫多大（相對 PSD 量到的「蝦皮購物LOGO範圍」框）。
+     2026-09-11 使用者指定縮到 80%——**定位框本身不動**，只有圖畫小，
+     而且是往框的中心縮（ink 路徑用 left/top:50%＋負 margin 置中，
+     退回路徑靠 .slot 的 flex 置中），所以四邊留白平均、不會偏一邊。 */
+  const SHOPEE_LOGO_RATIO = 0.8;
+  /* CTA 圓角：使用者確認是「固定半徑」的設計值（不是膠囊、也不是按鈕高度的比例），
+     所以它是原生尺寸下的絕對 px，每塊板都一樣，畫布上再乘倍率。改設計只要改這一個數字。 */
+  const CTA_RADIUS = 8;
+  /* CTA 箭頭在 CSS 裡是 margin-left:.32em ＋ border-left:.42em（width:0 的三角形），
+     所以它會吃掉 0.74em 的寬度——算「文字塞不塞得下」時必須把它算進去。 */
+  const CTA_ARROW_EM = 0.32 + 0.42;
+  /* 環繞徽章的白框與陰影、LOGO 分隔線的圓角與陰影，也都是原生尺寸下的絕對 px。 */
+  const BADGE_RING = 3;
+  const DIV_RADIUS = 1;
+  /* 不放廠商 LOGO 的版位：只畫固定 LOGO，不接分隔線也不留廠商 LOGO 位。
+     跟主題無關，是版位本身的性質。
+     ⚠ 2026-09-11 清空：原本點名的 Seller Center－Homepage-Banner_360x186
+     使用者改口要它照畫（它的 LOGO 框是 331×41、長寬比 8.1，跟 Shopee HBN 的
+     7.9 差不多，寬度本來就夠）。名單留著當機制，之後要排除某塊板加一行即可。 */
+  const NO_VENDOR_BOARDS = [];
+  /* 這些版位的蝦皮／直播 LOGO 固定用白版，不跟主題的 logoColor 走（使用者指定）。
+     跟 BOARD_FIXED_COLORS 同一種「版位本身的性質蓋過主題設定」的做法。 */
+  const BOARD_FIXED_LOGO_COLOR = {
+    'Seller Center－APP-Marketing banner_1200×346': 'white',
+  };
+  /* 這塊板不管選哪個主題，文案配色一律固定——BN新工單「BN主題文案配色」
+     分頁明講的規則（黑底播放鍵樣式的CTA，跟其他版位的淺色藥丸CTA本來就不同）。
+     優先序高於主題色與版位自帶的 PSD 色（見 colorsFor()／ctaHTML()）。 */
+  const BOARD_FIXED_COLORS = {
+    'Seller Center－image Popup_800x720': {
+      title: '#ffffff', small: '#ffffff', sub: '#ffeb00', ctaBg: '#000000', ctaText: '#ffffff'
+    }
+  };
+  /* 文字/CTA 顏色優先序：這塊板的固定色 > 目前主題色。主題A／B原本就是
+     「整個主題一套色」，這裡多一層固定色只影響上面點名的那塊板。 */
+  function colorsFor(st, boardId) {
+    return BOARD_FIXED_COLORS[boardId] || (themeFor(st) && themeFor(st).colors) || null;
+  }
+  /* 版位下方的「微笑遮罩」（2026-09-17 使用者指定；色號來自 蝦大BN新工單.xlsx
+     「BN主題文案配色」分頁的「下方半弧底色」欄，見 themes.js 的 colors.arc——
+     20 個主題已逐一與工單比對過，0 個不符，所以這次只做幾何、不動色票）。
+     只有這兩塊板有：Shopee DDC_531×792（使用者口語稱「HBN」——這塊板的畫布高
+     792px 才裝得下 670 這個位置；同名的「Shopee HBN_1200x360」只有 360px 高，
+     落不進去，已與使用者確認過）與 LPBN_1200x550。
+
+     形狀不是推估的：`#BN主題/主題X/` 的完稿參考圖本來就畫了這塊遮罩，是用
+     「完稿 vs 空圖」逐欄位掃出邊界再擬合二次曲線量出來的（DDC 在 16 個主題、
+     LPBN 在 12 個主題都有，各主題之間一致 ±2px、擬合殘差 <2.4px ⇒ 它是固定的
+     設計元素，不是逐主題各畫一次）。先前三個做錯的版本（中間凸起的山丘／兩側
+     頂滿中間下凹的硬邊拼接／radial-gradient 柔光暈）都是在「只有 CSS 可用」的
+     前提下硬湊的；實測 html2canvas 會畫 inline SVG 之後就不需要那些權宜做法。
+
+     三個數字都是原生 px、未乘倍率，直接對應一條二次貝茲（數學上就是拋物線）：
+       yL／yR＝曲線在版位最左／最右緣的 y；ctrlY＝控制點的 y（控制點 x 固定在
+       版位水平中央）。曲線＝ M0,yL Q w/2,ctrlY w,yR，其下填滿到版位底邊。
+       DDC  左右等高（對稱），最低點 (265, 699)，比兩側低 27px。
+       LPBN 左右**不等高**（521 / 487，整條微微傾斜），最低點 (450, 540)——
+            這是量出來的設計原樣，不是量歪，所以刻意不強制對稱。
+     舊版只存一個數字（DDC 670／LPBN 485），剛好就是各自「高的那一側」，與新量
+     的 672／487 相差 2px 以內，所以這不是改設計，是把同一條曲線的三個點補齊。
+
+     渲染順序見 boardInnerHTML()——排在人物/圖素圖層之後、文字/LOGO/CTA 之前，
+     蓋住人物下半身但不擋住文字（這也是完稿圖本身的層序）。 */
+  const ARC_BOARDS = {
+    'Shopee DDC_531×792': { yL: 672, yR: 672, ctrlY: 726 },
+    'LPBN_1200x550': { yL: 521, yR: 487, ctrlY: 572 },
+  };
+
+  /* 公版定位只有一份（使用者 2026-09-16：「所有主題的定位先統一用 主題公版定位 New」）。
+     New 版的人物框是**一個**「雙人人物框」（長寬比約 1.70），框裡放一張 1200×700 的
+     圖素——圖素本身就畫好了一人或兩人，不再是「人物1／人物2」兩個獨立框。
+     先前並存的單人版／雙人版與右欄那個「人物版位」切換都已移除
+     （來源資料夾仍在 主題JSON/，真要回頭比較就重跑 gen_bn_master_placements.py）。
+     這層 PLACEMENT_SETS 留著是因為 photoSlotCount()/placementFor() 都靠它取資料，
+     而且之後真要再並存一份定位時只要多加一行。 */
+  const PLACEMENT_SETS = {
+    master: { name: '公版（雙人人物框）', map: () => XD.packs.bnMasterPlacements || {} },
+  };
+  const DEFAULT_SET = 'master';
+  function placementSetId(st) {
+    return PLACEMENT_SETS[st && st.photoSet] ? st.photoSet : DEFAULT_SET;
+  }
+  /* 人物框一律當陣列看（單人版長度 1），渲染端不為「一個人」跟「兩個人」分兩條路。
+     photo（單數）是舊欄位，留著當防手改過的舊檔的保險。 */
+  function photoBoxes(p) {
+    if (!p) return [];
+    if (p.photos && p.photos.length) return p.photos;
+    return p.photo ? [p.photo] : [];
+  }
+  /* 這個定位版最多幾個人物框＝右欄要開幾個人物槽。
+     公版資料本身只有一個「雙人人物框」，但使用者可以按「+ 新增人物2」手動多開一槽——
+     那一槽的框不是公版量出來的，是程式把公版那個框即時拆成左右兩塊（見 twoPersonActive／
+     splitDuoFrame），所以槽數要看 state.photos 的長度，不能只看公版資料。上限鎖在 2
+     （2026-09-17 使用者指定的規則只講了兩人：人物1左／人物2右）。 */
+  function photoSlotCount(st) {
+    const M = PLACEMENT_SETS[placementSetId(st)].map();
+    let n = 0;
+    Object.keys(M).forEach(id => { n = Math.max(n, photoBoxes(M[id]).length); });
+    return Math.max(n, Math.min((st.photos || []).length, 2));
+  }
+  const NOPHOTO_MAP = {};
+  function placementsFor(setId, noPhoto) {
+    const M = PLACEMENT_SETS[setId].map();
+    if (!noPhoto) return M;
+    if (!NOPHOTO_MAP[setId]) {
+      const m = {};
+      Object.keys(M).forEach(id => {
+        m[id] = Object.assign({}, M[id], { photo: null, photos: null });
+      });
+      NOPHOTO_MAP[setId] = m;
+    }
+    return NOPHOTO_MAP[setId];
+  }
+  function placementFor(st, boardId) {
+    const th = themeFor(st);
+    return placementsFor(placementSetId(st), !!(th && th.noPhoto))[boardId] || null;
+  }
+
+  /* ============ 人物框圖素（img/圖素版/） ============
+     使用者 2026-09-16 指示「圖片預設直接套用進去人物框」＋「做成縮圖可以選擇圖素」。
+     所以人物框一開始就有東西（不用先上傳），右欄的縮圖列隨時換一張，也仍然可以
+     上傳自己的照片蓋掉。清單是手維護的（瀏覽器讀不到資料夾），見 photo-assets.js。
+     ⚠ 這個 const 刻意放在「狀態」之前：initial 的物件字面值在 script 評估時就會
+     讀到 STOCK，放在後面會 TDZ（Cannot access before initialization），整頁掛掉。 */
+  const STOCK = XD.packs.bnPhotoAssets || { dir: '', defaultId: '', items: [] };
+  function stockItems() { return STOCK.items || []; }
+  function stockUrl(it) { return it ? STOCK.dir + it.file : ''; }
+  function stockItem(id) { return stockItems().filter(x => x.id === id)[0] || null; }
+  function defaultStockUrl() { return stockUrl(stockItem(STOCK.defaultId) || stockItems()[0]); }
+  /* 這個 url 是哪一張圖素（不是圖素就回 null）＝縮圖列要標哪一顆是目前套用的 */
+  function stockIdOf(url) {
+    const it = stockItems().filter(x => stockUrl(x) === url)[0];
+    return it ? it.id : null;
+  }
+  /* 一個乾淨的人物槽。刻意用字面值、不引用下面的 EMPTY_PHOTO——那是 const，
+     在 initial 評估的時候還沒初始化（同上 TDZ 理由）。
+     ownUrl／stockId＝「圖素」「人物照片」兩個模式各自記住的最後內容（見下方
+     frameTabs 的切換邏輯），讓誤按圖素縮圖之後還切得回原本的人物照片。 */
+  function freshPhoto(url) {
+    return { url: url || '', zoom: 1, x: 0, y: 0, r: 0, boards: {},
+             ownUrl: '', stockId: stockIdOf(url) || '' };
+  }
+
+  /* ---- 人物框統一改用「圖素定位框」（2026-09-17 使用者指示：把人物版本改成跟圖素版一樣的定位框）----
+     圖素是「1200×700 的畫布裡放一張沒填滿的插畫」——墨迹只佔畫布寬 40~62%、
+     四周是透明邊。公版的人物框（1.70＝圖素**畫布**比例）是照這張畫布畫的，
+     所以不管框裡放的是圖素還是使用者自己上傳的照片，都改成套用
+     packs/bn/stock-placements.js 的「圖素定位框」（長寬比 1.10）——
+     這才是「插畫本身該佔的範圍」，不是畫布留白後縮水的範圍。
+     兩種來源的差別只剩貼合方式：
+       圖素           → 墨迹 contain（貼合插畫的透明邊界，見 slotInk）
+       自己上傳的照片 → 整張 contain（一般照片沒有已知的透明邊界可貼合）
+     ⚠ 墨迹邊界是開機用 canvas 量 alpha（measureLogoInk），量不到就退回整張 contain
+     ——插畫會偏小但不會壞掉。BN 本來就要求用 http 開（file:// 下 canvas 會 tainted）。 */
+  function stockFrame(boardId) { return (XD.packs.bnStockPlacements || {})[boardId] || null; }
+  function slotIsStock(st, i) { return !!stockIdOf(photoUrl(st, i)); }
+  /* ---- 雙人上傳照片：把單一人物框拆成左右兩塊（2026-09-17 使用者指示） ----
+     使用者的規則：①人物1在左、人物2在右 ②人物1的圖層在人物2上面。
+     只有「兩邊都是自己上傳的照片」才拆分——圖素本身已經是一張完整插畫（可能已經
+     畫了一或兩個人），從中間切開只會把構圖切爛；圖素永遠只吃 slot 0 的整個框。
+     重疊比例落在使用者指定的 5~10% 之間，取中間值 8%。高度不切——兩人都用整框的
+     高度，只在寬度方向重疊，比較符合真人半身/全身照的構圖。 */
+  const DUO_OVERLAP = 0.08;
+  function twoPersonActive(st) {
+    return !!(photoUrl(st, 0) && photoUrl(st, 1) &&
+              !slotIsStock(st, 0) && !slotIsStock(st, 1));
+  }
+  function splitDuoFrame(box) {
+    const w = box[2] * (1 + DUO_OVERLAP) / 2;
+    return [
+      [box[0], box[1], w, box[3]],
+      [box[0] + box[2] - w, box[1], w, box[3]],
+    ];
+  }
+  /* 這個槽在這塊板上實際用哪個框。圖素定位框一塊板只有一個，所以「這個框」永遠只有一份；
+     雙人上傳時程式即時把它拆成左右兩塊給 slot 0／1 各用一塊，不是公版資料本身多了一個框。 */
+  function photoBoxAt(st, i, boardId) {
+    if (i === 0 || i === 1) {
+      const primary = stockFrame(boardId) || photoBoxes(placementFor(st, boardId))[0] || null;
+      if (!primary) return null;
+      if (twoPersonActive(st)) return splitDuoFrame(primary)[i];
+      return i === 0 ? primary : null;
+    }
+    return photoBoxes(placementFor(st, boardId))[i] || null;
+  }
+  /* 這個槽要不要走墨迹貼合＝它是圖素、而且墨迹邊界量到了 */
+  function slotInk(st, i) {
+    if (!slotIsStock(st, i)) return null;
+    const ink = LOGO_INK[photoSrc(photoUrl(st, i))];
+    return (ink && ink.fillW > 0.02 && ink.fillH > 0.02) ? ink : null;
+  }
+
+  /* ============ 狀態（進歷史的只有這三段＋勾選） ============ */
+  /* 有沒有內容可畫，看公版定位（全部主題共用同一份，見 master-placements.js）；
+     版位本身（PACK.boards）只剩 id/w/h 結構性資訊，不帶 title/logo/cta。 */
+  function hasContent(boardId) {
+    const p = (XD.packs.bnMasterPlacements || {})[boardId];
+    return !!(p && (p.title || p.sub || p.logo || p.cta || p.ar));
+  }
+  const saved = XD.store.get(STORE, null);
+  /* PHOTO_STORE 存的是「陣列」，每個人物槽一格：
+       舊格式（2026-09-16 前）＝陣列元素直接是 url 字串。
+       新格式（2026-09-17 起）＝陣列元素是 {u, o}——u＝目前框裡的內容（跟以前一樣），
+       o＝「圖素／人物照片」切分頁要記住的另一邊，**只在它跟 u 不同時才存**（大多數
+       時候使用者正在看的就是自己上傳的那張，o 會跟 u 一模一樣，重複存一份等於白白
+       多佔一倍的 localStorage 額度，見下面 save() 的說明）。兩種格式都要吃得下，
+       不然使用者重新整理就會掉照片。 */
+  let savedPhotos = [], savedOwnPhotos = [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(PHOTO_STORE) || 'null');
+    const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    savedPhotos = arr.map(x => (x && typeof x === 'object') ? (x.u || '') : (x || ''));
+    savedOwnPhotos = arr.map(x => (x && typeof x === 'object') ? (x.o || '') : '');
+  } catch (e) { savedPhotos = []; savedOwnPhotos = []; }
+  /* 舊存檔的照片狀態是「一張 personPhoto ＋ 一組全域變形 ＋ photoBoards」，
+     遷移成 photos[0]；使用者 2026-09-14 指示兩個人要能各自獨立調整，所以
+     變形參數跟著每一張走，不再是全域共用一組。
+     ownUrl／stockId 是這輪（2026-09-17）才加的欄位，舊存檔不會有——照目前的
+     url 是不是圖素回填成對應那一邊，讓舊存檔不用重新上傳/選圖就能吃到
+     「切分頁自動換回原本內容」這個修正（見下面 frameTabs 的說明）。 */
+  function backfillPhotoSides(p) {
+    if (!p.ownUrl && !p.stockId && p.url) {
+      const sid = stockIdOf(p.url);
+      if (sid) p.stockId = sid; else p.ownUrl = p.url;
+    }
+    return p;
+  }
+  function migratePhotos(st) {
+    if (Array.isArray(st.photos)) {
+      return st.photos.map((p, i) => backfillPhotoSides(Object.assign(
+        { url: '', zoom: 1, x: 0, y: 0, r: 0, boards: {}, ownUrl: '', stockId: '' }, p,
+        { url: savedPhotos[i] || (p && p.url) || '',
+          ownUrl: savedOwnPhotos[i] || (p && p.ownUrl) || '' })));
+    }
+    return [backfillPhotoSides({
+      url: savedPhotos[0] || st.personPhoto || '',
+      zoom: st.photoZoom == null ? 1 : st.photoZoom,
+      x: st.photoPosX || 0, y: st.photoPosY || 0, r: st.photoRot || 0,
+      boards: st.photoBoards || {}, ownUrl: savedOwnPhotos[0] || '', stockId: '',
+    })];
+  }
+  const initial = saved && saved.title != null
+    ? (function () {
+        const st = Object.assign({ arText: '', arSplit: 'less',
+                                   photoSet: DEFAULT_SET, photoOrder: [] }, saved);
+        st.photos = migratePhotos(st);
+        /* 2026-09-16 起人物框預設放圖素。舊存檔沒有 stockInit 旗標，所以「開這一版的
+           第一次」把預設圖素放進去；之後使用者自己換掉或清掉都記在存檔裡，不會再被
+           蓋回來（沒有這個旗標的話，清掉照片後重新整理又會自己冒出來，像工具壞了）。 */
+        if (!st.stockInit) {
+          st.stockInit = true;
+          if (!(st.photos || []).some(ph => ph && ph.url)) st.photos = [freshPhoto(defaultStockUrl())];
+        }
+        /* 舊欄位遷移完就拿掉，免得兩份狀態並存、之後看不出哪個才是真的 */
+        delete st.personPhoto; delete st.photoZoom; delete st.photoPosX;
+        delete st.photoPosY; delete st.photoRot; delete st.photoBoards;
+        return st;
+      })()
+    : {
+    title: '主標文案', sub: '副標文案', cta: '報名去', small: '',
+    /* AR 版位不跟其他版位共用文案（工單是獨立一格「AR案型」），上下兩排、共 5 字內。
+       arSplit＝奇數字時上排要拿少的('less'，例如 5 字＝上2下3)還是多的('more'，上3下2)。 */
+    arText: '', arSplit: 'less',
+    on: PACK.boards.filter(b => hasContent(b.id)).map(b => b.id),
+    theme: '', vendorLogos: [],
+    /* 蝦皮直播 LOGO 預設不畫（使用者 2026-09-11 指示：工單有讀到才要）。
+       工單多一列「蝦皮直播」填 Y 會打開，右欄也有手動開關。 */
+    liveLogo: false,
+    /* photos＝人物框的圖陣列（公版定位目前只有一個「雙人人物框」，所以長度 1；
+       多框的定位資料一進來就會自動多開槽，見 photoSlotCount()）。
+       每一張各自帶 url ＋ 一組整體設定（zoom/x/y/r，右欄小預覽框調的，套用到所有版位）
+       ＋ boards（逐版位的手動調整，畫布上直接拖／縮／轉出來的）。
+       有 boards[id] 的版位就不再跟著該張的整體設定走——見 photoTFor()。
+       url 可以是上傳的 dataURL，也可以是圖素的相對路徑（見 photoSrc()）；
+       預設就放第一張圖素，使用者不用先上傳任何東西。
+       photoSet＝用哪一份公版定位（目前只有 master 一份，見 PLACEMENT_SETS）。
+       photoOrder＝疊放順序（第一個畫在最底下），只影響前後遮擋，不影響
+       哪一張用哪個定位框——見 photoOrderFor()。
+       stockInit＝「預設圖素已經放過了」，見上面舊存檔那一段的說明。 */
+    photos: [freshPhoto(defaultStockUrl())], photoSet: DEFAULT_SET, photoOrder: [], stockInit: true,
+  };
+  const H = XD.createHistory(initial);
+  const S = () => H.getState();
+
+  /* 檢視狀態（縮放/平移/模式）刻意不進歷史——倒回視角或模式會把使用者正在看的東西洗掉 */
+  /* selBoard＝畫布上目前被選取、正在單獨調整人物照片的版位（不進歷史：選取只是視角狀態） */
+  /* frameMode＝右欄「人物框」現在顯示哪一組工具（圖素／人物照片）。
+     開機時跟著框裡實際的東西走：存檔裡是自己上傳的照片就直接開在照片模式，
+     否則（圖素或空的）開在圖素模式。 */
+  const view = { mode: 'overview', zoom: 1, x: 0, y: 0, userAdjusted: false,
+                 selBoard: null, selIdx: 0, slot: 0, pvBoard: null,
+                 frameMode: (function () {
+                   const u = ((initial.photos || [])[0] || {}).url || '';
+                   return u && !stockIdOf(u) ? 'photo' : 'stock';
+                 })() };
+  const MIN_Z = 0.1, MAX_Z = 4, STEP = 1.12, FIT_PAD = 40;
+
+  $('#src').textContent = PACK.source;
+  $('#footSrc').textContent = 'packs/bn/placements.js v' + PACK.version + '｜' + PACK.boards.length + ' 版位';
+
+  /* ============ 版位清單 ============ */
+  function paintList() {
+    const st = S();
+    $('#cntBoards').textContent = st.on.length + ' / ' + PACK.boards.length;
+    $('#boards').innerHTML = PACK.boards.map(b => {
+      /* 缺件提示要看「目前選的主題」，不是永遠看主題A——例如 AR 版位只有主題B
+         才有文案框（ar），永遠看主題A 會一直標成「無文字定位」。 */
+      const p = placementFor(st, b.id);
+      const miss = [];
+      if (!p || (!p.title && !p.sub && !p.ar)) miss.push('無文字定位');
+      if (!p || !p.cta) miss.push('無CTA');
+      const on = st.on.indexOf(b.id) >= 0;
+      const sz = b.w + '×' + b.h;
+      return '<label class="bd' + (on ? ' on' : '') + '" title="' + esc(b.id) + '">' +
+        '<input type="checkbox" data-b="' + esc(b.id) + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="nm">' + esc(b.id) + '</span>' +
+        '<span class="meta"><span>' + sz + '</span>' +
+        (miss.length ? '<span class="miss">' + miss.join('・') + '</span>' : '') +
+        '</span></label>';
+    }).join('');
+  }
+  $('#boards').addEventListener('change', e => {
+    const cb = e.target.closest('input[data-b]'); if (!cb) return;
+    const id = cb.dataset.b, st = S();
+    const on = cb.checked ? st.on.concat(id) : st.on.filter(x => x !== id);
+    H.set(Object.assign({}, st, { on }), { key: 'board:' + id });
+  });
+  $('#selAll').onclick  = () => H.set(Object.assign({}, S(), { on: PACK.boards.map(b => b.id) }), {});
+  $('#selNone').onclick = () => H.set(Object.assign({}, S(), { on: [] }), {});
+
+  /* ============ 共用：畫一個版位的定位框 ============ */
+  function slotHTML(cls, box, s, style, text) {
+    if (!box) return '';
+    return '<div class="slot ' + cls + '" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + (box[2] * s) + 'px;height:' + (box[3] * s) + 'px;' + (style || '') + '">' +
+           (text == null ? '' : '<span class="ink">' + esc(text) + '</span>') + '</div>';
+  }
+  /* 主題：依 state.theme 找對應的主題定義（找不到＝沒選主題） */
+  function themeFor(st) {
+    return ((XD.packs.bnThemes && XD.packs.bnThemes.themes) || []).find(t => t.id === st.theme) || null;
+  }
+  /* 定位資料：全部主題共用同一份公版（packs/bn/master-placements.js，來源
+     主題JSON/主題公版定位）。主題之間只差底圖與文案配色，位置一律相同——
+     使用者 2026-09-10 指示，先前「每個主題各一份定位」的做法已經停用。
+     唯一的例外是宣告 noPhoto 的主題（固定視覺的主題1-1~3-4）不畫人物框：
+     同一份公版去掉 photo 之後快取起來（渲染每塊板都會呼叫，不要每次複製）。 */
+  /* packs 裡的圖片路徑一律「相對專案根目錄」（img/…），這頁在 tools/ 底下，
+     所以要補一層 ../。搬動這頁的存放位置時只改這個常數就好。
+     ⚠ 這頁必須用 http(s) 開（部署網址，或本機 python -m http.server）。
+     file:// 底下圖顯示得出來，但畫進 canvas 會 tainted、匯出 PNG 必定失敗。 */
+  const ASSET_BASE = '../';
+  function assetUrl(p) {
+    /* 檔名有空白、全形符號、CJK，url() 與 <img src> 都要先編碼。
+       encodeURI 不會動 #，但專案路徑本身就有 #，補一手比較保險。 */
+    return p ? ASSET_BASE + encodeURI(p).replace(/#/g, '%23') : '';
+  }
+  /* 人物框的圖：上傳來的是 dataURL（直接用），圖素存的是「相對專案根目錄」的路徑
+     （跟 themes.js 的底圖同一套），要走 assetUrl 補相對層級與編碼。
+     匯出（html2canvas）也走同一個函式——離屏節點在同一份文件裡，相對路徑的解析
+     基準一樣是這一頁，所以不用特別處理。 */
+  function photoSrc(url) {
+    const u = String(url || '');
+    if (!u) return '';
+    return /^(data:|blob:|https?:)/.test(u) ? u : assetUrl(u);
+  }
+  /* 底圖：主題底下這個版位有對到圖才換底圖，沒對到就維持原本的格紋佔位。
+     路徑＝themes.js 的 dir + images[版位id]，直接讀 img/ 裡的原始檔，
+     沒有第二份複本——換圖覆蓋檔案、重新整理就好，不用跑任何產生腳本。 */
+  function themeAssetFor(th, boardId) {
+    const fn = th && th.images && th.images[boardId];
+    return fn ? assetUrl((th.dir || '') + fn) : '';
+  }
+  function cvBgStyle(b, st) {
+    const th = themeFor(st);
+    const url = th && themeAssetFor(th, b.id);
+    if (!url) return '';
+    return "background-image:url('" + url + "');background-size:cover;background-position:center;";
+  }
+  /* 直式（方型／近方型）版位在 PSD 裡量出來的主標／副標框，左右留白幾乎對稱——
+     代表設計本來就是置中；橫式長條版位左右留白差很多，是刻意靠左讓右邊留給 LOGO/CTA。
+     用「這個框本身左右是否對稱」判斷，比寫死一份版位清單更準，新版位也不用手動分類。 */
+  function isCentered(box, boardW) {
+    if (!box) return false;
+    const left = box[0], right = boardW - (box[0] + box[2]);
+    return Math.abs(left - right) <= Math.max(6, boardW * 0.02);
+  }
+  /* 蝦皮直播／蝦皮購物兩顆 LOGO 各有橘、白兩版，依主題底色深淺挑一版——哪個主題用
+     哪一版由主題自己宣告（themes.js 的 logoColor，來源是工單「BN主題文案配色」分頁
+     的「蝦皮/直播LOGO顏色」欄），不是靠版位或底圖亮度猜。沒宣告就用白版
+     （工單只列了主題1-1~3-4；主題A/B 沿用原本的白色）。
+     蝦大 LOGO 只有一版——它畫在白色圓形底上，不隨主題變色。 */
+  function logoVariant(st, boardId) {
+    if (boardId && BOARD_FIXED_LOGO_COLOR[boardId]) return BOARD_FIXED_LOGO_COLOR[boardId];
+    const th = themeFor(st);
+    return (th && th.logoColor === 'orange') ? 'orange' : 'white';
+  }
+  /* logo-assets.js 的 live/shopee 是 {white,orange} 物件，xiada 是單一字串——
+     兩種都吃，缺色時退回白版，這樣之後新增顏色也不會整頁炸掉。 */
+  function logoSrc(entry, variant) {
+    if (!entry) return '';
+    return assetUrl(typeof entry === 'string' ? entry : (entry[variant] || entry.white || ''));
+  }
+  /* ---- LOGO 圖案實際範圍（開機量一次） ----
+     設計師匯出的 PNG 常常四周留一圈透明：實測蝦皮直播是 600×600 的畫布裡只有
+     553×341 的圖案、上下各留 130px。而 object-fit:contain 是照「畫布」收斂的，
+     所以留白越多、畫出來的圖案就越小——這就是「直播 LOGO 看起來縮太小」的成因
+     （圖案只佔格子高度的 56.8%）。
+     這裡開機量一次每張 LOGO 的不透明像素邊界，排版改用「圖案」的比例與佔比來算，
+     不是畫布的。好處是不論設計師匯出時留不留白都會對，也不必在 packs 裡維護
+     一組會跟素材漂移的數字（那正是內嵌 base64 時代的維護痛點）。
+     ⚠ 讀像素需要 canvas，所以必須用 http(s) 開；量不到就回 null，
+     排版自動退回「照畫布 contain」＝跟改版前完全一樣的行為，不會壞掉。
+     蝦大 LOGO 刻意不套：它畫在白色圓形裡、靠 .logo-circle 的 76% 內縮留白，
+     那個 76% 是配著現有素材調出來的視覺值，改用圖案邊界會連帶要重調。 */
+  const LOGO_INK = {};
+  function measureLogoInk(src) {
+    return new Promise(resolve => {
+      const im = new Image();
+      im.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = im.naturalWidth; c.height = im.naturalHeight;
+          const g = c.getContext('2d');
+          g.drawImage(im, 0, 0);
+          const d = g.getImageData(0, 0, c.width, c.height).data;
+          let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+          for (let y = 0; y < c.height; y++) {
+            for (let x = 0; x < c.width; x++) {
+              if (d[(y * c.width + x) * 4 + 3] > 8) {
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+              }
+            }
+          }
+          if (x1 < x0 || y1 < y0) return resolve(null);   /* 整張全透明 */
+          const iw = x1 - x0 + 1, ih = y1 - y0 + 1;
+          /* cx/cy＝墨迹中心在畫布裡的位置（0~1）。LOGO 的墨迹本來就置中所以用不到，
+             但圖素不是（例如圖素01 上緣留 5.1%、下緣 0%），要拿來把墨迹搬到框心。 */
+          resolve({ ratio: iw / ih, fillW: iw / c.width, fillH: ih / c.height,
+                    canvasRatio: c.width / c.height,
+                    cx: (x0 + iw / 2) / c.width, cy: (y0 + ih / 2) / c.height });
+        } catch (err) { resolve(null); }   /* file:// 會 tainted，退回畫布模式 */
+      };
+      im.onerror = () => resolve(null);
+      im.src = src;
+    });
+  }
+  /* 廠商 LOGO 也要量（量的是長寬比，拿來當格子的寬度上限，見 logoRowHTML 的說明）。
+     它們是使用者上傳後轉成的 dataURL，同源、不會 tainted，量測一定成功。
+     量到新的才重畫，所以可以安心在每個「廠商 LOGO 換了」的地方呼叫。 */
+  function syncVendorInk() {
+    const urls = (S().vendorLogos || []).filter(u => u && !LOGO_INK[u]);
+    if (!urls.length) return Promise.resolve(false);
+    return Promise.all(urls.map(u => measureLogoInk(u).then(ink => { if (ink) LOGO_INK[u] = ink; })))
+      .then(() => { renderAny(); return true; });
+  }
+  /* 把一張「可能有透明留白」的 LOGO 畫進 box，讓**圖案**剛好 contain 進去。
+     回傳 inline style：圖案的可見尺寸＝ink 撐滿 box，img 本身放大到
+     (ink ÷ 佔比)，多出來的透明邊靠 overflow:hidden 藏掉。
+     用 left/top:50% + 負 margin 置中（不是算好的絕對座標）——這樣即使外層
+     flex 最後把格子拉寬，圖案仍然自己對齊中線。不用 transform：
+     html2canvas 會把子孫的 transform 一起畫，能不用就不用。 */
+  function inkImgStyle(src, boxW, boxH) {
+    const ink = LOGO_INK[src];
+    if (!ink) return { w: boxW, h: boxH, style: 'width:100%;height:100%;object-fit:contain' };
+    const inkH = Math.min(boxH, boxW / ink.ratio), inkW = inkH * ink.ratio;
+    const imgH = inkH / ink.fillH, imgW = imgH * ink.canvasRatio;
+    return {
+      w: inkW, h: inkH,
+      style: 'position:absolute;left:50%;top:50%;width:' + imgW + 'px;height:' + imgH +
+             'px;margin-left:' + (-imgW / 2) + 'px;margin-top:' + (-imgH / 2) + 'px;max-width:none;max-height:none'
+    };
+  }
+  /* LOGO 條：蝦大／蝦皮直播兩顆固定LOGO永遠在（不管哪個主題），差別在後面要不要接
+     分隔線＋廠商LOGO位。row模式（公版定位／主題A）：PSD畫「整個LOGO範圍」一塊框，
+     依框等分成蝦大／蝦皮直播／分隔線／VENDOR_SLOTS 個廠商LOGO位。
+     orbit模式（主題B，placement另外有 vendorBadges）：這個框只框住蝦大＋蝦皮直播
+     兩顆固定LOGO，廠商LOGO改成圍繞人物照片的獨立圓圈（見 vendorBadgeHTML），
+     這裡就不接分隔線/廠商LOGO位，只等分成2格。
+     分隔線／空位框線／空位字級這些「零碎尺寸」全部用 s 換算成 px 寫進 inline style，
+     不能留在 CSS 寫死 px——CSS 固定值不會跟著 zoom 縮放，放大畫布時就會顯得時大時小
+     （這正是先前分隔線「怎麼縮放都是那 2px」的成因，也是整條 LOGO 唯一會這樣的地方，
+     其餘定位框/字級本來就都是照這個 s 換算的）。 */
+  function logoRowHTML(box, st, s, withVendorRow, centered, boardId) {
+    const PAD = s;   /* 必須跟下面 .slot.logo 內嵌的 padding 一致 */
+    const innerH = box[3] * s - PAD * 2, innerW = box[2] * s - PAD * 2;
+    const vendor = st.vendorLogos || [];
+    const LOGO = XD.packs.bnLogoAssets || {};
+    const RATIO = LOGO.ratio || {};
+    const variant = logoVariant(st, boardId);
+    /* 蝦皮直播 LOGO 預設不畫，工單讀到、或使用者在右欄打開才畫（2026-09-11 指示）。 */
+    const showLive = !!st.liveLogo;
+    const liveSrc = logoSrc(LOGO.live, variant);
+    /* 直播 LOGO 的格子寬度照「圖案」的長寬比算（量到的話），不是畫布的——
+       素材是 1.62 的橫式圖案放在 1:1 的畫布裡，照畫布算會讓格子變成正方形、
+       圖案只填到 57% 的高度。量不到（file:// 或讀失敗）才退回 ratio.live。 */
+    const liveInk = LOGO_INK[liveSrc];
+    const LIVE_AR = liveInk ? liveInk.ratio : (RATIO.live || 1);
+    /* 蝦大圓形／蝦皮直播兩個固定 LOGO 的寬度是「照內容比例算出來的」，不是跟其他
+       flex 子項一樣的等份寬——極窄的版位（或畫布縮很小時）分下來可能比這兩顆
+       LOGO 本身還窄，flex 預設會把它們硬擠小，圓形會被壓扁、變形。
+       直接給這兩格 min-width＝它們實際需要的寬度，擠壓自然改由伸縮空間較大的
+       其他格承擔（縮小廠商LOGO位遠比擠壓蝦皮自己的LOGO可以接受）。 */
+    /* orbit 模式（主題B）沒有分隔線/廠商LOGO位可以撐滿框——這個框本來就是照
+       「蝦大+蝦皮直播兩顆固定LOGO」量的，不是像row模式那樣照整條5格量的，
+       兩顆固定LOGO不該再用 flex-grow 撐滿整個框寬（框往往比兩顆LOGO寬很多，
+       撐滿會把兩顆LOGO拉開一大段距離），改成照自身內容寬度排。 */
+    const fixedFlex = withVendorRow ? '' : ';flex:none';
+    /* orbit 模式的框是照「蝦大＋蝦皮直播兩顆」量的，只有兩格、寬度算得準，所以把
+       直播 LOGO 的寬度夾在「剩餘空間」內，高度自然由 object-fit:contain 收斂。
+       row 模式是多格等分、算式不同，維持照自然寬走。 */
+    const liveNatural = innerH * LIVE_AR;
+    const liveW = withVendorRow ? liveNatural
+                : Math.max(1, Math.min(liveNatural, innerW - innerH - innerW * 0.06));
+    const liveImg = inkImgStyle(liveSrc, liveW, innerH);
+    let cells =
+      '<div class="logo-slot fixed" style="min-width:' + innerH + 'px;max-width:' + innerH + 'px' + fixedFlex + '"><div class="logo-circle" style="width:' + innerH + 'px;height:' + innerH + 'px">' +
+      '<img src="' + logoSrc(LOGO.xiada, variant) + '" alt="蝦大"></div></div>' +
+      (showLive
+        ? '<div class="logo-slot fixed ink" style="min-width:' + liveW + 'px;max-width:' + liveW + 'px' + fixedFlex +
+          '"><img src="' + liveSrc + '" alt="蝦皮直播" style="' + liveImg.style + '"></div>'
+        : '');
+    /* 廠商 LOGO「上傳幾顆就畫幾格」，不預留空位（2026-09-11 使用者指定）。
+       先前是固定畫滿 VENDOR_SLOTS 格、沒上傳的畫虛線「廠商」缺件提示——只上傳兩顆
+       時右邊就空一格。而且那個空格**匯出時也還在**：.cv.export 只是把它塗成透明，
+       flex:1 1 0 佔的寬度沒有消失，交付的圖一樣被推歪，不只是預覽難看而已。
+       一顆都沒有時連分隔線一起不畫（有可能整場活動就是沒有廠商 LOGO）。
+       filter(Boolean) 是防中間有洞（LOGO 編輯器是照 index 寫回的）。 */
+    const vendorShown = withVendorRow ? vendor.filter(Boolean).slice(0, VENDOR_SLOTS) : [];
+    if (vendorShown.length) {
+      const divW = Math.max(1, innerH * 0.035);
+      const divH = innerH * 0.70;   /* 分隔線＝框高 70% */
+      /* 原本有一層 box-shadow:0 0 2px 讓白線在淺色底圖上看得出邊界，但 html2canvas
+         不畫 box-shadow，留著會讓預覽與匯出不一致，所以兩邊都拿掉，只留圓角。 */
+      const divStyle = 'width:' + divW + 'px;height:' + divH + 'px;border-radius:' + (DIV_RADIUS * s) + 'px';
+      cells += '<div class="logo-div" style="' + divStyle + '"></div>';
+      /* 每格 flex:1 1 0 ⇒ 等分剩下的寬度＝等距；圖 object-fit:contain ⇒ 等比不變形。
+         ⚠ 但「等分剩下的全部」在 LOGO 框特別寬的版位會出事：像 SUBN 方型_800x800
+         的框是 615×57（長寬比 10.8），而 Shopee HBN 是 449×57（7.9）——同樣的高度、
+         框卻寬了一大截，剩餘寬度全部灌進三格，格子就被撐到遠比 LOGO 本身需要的寬，
+         圖置中之後左右各留一大塊空白，看起來就是「這幾塊板的廠商 LOGO 間距特別寬」。
+         修法：給每格 max-width＝這張 LOGO 在滿框高時的自然寬度（innerH × 圖案長寬比），
+         格子就不會比 LOGO 需要的更寬；框有剩的空間交給 justify-content 統一處理。
+         量不到長寬比（還沒量完/量失敗）就不設上限＝退回原本的等分行為。 */
+      /* ⚠ 這裡刻意不套 inkImgStyle（廠商 LOGO 是使用者上傳的，不像固定素材那樣
+         可以預期）：inkImgStyle 是絕對定位＋算好的固定尺寸，格子一旦被 flex 壓縮到
+         比 max-width 窄，圖不會跟著縮就會被 overflow 裁掉。維持 object-fit:contain
+         讓它自己收斂，只加寬度上限，兩邊的好處都拿到、沒有裁圖風險。 */
+      vendorShown.forEach((url, i) => {
+        const vk = LOGO_INK[url];
+        const cap = vk ? 'max-width:' + (innerH * vk.canvasRatio) + 'px' : '';
+        cells += '<div class="logo-slot vendor" style="' + cap + '">' +
+                 '<img src="' + url + '" alt="廠商LOGO' + (i + 1) + '"></div>';
+      });
+    }
+    /* 兩顆固定 LOGO 是 flex:none、照內容寬度排，框往往比內容寬，所以「靠框的哪一邊」
+       看得出來。判斷用兩條規則的聯集：① 直式／方形版位（w<=h）一律置中；
+       ② 橫式版位只有在「PSD 量出來的 LOGO 框本身左右留白對稱」時才置中——這正好對到
+       使用者點名的 image Popup_800x720（框 258/259）與 Seller EDM_300x250（框 80/80），
+       其餘橫式版位的框都明顯偏左，維持齊左。用量測值判斷，新版位不用回來手動加名單。
+       row 模式以前不設 justify-content（廠商位 flex:1 會撐滿框，設了也沒作用），
+       但現在廠商位有 max-width 上限、框有剩就會留白，所以兩種模式都要設。 */
+    const rowJustify = 'justify-content:' + (centered ? 'center' : 'flex-start') + ';';
+    /* 間距綁 LOGO 條高度（見 LOGO_GAP_RATIO 的說明）——這樣間距會跟旁邊的 LOGO
+       一起縮放，各版位的視覺比例才一致；innerH 已含倍率，不用再乘 s。
+       省下來的寬度由 flex:1 的廠商 LOGO 位吸收。 */
+    const gap = innerH * LOGO_GAP_RATIO;
+    return '<div class="slot logo" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + (box[2] * s) + 'px;height:' + (box[3] * s) + 'px;padding:' + s + 'px">' +
+           '<div class="logo-row" style="gap:' + gap + 'px;' + rowJustify + '">' + cells + '</div></div>';
+  }
+
+  /* 蝦皮購物 LOGO（公版定位的「蝦皮購物LOGO範圍」，目前 3 塊板有：EDM 300x250／
+     LINE／AD2）：固定素材、不吃使用者上傳，直接照框畫。html2canvas 不支援
+     object-fit，所以 contain 後的尺寸自己算好寫進 img 的 width/height
+     （跟人物照片同一套處理，見 photoHTML 的說明）。 */
+  function shopeeLogoHTML(box, st, s, boardId) {
+    const LOGO = XD.packs.bnLogoAssets || {};
+    const src = logoSrc(LOGO.shopee, logoVariant(st, boardId));
+    if (!src) return '';
+    const w = box[2] * s, h = box[3] * s;
+    /* 圖只畫到框的 SHOPEE_LOGO_RATIO（框本身維持 PSD 量到的大小與位置）：
+       把「要塞進去的框」先乘上比例再算 contain，圖自然會往中心縮。 */
+    const dw = w * SHOPEE_LOGO_RATIO, dh = h * SHOPEE_LOGO_RATIO;
+    /* 跟直播 LOGO 同一套：照「圖案」而不是畫布收斂（這張的畫布也留了一圈透明，
+       圖案 332×453 在 428×508 裡）。量不到就退回舊算法＝照畫布比例 contain。 */
+    const ink = LOGO_INK[src];
+    let imgStyle;
+    if (ink) {
+      imgStyle = inkImgStyle(src, dw, dh).style;
+    } else {
+      const ar = (LOGO.ratio && LOGO.ratio.shopee) || 428 / 508;
+      const iw = Math.min(dw, dh * ar);
+      imgStyle = 'width:' + iw + 'px;height:' + (iw / ar) + 'px';
+    }
+    return '<div class="slot shopee-logo' + (ink ? ' ink' : '') + '" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + w + 'px;height:' + h + 'px;justify-content:center">' +
+           '<img src="' + src + '" alt="蝦皮購物" style="' + imgStyle + '">' +
+           '</div>';
+  }
+
+  /* 廠商 LOGO 環繞徽章（orbit 模式）：每個圓圈是 PSD 裡各自獨立標記的位置
+     （不是像 row 模式那樣切一個框等分——設計師手動排的，位置不規則），照陣列順序
+     對應 st.vendorLogos[i]，沒上傳的那個位置顯示虛線圓佔位。
+     ⚠ 目前的公版定位沒有環繞徽章（廠商LOGO 回到 LOGO 帶裡的 row 模式），
+     這條路徑因此暫時沒有資料會走到；保留是因為它完全由資料驅動
+     （placement 有 vendorBadges 才畫），之後公版若再標環繞徽章就直接生效。 */
+  function vendorBadgeHTML(box, url, s) {
+    const w = box[2] * s, h = box[3] * s;
+    const fs = Math.max(6, Math.min(w, h) * 0.16);
+    /* 白框原本用 box-shadow 的 spread 畫（不佔版面、往外長），但 html2canvas 完全不畫
+       box-shadow（實測徽章外緣取樣到的是底圖顏色）。改成 border：把整個框往外撐 ring，
+       因為 box-sizing:border-box，內容框仍然剛好等於 PSD 量到的框，圓形與圖片大小不變。
+       原本另外疊的柔和陰影（0 2px 8px）只能捨棄——html2canvas 畫不出來，留著只會讓
+       預覽跟匯出不一致。缺件的空徽章維持原本的虛線框（那是編輯提示，匯出時會被藏掉）。 */
+    const ringW = BADGE_RING * s;
+    const ring = url ? 'border:' + ringW + 'px solid rgba(255,255,255,.9);' : '';
+    const bx = url ? box[0] * s - ringW : box[0] * s;
+    const by = url ? box[1] * s - ringW : box[1] * s;
+    const bw2 = url ? w + ringW * 2 : w;
+    const bh2 = url ? h + ringW * 2 : h;
+    return '<div class="slot badge' + (url ? '' : ' empty') + '" style="left:' + bx + 'px;top:' + by +
+           'px;width:' + bw2 + 'px;height:' + bh2 + 'px;font-size:' + fs + 'px;' + ring + '">' +
+           (url ? '<img src="' + url + '" alt="廠商LOGO">' : '廠商') + '</div>';
+  }
+  /* 人物照片：用 contain——上傳當下整張固定在定位框內（去背人像不會被切手腳），
+     之後可自由縮放/位移且不再鎖在框內（見下方「位置/縮放調整」）。
+     沒上傳時顯示虛線佔位，不擋畫面（沒有照片時版面仍要看得出其他元素的相對位置）。
+     zoom/位移是全體版位共用同一組（跟廠商LOGO/照片本身一樣是活動層級設定），
+     見「人物照片：位置/縮放調整」區塊——這裡只是把 state 存的值轉成 transform。 */
+  function photoHTML(box, st, s, boardId, i) {
+    const url = photoUrl(st, i);
+    const bw = box[2] * s, bh = box[3] * s;
+    /* html2canvas 不支援 object-fit，會把 <img> 直接拉滿 width/height（實測 400×800 的
+       照片在 365×391 的框裡被畫成 365×382）。所以這裡自己把 contain 後的尺寸算出來
+       寫在 img 上，object-fit 只留著當保險。承 01_蝦導播 v14 的處理方式。
+       位移原本寫成 translate(%)，% 是相對「元素自己的邊框盒」解析的——img 尺寸從
+       整個定位框改成 contain 尺寸之後，同一組百分比的意義就變了，所以改成先乘出 px
+       （仍以定位框 bw/bh 為基準，跟 geomFrom() 與已存檔的各版位微調完全等價）。 */
+    const t = photoTFor(st, i, boardId);
+    const sty = photoImgStyle(bw, bh, t, i, slotInk(st, i));
+    const nm = photoSlotName(st, i);
+    return '<div class="slot photo' + (url ? '' : ' empty') + '" data-photo-board="' + esc(boardId) +
+           '" data-photo-idx="' + i + '" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + bw + 'px;height:' + bh + 'px">' +
+           (url ? '<img src="' + photoSrc(url) + '" alt="' + nm + '" style="' + sty.css + '"' +
+                  (sty.base ? ' data-ink-tf="' + sty.base.trim() + '"' : '') + '>' : nm) + '</div>';
+  }
+  /* 金額是一個不可分割的整體：「折$1,000」從中間斷開會變成「折$1／,000」，
+     整串意思就沒了。只要文案裡出現 $＋數字（含全形＄、全形數字、NT$）就整串排一排。 */
+  const AR_MONEY_RE = /[$＄]\s*[0-9０-９]/;
+  /* AR 文案要不要拆成上下兩排。門檻用 XD.countUnits 的「字」（半形算 0.5），
+     跟輸入框旁邊的字數計數同一把尺——未滿 4 字排一排就夠大，硬拆成兩排
+     反而一排只剩一兩個字、左右大片留白。 */
+  function arWraps(st) {
+    const t = String(st.arText || '');
+    return XD.countUnits(t) >= 4 && !AR_MONEY_RE.test(t);
+  }
+  /* 斷行位置以「碼點」計（Array.from 避免把表情符號/罕用字拆成兩半），
+     所以按鈕上的「上2下3」講的是實際會排幾個字。 */
+  function arLines(st) {
+    const chars = Array.from(String(st.arText || ''));
+    if (!chars.length) return [];
+    if (!arWraps(st)) return [chars.join('')];
+    const top = st.arSplit === 'more' ? Math.ceil(chars.length / 2) : Math.floor(chars.length / 2);
+    return [chars.slice(0, top).join(''), chars.slice(top).join('')];
+  }
+  function arHTML(box, st, s, style) {
+    const lines = arLines(st);
+    if (!lines.length) return '';
+    const bw = box[2] * s, bh = box[3] * s;
+    /* 一排塞得下多少，看的是「視覺寬度」不是字數：$1,000 有 6 個碼點，
+       但半形字只佔全形的一半，實際只有 3 個全形字寬——用 4 分之 1 的字級畫
+       會小得看不清。估不準時還有 fitTexts 克底（只縮不放），寧可先給大一點。 */
+    const longest = Math.max.apply(null, lines.map(l => XD.countUnits(l))) || 1;
+    /* 兩排要剛好填滿框高（行高＝框高÷排數），但字級還得同時受框寬限制——
+       3 個字擠在 71px 寬的框裡，字級只能是 71/3，不能用框高÷2 的 36px。 */
+    const lh = bh / lines.length;
+    const fs = Math.min(lh, bw / longest);
+    return '<div class="slot ar" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + bw + 'px;height:' + bh + 'px;font-size:' + fs + 'px;line-height:' + lh + 'px;' +
+           (style || '') + '">' + '<span class="ink">' + esc(lines.join('\n')) + '</span></div>';
+  }
+  /* 微笑遮罩的畫法＝一塊 inline SVG 裡兩條同形狀的 path：先畫「模糊陰影」（弧色
+     的極深版、半透明、feGaussianBlur），再畫「不透明實色」蓋上去。實色只覆蓋曲線
+     以下，所以陰影只剩曲線**以上**那一半露出來，形成一條貼著曲線往上自然淡出的
+     暗邊——這正是完稿圖的做法。
+
+     為什麼用 SVG 不用 CSS：2026-09-17 實測 html2canvas 1.4.1（匯出走的就是它）
+       inline SVG <path>          ✅ 畫得出來
+       inline SVG feGaussianBlur  ✅ 畫得出來（真高斯模糊）
+       CSS filter: blur()         ❌ 被忽略
+       CSS clip-path / mask-image ❌ 被忽略
+       CSS box-shadow             ❌ 被忽略（第十九輪已知）
+     「畫面看得到、匯出卻不見」的風險只存在於後三者。SVG 這條路連
+     XD.withOffscreen + XD.captureNodeH2C（＝下載整包同一條路徑）都實測過。
+
+     ⚠ 兩條 path 的 d 是重複的字串，不要「優化」成 <defs><path id> ＋ <use fill>：
+     html2canvas 會把 <use> 上的 fill 丟掉，整塊變成純黑（2026-09-17 實測踩到）。
+
+     ⚠ 陰影參數的量測依據：把完稿與空圖逐列最小平方擬合，解出陰影不透明度隨高度
+     的變化＝邊緣 0.21、往上 8px 0.15、16px 0.08、28px 0.02（約 30px 外歸零），也
+     就是使用者說的「20% 深色模糊陰影」。高斯模糊在邊界的可見值恰好是設定 opacity
+     的一半，所以 ARC_SHADOW_ALPHA 設 0.40 ⇒ 邊緣約 20%。
+
+     ⚠ path 四面都要多畫 ARC_BLEED，否則陰影會不均（兩種症狀實測都踩過）。
+     高斯模糊會把「區域外」當成透明去平均，所以：
+       ① 左右：path 若剛好切在 x=0／x=w，版位左右緣的陰影會被算掉一半而「褪色」。
+       ② 下方：陰影是由「曲線以下那塊實心」模糊出來的。path 若切在 y=b.h，則在
+         「曲線離版位底邊很近」的 x 位置可用的實心不到 3σ，陰影會明顯變淡——LPBN
+         正中央曲線在 y=538、版位只到 550，實心只有 12px，實測陰影強度只有 DDC
+         的一半（0.084 vs 0.140）。設計稿上這塊形狀本來就超出畫布，所以要補回來。
+     做法：path 沿同一條拋物線外推到 [-bleed, w+bleed]（兩端點＋中點就能精確重建
+     控制點，外推後仍是同一條曲線）、下緣再延伸到 b.h+bleed，filter 區域也用
+     userSpaceOnUse 四面一起放大；超出版位的部分交給 SVG viewport 與 .cv 的
+     overflow:hidden 裁掉，所以畫面上看不到任何差別。
+
+     倍率：viewBox 固定用版位原生尺寸、width/height 乘 s，所以裡面的一切（含
+     stdDeviation）都跟著縮放走，不用自己乘 s——天生符合「版位內不准寫固定 px」，
+     也天生維持總覽↔匯出 0 誤差（總覽就是 affine scale）。
+     沒有主題（colorsEff 為空）就不畫：沒有色號可用時，畫一個猜的顏色比不畫更奇怪。 */
+  const ARC_SHADOW_ALPHA = 0.40;   // 高斯模糊在邊界只露一半 ⇒ 邊緣可見約 20%
+  const ARC_SHADOW_DARKEN = 0.35;  // 陰影色＝弧色 × 此倍率（實測是弧色的極深版，不是純黑）
+  const ARC_SHADOW_BLUR = 18;      // feGaussianBlur stdDeviation，原生 px
+  const ARC_BLEED = 60;            // 四面外推量，需 ≥3σ 才不會在版位邊緣褪色
+  function hexToRgbTuple(hex) {
+    const n = parseInt(String(hex).replace('#', ''), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function darkenHex(hex, k) {
+    return '#' + hexToRgbTuple(hex)
+      .map(v => ('0' + Math.max(0, Math.min(255, Math.round(v * k))).toString(16)).slice(-2))
+      .join('');
+  }
+  /* 這條拋物線在 x 處的 y：由 yL／ctrlY／yR 反推（等價於二次貝茲以 t=x/w 取值）。
+     是多項式，所以 x 落在 [0,w] 之外（外推用）同樣成立。 */
+  function arcYAt(a, w, x) {
+    const u = x / w;
+    return a.yL * (1 - u) * (1 - u) + 2 * a.ctrlY * u * (1 - u) + a.yR * u * u;
+  }
+  function arcHTML(boardId, st, s) {
+    const a = ARC_BOARDS[boardId];
+    if (!a) return '';
+    const b = PACK.boards.find(x => x.id === boardId);
+    const colorsEff = colorsFor(st, boardId);
+    if (!b || !colorsEff || !colorsEff.arc) return '';
+    if (Math.min(a.yL, a.yR) >= b.h) return '';
+    const x0 = -ARC_BLEED, x1 = b.w + ARC_BLEED, xm = (x0 + x1) / 2;
+    const y0 = arcYAt(a, b.w, x0), y1 = arcYAt(a, b.w, x1);
+    const cy = 2 * arcYAt(a, b.w, xm) - (y0 + y1) / 2;
+    const yBot = b.h + ARC_BLEED;
+    const d = 'M' + x0 + ',' + y0 + ' Q' + xm + ',' + cy + ' ' + x1 + ',' + y1 +
+              ' L' + x1 + ',' + yBot + ' L' + x0 + ',' + yBot + ' Z';
+    const fid = 'arcsh-' + boardId.replace(/[^A-Za-z0-9]/g, '');
+    return '<svg class="arcdeco" width="' + (b.w * s) + '" height="' + (b.h * s) + '" ' +
+      'viewBox="0 0 ' + b.w + ' ' + b.h + '" style="left:0;top:0">' +
+      '<defs><filter id="' + fid + '" filterUnits="userSpaceOnUse" x="' + x0 + '" ' +
+      'y="' + (-ARC_BLEED) + '" width="' + (x1 - x0) + '" height="' + (yBot + ARC_BLEED) + '">' +
+      '<feGaussianBlur stdDeviation="' + ARC_SHADOW_BLUR + '"></feGaussianBlur>' +
+      '</filter></defs>' +
+      '<path d="' + d + '" fill="' + darkenHex(colorsEff.arc, ARC_SHADOW_DARKEN) + '" ' +
+      'opacity="' + ARC_SHADOW_ALPHA + '" filter="url(#' + fid + ')"></path>' +
+      '<path d="' + d + '" fill="' + colorsEff.arc + '"></path>' +
+      '</svg>';
+  }
+  function boardInnerHTML(b, st, s) {
+    const p = placementFor(st, b.id);
+    if (!p) return '';
+    const th = themeFor(st);
+    const colorsEff = colorsFor(st, b.id);
+    const titleColor = colorsEff ? 'color:' + colorsEff.title + ';' : '';
+    const subColor   = colorsEff ? 'color:' + colorsEff.sub   + ';' : '';
+    const smallColor = colorsEff ? 'color:' + colorsEff.small + ';' : '';
+    const titleAlign = isCentered(p.title, b.w) ? 'justify-content:center;text-align:center;' : '';
+    const subAlign   = isCentered(p.sub,   b.w) ? 'justify-content:center;text-align:center;' : '';
+    const smallAlign = isCentered(p.small, b.w) ? 'justify-content:center;text-align:center;' : '';
+    /* 字級＝定位框高 × 比例（line-height 收到跟字級一樣，不留額外行距空隙）。
+       主標/副標 90%、小字 85%——全部都是「框不動、字往中心縮」（.slot 是
+       align-items:center，所以縮小後仍在框的垂直中線上）。
+       字數上限（主標8/副標7）是設計端抓的「這個框寬剛好塞滿」的字數，
+       正常輸入不會超框；真的超了 fitTexts() 還是會兜底再縮。 */
+    const titleFs = p.title ? p.title[3] * s * TITLE_FS_RATIO : 0;
+    const subFs   = p.sub   ? p.sub[3]   * s * SUB_FS_RATIO   : 0;
+    const smallFs = p.small ? p.small[3] * s * SMALL_FS_RATIO : 0;
+    let inner = '';
+    /* 人物照片畫在最前面＝疊在最底下（slot 都是絕對定位、沒設 z-index，順序＝疊放順序）。
+       照片現在可以拖出定位框，若照舊畫在最後，放大時會蓋掉文字、CTA 與環繞徽章；
+       徽章本來就是「圍繞人物」的設計，本來也該壓在照片上面。 */
+    /* 人物照片畫在最前面＝疊在最底下。多人時照 photoOrder（預設就是人物1 在下、
+       人物2 在上），順序可以在右欄的圖層面板調；關掉的圖層畫面與匯出都不畫。 */
+    photoOrderFor(st).forEach(pi => {
+      const pbox = photoBoxAt(st, pi, b.id);
+      if (!pbox || photoHidden(st, pi)) return;
+      inner += photoHTML(pbox, st, s, b.id, pi);
+    });
+    /* 半弧疊在人物/圖素圖層之上、文字/LOGO/CTA 之下——蓋住人物下半身，不擋文字。 */
+    inner += arcHTML(b.id, st, s);
+    inner += slotHTML('title', p.title, s, 'font-size:' + titleFs + 'px;line-height:' + titleFs + 'px;' + titleColor + titleAlign, st.title);
+    inner += slotHTML('sub', p.sub, s, 'font-size:' + subFs + 'px;line-height:' + subFs + 'px;' + subColor + subAlign, st.sub);
+    if (p.small) inner += slotHTML('small', p.small, s, 'font-size:' + smallFs + 'px;line-height:' + smallFs + 'px;' + smallColor + smallAlign, st.small);
+    /* 有 vendorBadges（環繞徽章）就不接橫排的廠商 LOGO 位；
+       NO_VENDOR_BOARDS 是另外點名「這塊板根本不放廠商 LOGO」的版位。 */
+    const withVendorRow = !p.vendorBadges && NO_VENDOR_BOARDS.indexOf(b.id) < 0;
+    if (p.logo) inner += logoRowHTML(p.logo, st, s, withVendorRow, b.w <= b.h || isCentered(p.logo, b.w), b.id);
+    if (p.shopeeLogo) inner += shopeeLogoHTML(p.shopeeLogo, st, s, b.id);
+    if (p.vendorBadges) {
+      const vendor = st.vendorLogos || [];
+      inner += p.vendorBadges.map((box, i) => vendorBadgeHTML(box, vendor[i], s)).join('');
+    }
+    if (p.ar) inner += arHTML(p.ar, st, s, titleColor);
+    inner += ctaHTML(p, st, s, b.id);
+    return inner;
+  }
+  /* CTA 箭頭用 CSS 三角形（border trick）畫實心三角，不用「›」這種細線符號，
+     邊框用 currentColor＋em 單位，跟著 CTA 文字色與字級走，不用另外校色/校尺寸。
+     底色／文字色優先用 PS 實際抽出來的顏色（主題A有——各版位不一定相同，例如有些
+     是深字配黃底、有些是白字）；主題B的定位資料是色塊標記，沒有真實設計顏色，
+     抽不到就退回原本的預設深藍配色。ctaText.fs 沒有時（主題B）改用「滿版」慣例
+     ＝ctaText.box 的高度，跟主標/副標同一套邏輯。 */
+  function ctaHTML(p, st, s, boardId) {
+    if (!p.cta) return '';
+    const box = p.cta;
+    /* 主題A 的定位資料帶 PSD 抽出來的真實字級（ctaText.fs），直接用最準。
+       主題B 沒有 fs，只有一個「CTA文字範圍」色塊。原本只拿框「高」當字級、完全沒看框寬，
+       結果 6 塊有 CTA 的主題B 版位裡有 4 塊的「文字＋箭頭」比框寬多出 13～24%
+       （Seller EDM_600x150 最誇張：需要 63.4px、框只有 51px）。
+       差別的原因是兩個主題的 PSD 標記法不同：主題A 另外有一個箭頭圖層，所以它的文字框
+       只框文字；主題B 的 JSON 沒有箭頭圖層（實測 07 那塊只有 6 個色塊），那個框就是
+       「文字＋箭頭」的可用區域。所以主題B 改成跟 AR 文案同一套慣例：
+       字級＝min(框高, 框寬 ÷ 內容 em 寬)，兩個方向都不超出設計標的框。
+       寬度用 XD.countUnits（半形算 0.5）跟輸入框計數、AR 文案同一把尺。 */
+    const ctaFs = (p.ctaText && p.ctaText.fs) ? p.ctaText.fs * s
+                : (p.ctaText && p.ctaText.box)
+                  ? Math.min(p.ctaText.box[3],
+                             p.ctaText.box[2] / (XD.countUnits(st.cta || '') + CTA_ARROW_EM)) * s
+                : box[3] * s * .5;
+    /* 顏色優先序：這塊板自己的固定色（BOARD_FIXED_COLORS）> 版位自帶的顏色
+       （公版定位沒有——色塊只是標記，所以現在實際上不會走到這一層）>
+       目前主題的 colors.ctaBg/ctaText（來自工單「BN主題文案配色」）> 預設深藍/白。 */
+    const fixed = BOARD_FIXED_COLORS[boardId], tc = colorsFor(st, boardId);
+    const bg = (fixed && fixed.ctaBg) || p.ctaBg || (tc && tc.ctaBg) || '#16277F';
+    const color = (fixed && fixed.ctaText) || (p.ctaText && p.ctaText.color) || (tc && tc.ctaText) || '#fff';
+    return '<div class="slot cta" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
+           'px;width:' + (box[2] * s) + 'px;height:' + (box[3] * s) + 'px;font-size:' + ctaFs +
+           'px;border-radius:' + (CTA_RADIUS * s) + 'px;background:' + bg + ';color:' + color + '">' +
+           '<span class="ink">' + esc(st.cta) + '</span><span class="cta-arrow"></span></div>';
+  }
+  /* 文字超出定位框就縮小（只縮不放）。root 給離屏匯出用的容器，
+     不傳就跟畫面預覽一樣掃整個文件；s 是這批節點的排版倍率（匯出/總覽都是 1）。
+     ⚠ 縮字的「判斷」必須跟倍率無關：原本直接量 DOM 的 scrollWidth/clientWidth，
+     這兩個值會被次像素捨入影響，而容差 +1px 也不隨倍率縮放，於是同一塊板在畫布 64%
+     縮的級數會跟匯出（s=1）不一樣（第十六輪在總覽量到的 15.8px 就是這個來源）。
+     改成先用 canvas measureText 取「每 em 幾 px」的字寬，再把整條判斷式換算回原生尺度
+     （寬度與容差同除以 s），任何倍率算出來的倍數 k 完全相同。
+     canvas 量測跟 DOM 排版仍可能有極小差異（kerning/letter-spacing），所以後面留一段
+     DOM 迴圈兜底——只有真的還超框才會再收。 */
+  const fitCtx = document.createElement('canvas').getContext('2d');
+  function fitTexts(root, s) {
+    const sc = s > 0 ? s : 1;
+    XD.$$('.slot.title, .slot.sub, .slot.small, .slot.ar, .slot.cta', root).forEach(el => {
+      const fs = parseFloat(el.style.fontSize), w = parseFloat(el.style.width);
+      const txt = el.textContent || '';
+      if (!(fs > 0) || !(w > 0) || !txt) return;
+      const cs = getComputedStyle(el);
+      fitCtx.font = cs.fontWeight + ' 1000px ' + cs.fontFamily;
+      let advEm = 0;
+      txt.split('\n').forEach(line => {
+        advEm = Math.max(advEm, fitCtx.measureText(line).width / 1000);
+      });
+      /* CTA 的箭頭是 CSS 三角形、不在 textContent 裡，但它確實佔 0.74em 寬 */
+      if (el.querySelector('.cta-arrow')) advEm += CTA_ARROW_EM;
+      if (advEm > 0) {
+        /* 全部除以 sc ＝ 換算回原生尺度後再判斷，容差 1px 也才是原生的 1px */
+        const fs0 = fs / sc, w0 = w / sc;
+        let k = 1, guard = 24;
+        while (guard-- && fs0 * k > 4 && advEm * fs0 * k > w0 + 1) k *= .93;
+        if (k < 1) el.style.fontSize = (fs * k) + 'px';
+      }
+      let guard2 = 8;
+      while (guard2-- && parseFloat(el.style.fontSize) > 4 && el.scrollWidth > el.clientWidth + 1) {
+        el.style.fontSize = (parseFloat(el.style.fontSize) * .93) + 'px';
+      }
+    });
+  }
+
+  /* ============ 畫布模式：可縮放/平移的單欄直排 ============
+     依 zoom 重新排版，不用 CSS transform 縮放——
+     transform:scale 放大的是「已經畫好的點陣圖」，越放越糊；
+     直接把每個座標與字級乘上倍率，瀏覽器會用新尺寸重新排版，放大反而更清楚。
+     （做法承自 02_吸底 viewport.js 縮放 Konva Stage 而非容器的理由） */
+  function render() {
+    const st = S(), z = view.zoom;
+    const list = PACK.boards.filter(b => st.on.indexOf(b.id) >= 0);
+    const world = $('#world');
+    world.style.position = 'absolute';
+    world.style.width = 'auto';
+    world.style.padding = '28px 36px';
+    if (!list.length) {
+      world.innerHTML = '<div id="empty">左邊沒有勾選任何版位<br>勾選後會在這裡依實際尺寸排出來</div>';
+    } else {
+      world.innerHTML = list.map(b => {
+        const sz = b.w + '×' + b.h;
+        return '<div class="bncard"><div class="cap"><b>' + esc(b.id) + '</b><span>' + sz + '</span>' +
+          '<span class="kb">' + Math.round(z * 100) + '%</span></div>' +
+          '<div class="cv" data-cv="' + esc(b.id) + '" style="width:' + (b.w * z) + 'px;height:' + (b.h * z) + 'px;' + cvBgStyle(b, st) + '">' +
+          boardInnerHTML(b, st, z) + '</div></div>';
+      }).join('');
+    }
+    world.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px)';
+    fitTexts(null, z);   /* 帶入倍率：縮字判斷要換算回原生尺度才會跟匯出一致 */
+    paintPhotoOverlay();      /* innerHTML 重畫會清掉選取框，這裡照目前選取狀態重建 */
+  }
+
+  /* ============ 總覽模式：contact sheet，不用捲動看到所有版位 ============
+     每個縮圖各自獨立縮放（長邊對齊統一的 TILE 尺寸），跟畫布模式的
+     「全體共用一個 zoom」不同——這裡要的是「一眼看完」。
+     TILE 依目前勾選數與可視區面積反推，貼近「剛好塞滿、不用捲動」。
+
+     ⚠ 縮放方式跟畫布模式**刻意相反**：畫布是「座標×倍率重新排版」（放大才會越放越清楚），
+     總覽改成「**照原生尺寸排版（s=1），再用 CSS transform:scale 整塊等比縮小**」。
+     原因是重新排版在小倍率下會累積誤差，量測過最嚴重的兩個來源：
+       ① fitTexts() 的超框縮字判斷在不同倍率下結果不同——同一塊板 s=1 時副標被縮到
+          0.175 倍框高，縮圖只縮到 0.188，換算回 1200px 板差了 15.8px，縮圖看起來字比
+          實際輸出大；
+       ② LOGO 條的 padding 之類「有下限的零碎尺寸」不會等比縮（padding:max(1,s) 在
+          s=0.167 時是 1px，該是 0.167px），LOGO 條整條高度差了 18%，圓形 LOGO 被擠掉
+          一截、看起來壓在文字上。
+     改成 transform 之後，排版與 fitTexts 都在 s=1 算（跟「下載整包」離屏擷取的條件
+     完全一致），縮圖只是這份結果的仿射縮小 → **相對幾何 0 誤差**，總覽上看到的比例
+     就是匯出的比例，不用再放大複驗。總覽只會縮小不會放大，所以不吃「transform 放大
+     會糊」的虧。 */
+  function computeTileMax(n, w, h) {
+    const area = Math.max(w, 200) * Math.max(h, 200) * 0.8;
+    return clamp(Math.sqrt(area / Math.max(n, 1)), 90, 260);
+  }
+  function renderOverview() {
+    const st = S();
+    const list = PACK.boards.filter(b => st.on.indexOf(b.id) >= 0);
+    const world = $('#world');
+    world.style.position = 'static';
+    world.style.transform = 'none';
+    world.style.width = '100%';
+    world.style.padding = '20px';
+    if (!list.length) {
+      world.innerHTML = '<div id="empty">左邊沒有勾選任何版位<br>勾選後會在這裡看到縮圖總覽</div>';
+      return;
+    }
+    const rect = $('#stage').getBoundingClientRect();
+    const TILE = computeTileMax(list.length, rect.width, rect.height);
+    world.innerHTML = '<div class="ov-grid">' + list.map(b => {
+      const s = TILE / Math.max(b.w, b.h);
+      /* .ovthumb 佔的是縮小後的版面尺寸（transform 不影響 layout，外層得自己給尺寸）；
+         裡面的 .cv 照原生 px 排版，再整塊 scale 下來。 */
+      return '<div class="ovcard" data-ov="' + esc(b.id) + '" title="點一下放大檢視">' +
+        '<div class="ovthumb" style="width:' + (b.w * s) + 'px;height:' + (b.h * s) + 'px">' +
+        '<div class="cv" data-cv="' + esc(b.id) + '" style="width:' + b.w + 'px;height:' + b.h +
+        'px;transform:scale(' + s + ');' + cvBgStyle(b, st) + '">' +
+        boardInnerHTML(b, st, 1) + '</div></div>' +
+        '<div class="ovcap">' + esc(b.id) + '<br>' + b.w + '×' + b.h + '</div></div>';
+    }).join('') + '</div>';
+    fitTexts(null, 1);   /* 總覽照 s=1 排版，判斷條件跟匯出完全同一組 */
+  }
+  function renderAny() { view.mode === 'overview' ? renderOverview() : render(); }
+
+  /* ============ 模式切換 ============ */
+  function paintMode() {
+    $('#tabOverview').classList.toggle('on', view.mode === 'overview');
+    $('#tabCanvas').classList.toggle('on', view.mode === 'canvas');
+    $('#zoombar').style.display = view.mode === 'canvas' ? 'flex' : 'none';
+    $('#stage').classList.toggle('ov-mode', view.mode === 'overview');
+    $('#footMode').textContent = view.mode === 'overview'
+      ? '總覽：點縮圖放大檢視'
+      : 'Alt＋滾輪縮放 · 拖曳空白處平移 · 點人物照片可單獨拖曳/四角等比縮放/旋轉（Shift 吸附 15°）';
+  }
+  function setMode(m) {
+    if (m !== 'canvas') view.selBoard = null;   /* 總覽沒有變形把手，選取狀態留著只會殘影 */
+    view.mode = m; paintMode(); renderAny();
+  }
+  $('#tabOverview').onclick = () => setMode('overview');
+  $('#tabCanvas').onclick   = () => setMode('canvas');
+
+  /* 從總覽點一張縮圖 → 切到畫布並把視角對準它（仔細檢查/編輯時才需要放大） */
+  function focusBoard(id) {
+    const b = PACK.boards.find(x => x.id === id);
+    view.mode = 'canvas'; paintMode();
+    if (!b) { render(); return; }
+    const stRect = $('#stage').getBoundingClientRect();
+    view.zoom = clamp(Math.min((stRect.width - FIT_PAD * 2) / b.w, 1), MIN_Z, MAX_Z);
+    view.userAdjusted = true;
+    view.x = 0; view.y = 0;
+    render();
+    const el = document.querySelector('.cv[data-cv="' + CSS.escape(id) + '"]');
+    if (el) {
+      const cardEl = el.closest('.bncard');
+      const r2 = $('#stage').getBoundingClientRect();
+      const cardRect = cardEl.getBoundingClientRect();
+      view.x += (r2.left + r2.width / 2) - (cardRect.left + cardRect.width / 2);
+      view.y += (r2.top + 24) - cardRect.top;
+      applyPan();
+    }
+    paintZoom();
+  }
+  $('#world').addEventListener('click', e => {
+    if (view.mode !== 'overview') return;
+    const card = e.target.closest('[data-ov]');
+    if (card) focusBoard(card.dataset.ov);
+  });
+
+  /* ============ 縮放／平移（僅畫布模式） ============ */
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  function applyPan() { $('#world').style.transform = 'translate(' + view.x + 'px,' + view.y + 'px)'; }
+
+  /* 以某個畫面座標為錨點縮放：該點底下的內容縮放後仍停在原位 */
+  function zoomAt(next, ax, ay) {
+    next = clamp(next, MIN_Z, MAX_Z);
+    if (Math.abs(next - view.zoom) < 1e-6) return;
+    const wx = (ax - view.x) / view.zoom, wy = (ay - view.y) / view.zoom;
+    view.zoom = next;
+    view.x = ax - wx * next;
+    view.y = ay - wy * next;
+    view.userAdjusted = true;
+    render(); paintZoom();
+  }
+  function zoomBy(f) {
+    const st = $('#stage').getBoundingClientRect();
+    zoomAt(view.zoom * f, st.width / 2, st.height / 2);
+  }
+  /* 符合視窗＝把「最寬的版位」塞進視窗寬度。
+     刻意不把整疊的總高一起算進去：版位是直排且可捲動，硬要整疊塞滿高度
+     會算出 10% 這種看不清的倍率。也不放大超過 100%（小版位不需要被撐大）。 */
+  function fit() {
+    const st = $('#stage').getBoundingClientRect();
+    const list = PACK.boards.filter(b => S().on.indexOf(b.id) >= 0);
+    if (!list.length || !st.width) { view.zoom = 1; view.x = 0; view.y = 0; render(); paintZoom(); return; }
+    const wideW = Math.max.apply(null, list.map(b => b.w));
+    view.zoom = clamp(Math.min((st.width - FIT_PAD * 2) / wideW, 1), MIN_Z, MAX_Z);
+    view.y = 0;
+    render();
+    view.x = Math.max(0, (st.width - $('#world').offsetWidth) / 2);   /* 量完真實寬度再置中 */
+    applyPan(); paintZoom();
+  }
+  function actualSize() {
+    const st = $('#stage').getBoundingClientRect();
+    const wide = Math.max.apply(null, PACK.boards.filter(b => S().on.indexOf(b.id) >= 0).map(b => b.w).concat([1]));
+    view.zoom = 1;
+    view.x = Math.min(0, (st.width - wide) / 2);
+    view.y = 0;
+    view.userAdjusted = true;
+    render(); paintZoom();
+  }
+  function paintZoom() {
+    const r = $('#zoomReadout');
+    if (r) r.textContent = Math.round(view.zoom * 100) + '%';
+  }
+  $('#zoombar').innerHTML =
+    '<button id="zOut" title="縮小">−</button><span class="zoom-readout" id="zoomReadout">100%</span>' +
+    '<button id="zIn" title="放大">＋</button>' +
+    '<button id="z100" title="以實際像素檢視">100%</button>' +
+    '<button id="zFit" title="把勾選的版位縮到看得完">符合視窗</button>' +
+    '<span class="zoom-hint">Alt+滾輪縮放</span>';
+  $('#zIn').onclick = () => zoomBy(STEP * STEP);
+  $('#zOut').onclick = () => zoomBy(1 / (STEP * STEP));
+  $('#z100').onclick = actualSize;
+  $('#zFit').onclick = fit;
+
+  const stage = $('#stage');
+  stage.addEventListener('wheel', e => {
+    if (view.mode !== 'canvas') return;    /* 總覽模式讓瀏覽器自己捲動 */
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    if (e.altKey) {                       /* Alt+滾輪＝縮放（與 PS 一致） */
+      zoomAt(view.zoom * (e.deltaY < 0 ? STEP : 1 / STEP), e.clientX - r.left, e.clientY - r.top);
+      return;
+    }
+    view.x -= e.deltaX; view.y -= e.deltaY;   /* 單獨滾輪＝平移 */
+    view.userAdjusted = true;
+    applyPan();
+  }, { passive: false });
+
+  let drag = null;
+  stage.addEventListener('pointerdown', e => {
+    if (view.mode !== 'canvas' || e.target.closest('.zoombar')) return;
+    drag = { sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+    stage.classList.add('grabbing');
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!drag) return;
+    view.x = drag.ox + (e.clientX - drag.sx);
+    view.y = drag.oy + (e.clientY - drag.sy);
+    view.userAdjusted = true;
+    applyPan();
+  });
+  const endDrag = () => { drag = null; stage.classList.remove('grabbing'); };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  /* 視窗改變尺寸：總覽模式永遠重算 TILE；畫布模式只在使用者沒自己調過視角時才重新符合視窗 */
+  if (typeof ResizeObserver === 'function')
+    new ResizeObserver(() => {
+      if (view.mode === 'overview') renderOverview();
+      else if (!view.userAdjusted) fit();
+    }).observe(stage);
+
+  /* ============ 文案輸入 ============ */
+  const FIELDS = [['inTitle', 'title', 'ccTitle'], ['inSub', 'sub', 'ccSub'], ['inCta', 'cta', 'ccCta'],
+                  ['inSmall', 'small', 'ccSmall'], ['inAr', 'arText', 'ccAr']];
+  FIELDS.forEach(([id, key, ccId]) => {
+    const el = $('#' + id);
+    el.addEventListener('input', () => {
+      XD.applyCount(el, $('#' + ccId), MAX[key]);
+      H.set(Object.assign({}, S(), { [key]: el.value }), { key: 'copy:' + key });
+    });
+  });
+  function syncInputs() {
+    const st = S();
+    FIELDS.forEach(([id, key, ccId]) => {
+      const el = $('#' + id);
+      if (el.value !== st[key]) el.value = st[key];
+      XD.applyCount(el, $('#' + ccId), MAX[key === 'arText' ? 'ar' : key]);
+    });
+    $('#chkLive').checked = !!st.liveLogo;
+    paintArSplit();
+  }
+  /* AR 斷行選擇：只有真的會排成兩排、而且字數是奇數時才有得選——
+     偶數上下一定各半，排一排的（未滿 4 字、或含 $ 金額）根本沒有斷行點。
+     按鈕文字直接寫成「上2下3」這種實際結果，不用讓人自己換算。 */
+  function paintArSplit() {
+    const st = S(), n = Array.from(String(st.arText || '')).length;
+    const row = $('#arSplitRow'); if (!row) return;
+    const pick = arWraps(st) && n % 2 === 1;
+    row.style.display = pick ? '' : 'none';
+    if (!pick) return;
+    const less = Math.floor(n / 2), more = Math.ceil(n / 2);
+    XD.$$('button[data-arsplit]', row).forEach(b => {
+      const top = b.dataset.arsplit === 'more' ? more : less;
+      b.textContent = '上' + top + '下' + (n - top);
+      b.classList.toggle('on', (st.arSplit === 'more' ? 'more' : 'less') === b.dataset.arsplit);
+    });
+  }
+  $('#arSplitRow').addEventListener('click', e => {
+    const b = e.target.closest('button[data-arsplit]'); if (!b) return;
+    H.set(Object.assign({}, S(), { arSplit: b.dataset.arsplit }), {});
+  });
+
+  /* ============ 主題背景 ============ */
+  /* 主題縮圖用哪一塊板：方型版位最適合塞進方格，而且每張只有 9KB 左右
+     （20 個主題全部載進來約 180KB）。萬一某個主題沒有這塊板就退回它的第一張。 */
+  const THEME_THUMB_BOARD = '蝦大課程首圖 方型_608x608';
+  function themeThumbUrl(t) {
+    const im = t.images || {};
+    const f = im[THEME_THUMB_BOARD] || im[Object.keys(im)[0]];
+    return f ? assetUrl(t.dir + f) : '';
+  }
+  /* 主題／圖素兩個縮圖選擇器共用：items 是 [{key, name, img}]，key 就是 data-<attr> 的值。
+     只有「清單本身變了」才重建 innerHTML——每次重建會把 #themeRow 自己的捲動位置歸零
+     （右欄每改一次狀態都會重畫，打一個字就跳回最上面），而且 img 會重新建立。 */
+  function paintThumbs(rowSel, attr, items, curKey) {
+    const row = $(rowSel); if (!row) return;
+    const sig = items.map(it => it.key).join('|');
+    if (row.dataset.sig !== sig) {
+      row.dataset.sig = sig;
+      row.innerHTML = items.map(it =>
+        '<button type="button" class="thumb" ' + attr + '="' + esc(it.key) + '"' +
+        ' title="' + esc(it.name) + '">' +
+        '<span class="th">' + (it.img ? '<img src="' + it.img + '" alt="" loading="lazy">' : '') +
+        '</span><span class="nm">' + esc(it.name) + '</span></button>').join('');
+    }
+    XD.$$('.thumb', row).forEach(b => b.classList.toggle('on', b.getAttribute(attr) === curKey));
+  }
+  let themeScrolled = null;
+  function paintThemeGrid() {
+    const cur = S().theme || '';
+    const themes = (XD.packs.bnThemes && XD.packs.bnThemes.themes) || [];
+    paintThumbs('#themeRow', 'data-theme',
+      [{ key: '', name: '無主題', img: '' }].concat(
+        themes.map(t => ({ key: t.id, name: t.name, img: themeThumbUrl(t) }))),
+      cur);
+    const t = themeFor(S());
+    $('#themeCur').textContent = t ? t.name : '未選（只畫定位框）';
+    /* 只有「主題真的換了」才把選到的那顆捲進視野：每次重畫都捲的話，使用者
+       自己把清單捲到別處後，打一個字就會被拉回去。 */
+    if (themeScrolled !== cur) {
+      themeScrolled = cur;
+      const on = $('#themeRow').querySelector('.thumb.on');
+      if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    }
+  }
+  $('#themeRow').onclick = e => {
+    const btn = e.target.closest('[data-theme]'); if (!btn) return;
+    H.set(Object.assign({}, S(), { theme: btn.getAttribute('data-theme') }), {});
+  };
+
+  /* ============ 廠商 LOGO 素材包 ============
+     優先順序：① 工單有指定「廠商LOGO1/2」的實際檔名 → 精準比對素材包裡的同名檔案
+              ② 工單沒有指定，或指定的檔名都對不到 → 退回舊的資料夾判斷（沿用 shrimp2choice：
+                 先看檔案所在資料夾名稱有沒有 logo/商標/標誌，比對不到才退回檔名關鍵字）
+     ASSET_POOL 存這次上傳「所有」圖片（不只 LOGO 判斷到的那幾張，檔名→dataURL），
+     這樣不管工單跟素材包誰先匯入，都能事後用檔名互相比對。
+     人物圖片本階段只收檔名（personImageNames），不做比對，位置範圍待補。 */
+  /* 廠商 LOGO 只是排版位置用，縮到長邊 300px 就夠；人物照片佔版面大得多、又能放大到
+     5 倍，長邊留到 1800px（最大的人物定位框是 LINE_1200x1200 的 573×673，1800 的來源
+     在 contain 之後大約還有 2.6 倍餘裕）。之前人物照片「超糊」最主要就是走素材包比對
+     這條路時，直接沿用了 LOGO 用的 300px 縮圖（200×300 貼進 573×673 的框＝放大快 3 倍）。 */
+  const LOGO_MAX = 300, PHOTO_MAX = 1800;
+  let ASSET_POOL = {};          /* 檔名（不含路徑）→ 300px LOGO 縮圖 dataURL */
+  let ASSET_FILES = {};         /* 檔名（不含路徑）→ 原始 File，人物照片要照 PHOTO_MAX 重編 */
+  let PENDING_VENDOR_NAMES = null;  /* 工單指定的廠商LOGO檔名，素材包還沒上傳時先記著 */
+  let PENDING_PHOTO_NAMES = null;   /* 工單指定的人物照片檔名（陣列，對應人物1/人物2），
+                                       素材包還沒上傳時先記著，等上傳完再比對 */
+  /* 路徑只取檔名。斜線兩種都切：素材包來的是 webkitRelativePath（/），
+     但工單是手打的，很可能整條 Windows 路徑貼進去（\）。 */
+  function baseName(name) { return String(name || '').split(/[\/\\]/).pop(); }
+  /* 比對用正規化：去頭尾空白 → NFC → 小寫。
+     NFC 這步是必要的：macOS 產生的檔名是 NFD（組合字會拆成基底字＋記號），
+     跟蝦大在 Excel 打的 NFC 字串逐字比對不會相等，但兩邊人眼看起來一模一樣。 */
+  function normName(s) {
+    let t = String(s || '').trim();
+    try { t = t.normalize('NFC'); } catch (e) {}
+    return t.toLowerCase();
+  }
+  /* 去掉副檔名。只認得出來的圖片副檔名才砍，不用泛用的「砍掉最後一個點之後」——
+     那會把「廠商LOGO.橫版」這種帶點但不是副檔名的檔名砍掉半截。 */
+  const IMG_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif|tiff?|ico)$/;
+  function stemName(s) { return normName(s).replace(IMG_EXT_RE, ''); }
+  /* 依工單寫的檔名在素材包裡找檔案。比對刻意「寬限」，依序試三條規則：
+       ① 完全相同
+       ② 工單沒打副檔名（工單「台灣大哥大」對到素材包「台灣大哥大.png」）
+       ③ 兩邊副檔名不同（工單打 .jpg、設計師實際輸出 .png）
+     使用者 2026-09-14 指示「檔名有對就好」——工單是手打的，副檔名要嘛沒打、要嘛
+     跟實際輸出格式對不上，卡在這裡只會讓人以為配圖功能壞掉。
+     同一條規則內對到多個檔（例如 logo.png 與 logo.jpg 並存）就取排序後第一個，
+     並在主控台講清楚，不要靜靜挑一個讓人以為挑錯是隨機的。 */
+  function findAssetKey(name, keys) {
+    const want = normName(baseName(name));
+    if (!want) return null;
+    const wantStem = stemName(want);
+    const rules = [
+      k => normName(k) === want,      // ① 完全相同
+      k => stemName(k) === want,      // ② 工單沒打副檔名
+      k => stemName(k) === wantStem,  // ③ 兩邊副檔名不同
+    ];
+    for (let i = 0; i < rules.length; i++) {
+      const hits = keys.filter(rules[i]).sort();
+      if (!hits.length) continue;
+      if (hits.length > 1) {
+        console.warn('[BN] 工單檔名「' + name + '」在素材包裡對到 ' + hits.length +
+                     ' 個檔案，取「' + hits[0] + '」：', hits);
+      }
+      return hits[0];
+    }
+    return null;
+  }
+  /* 工單指定的人物照片檔名 → 逐一配進人物槽（第 n 個檔名配人物n）。
+     回傳 [{i, url}]，配不到的略過（不要讓第 2 張配不到就把第 1 張也擋掉）。 */
+  async function photosFromNames(names) {
+    const out = [];
+    for (let i = 0; i < (names || []).length; i++) {
+      const url = await photoFromPool(names[i]);
+      if (url) out.push({ i: i, url: url });
+    }
+    return out;
+  }
+  /* 把 photosFromNames 的結果併進一份待寫入的 state（每張連帶重設自己的變形） */
+  function mergePhotos(st, hits) {
+    const arr = (st.photos || []).slice();
+    hits.forEach(h => {
+      while (arr.length <= h.i) arr.push(Object.assign({}, EMPTY_PHOTO));
+      arr[h.i] = Object.assign({}, EMPTY_PHOTO, { url: h.url });
+    });
+    return arr;
+  }
+  function matchByNames(names) {
+    const keys = Object.keys(ASSET_POOL);
+    return (names || []).map(n => {
+      const hitKey = findAssetKey(n, keys);
+      return hitKey ? ASSET_POOL[hitKey] : null;
+    });
+  }
+  /* 人物照片專用比對：不吃 ASSET_POOL 的 300px LOGO 縮圖，改回頭拿原始 File
+     照 PHOTO_MAX 重編一次，否則從素材包帶進來的人物照片會糊到不能看。 */
+  async function photoFromPool(name) {
+    const hitKey = findAssetKey(name, Object.keys(ASSET_FILES));
+    if (!hitKey) return null;
+    try { return await downscaleToDataURL(ASSET_FILES[hitKey], PHOTO_MAX); }
+    catch (err) { console.error(err); return null; }
+  }
+  function findLogoFiles(fileList) {
+    const files = Array.from(fileList);
+    const byFolder = files.filter(f => {
+      const rel = f.webkitRelativePath || f.name;
+      const parts = rel.split('/');
+      const folderPath = parts.slice(0, -1).join('/');
+      return /logo|商標|標誌/i.test(folderPath);
+    });
+    let pool = byFolder.length ? byFolder : files.filter(f => /logo|商標|標誌/i.test(f.name));
+    pool = pool.filter(f => /\.(png|jpe?g|webp)$/i.test(f.name));
+    pool.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+    /* 上限給寬一點（不同主題需要的廠商LOGO數量不同：橫排固定2個、環繞可能3個+），
+       多抓到的頂多是排版時用不到、被忽略，不會造成錯誤。 */
+    return pool.slice(0, 6);
+  }
+  /* 圖檔 → dataURL，長邊超過 maxSide 才縮。
+     ① 不需要縮的時候直接回原始 dataURL，完全不進 canvas——省掉一次重新編碼，
+        也不會把 JPEG 洗成更大的 PNG。
+     ② 需要縮的時候分階段每次只縮一半（mipmap 做法）再做最後一階，每階都開
+        imageSmoothingQuality:high；單次大倍率 drawImage 的雙線性濾波會糊掉。
+     ③ 輸出格式跟著來源走：來源是 JPEG 就輸出 JPEG（品質 .92，檔案小很多），
+        PNG/WebP 這種可能帶透明的（去背人像就是）一律輸出 PNG，不然去背會變白底。 */
+  function downscaleToDataURL(file, maxSide) {
+    return new Promise((resolve, reject) => {
+      const keepAlpha = !/^image\/jpe?g$/i.test(file.type || '');
+      const fr = new FileReader();
+      fr.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          if (Math.max(img.width, img.height) <= maxSide) { resolve(fr.result); return; }
+          const r = maxSide / Math.max(img.width, img.height);
+          const tw = Math.max(1, Math.round(img.width * r)), th = Math.max(1, Math.round(img.height * r));
+          let cnv = document.createElement('canvas');
+          cnv.width = img.width; cnv.height = img.height;
+          cnv.getContext('2d').drawImage(img, 0, 0);
+          let cw = img.width, ch = img.height;
+          /* 每階最多縮一半；用 >= 讓「剛好兩倍」也走分階段，別留給最後一階硬縮 */
+          while (cw >= tw * 2 && ch >= th * 2) {
+            const nw = Math.max(tw, Math.round(cw / 2)), nh = Math.max(th, Math.round(ch / 2));
+            const next = document.createElement('canvas'); next.width = nw; next.height = nh;
+            const nctx = next.getContext('2d');
+            nctx.imageSmoothingEnabled = true; nctx.imageSmoothingQuality = 'high';
+            nctx.drawImage(cnv, 0, 0, nw, nh);
+            cnv = next; cw = nw; ch = nh;
+          }
+          const out = document.createElement('canvas'); out.width = tw; out.height = th;
+          const octx = out.getContext('2d');
+          octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
+          octx.drawImage(cnv, 0, 0, tw, th);
+          resolve(keepAlpha ? out.toDataURL('image/png') : out.toDataURL('image/jpeg', 0.92));
+        };
+        img.onerror = reject;
+        img.src = fr.result;
+      };
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  }
+  $('#fAssets').onchange = async e => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const imgFiles = Array.from(files).filter(f => /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+    if (!imgFiles.length) { XD.toast('素材包裡沒有可用的圖片檔'); e.target.value = ''; return; }
+    try {
+      const urls = await Promise.all(imgFiles.map(f => downscaleToDataURL(f, LOGO_MAX)));
+      ASSET_POOL = {}; ASSET_FILES = {};
+      imgFiles.forEach((f, i) => { ASSET_POOL[baseName(f.name)] = urls[i]; ASSET_FILES[baseName(f.name)] = f; });
+
+      let vendorUrls = null, msg = null;
+      if (PENDING_VENDOR_NAMES && PENDING_VENDOR_NAMES.length) {
+        const hit = matchByNames(PENDING_VENDOR_NAMES).filter(Boolean);
+        if (hit.length) {
+          vendorUrls = hit;
+          msg = hit.length === PENDING_VENDOR_NAMES.length
+            ? ('已依工單指定的檔名比對到 ' + hit.length + ' 個廠商 LOGO')
+            : ('依工單指定的檔名比對到 ' + hit.length + '／' + PENDING_VENDOR_NAMES.length + ' 個廠商 LOGO，其餘素材包裡沒有同名檔案');
+        }
+      }
+      if (!vendorUrls) {
+        const legacy = findLogoFiles(files).map(f => ASSET_POOL[baseName(f.name)]).filter(Boolean);
+        if (legacy.length) {
+          vendorUrls = legacy;
+          msg = (PENDING_VENDOR_NAMES && PENDING_VENDOR_NAMES.length)
+            ? ('工單指定的廠商 LOGO 檔名都對不到，改用資料夾判斷抓到 ' + legacy.length + ' 個')
+            : ('已依資料夾判斷匯入 ' + legacy.length + ' 個廠商 LOGO');
+        } else {
+          vendorUrls = [];
+          msg = '素材包裡找不到廠商 LOGO（資料夾/檔名需含「LOGO/商標/標誌」，或先匯入有指定檔名的工單）';
+        }
+      }
+      const next = Object.assign({}, S(), { vendorLogos: vendorUrls });
+      if (PENDING_PHOTO_NAMES && PENDING_PHOTO_NAMES.length) {
+        const hits = await photosFromNames(PENDING_PHOTO_NAMES);
+        if (hits.length) {
+          next.photos = mergePhotos(next, hits);
+          msg += '／依工單檔名套用 ' + hits.length + ' 張人物照片';
+        }
+      }
+      H.set(next, {});
+      syncVendorInk();
+      XD.toast(msg);
+    } catch (err) { console.error(err); XD.toast('LOGO 讀取失敗：' + err.message); }
+    e.target.value = '';
+  };
+  $('#btnClearVendor').onclick = () => H.set(Object.assign({}, S(), { vendorLogos: [] }), {});
+  $('#chkLive').onchange = e =>
+    H.set(Object.assign({}, S(), { liveLogo: e.target.checked }), { key: 'liveLogo' });
+  function paintVendorCount() {
+    $('#vendorCount').textContent = (S().vendorLogos || []).length + ' 個';
+  }
+  /* 廠商 LOGO 縮圖＋編輯：這幾顆 LOGO 是全體版位共用同一份（st.vendorLogos[i]），
+     所以編輯入口放在右欄各一次，不是放在每個版位的畫布上。
+     橫排 LOGO 條「上傳幾顆畫幾格」，最多 VENDOR_SLOTS（3）顆，超過的會被忽略。 */
+  function paintVendorPreview() {
+    const vendor = S().vendorLogos || [];
+    $('#vendorPreview').innerHTML = vendor.map((url, i) =>
+      '<div class="vp-item"><div class="vp-thumb"><img src="' + url + '" alt="廠商LOGO' + (i + 1) + '"></div>' +
+      '<button class="mini" data-editvendor="' + i + '">✎ 編輯</button></div>').join('');
+  }
+  $('#vendorPreview').addEventListener('click', e => {
+    const btn = e.target.closest('[data-editvendor]'); if (!btn) return;
+    const i = Number(btn.dataset.editvendor);
+    const src = (S().vendorLogos || [])[i]; if (!src) return;
+    window.LogoEditor.open(src, dataUrl => {
+      const vendorLogos = (S().vendorLogos || []).slice();
+      vendorLogos[i] = dataUrl;
+      H.set(Object.assign({}, S(), { vendorLogos }), {});
+      syncVendorInk();
+      XD.toast('已更新廠商 LOGO ' + (i + 1));
+    }, err => { console.error(err); XD.toast('開啟編輯器失敗：' + err.message); });
+  });
+
+  /* ============ 人物照片 ============
+     跟廠商 LOGO 同一套：全體版位共用同一批照片（st.photos，索引對應公版定位的
+     「人物1／人物2」），宣告 noPhoto 的主題會直接忽略。可以直接選檔上傳，也可以
+     靠工單指定的檔名從素材包裡自動比對（見 applyWo() 與 #fAssets 的比對邏輯）。
+     解析度統一走 PHOTO_MAX（1800，見上方常數說明），不論是這裡直接選檔、還是從素材包
+     依工單檔名比對進來的都一樣——後者以前沿用 LOGO 的 300px 縮圖，是「超糊」的主因。
+     長邊沒超過 1800 的原圖會原封不動保留（downscaleToDataURL 不重新編碼）。 */
+  $('#fPhoto').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const st = S(), i = activeSlot(st);
+    try {
+      const url = await downscaleToDataURL(f, PHOTO_MAX);
+      view.frameMode = 'photo';
+      setPhotoAt(st, i, Object.assign({ url: url, ownUrl: url }, PHOTO_T_RESET));
+      XD.toast('已上傳' + photoSlotName(st, i));
+    } catch (err) { console.error(err); XD.toast('照片讀取失敗：' + err.message); }
+    e.target.value = '';
+  };
+  /* 「清除這張照片」只清「自己上傳的照片」（ownUrl）——不是清掉目前框裡不管是什麼的
+     那個 url。這顆鈕在「人物照片」分頁裡，按下去的意圖永遠是「不要我上傳的這張」，
+     跟目前是不是正顯示著圖素無關（見下面 disabled 的判斷同一個理由）。 */
+  $('#btnClearPhoto').onclick = () => {
+    const st = S(), i = activeSlot(st);
+    setPhotoAt(st, i, Object.assign({ url: '', ownUrl: '' }, PHOTO_T_RESET));
+    XD.toast('已清除' + photoSlotName(st, i));
+  };
+  /* + 新增人物2／− 移除人物2：唯一決定「要不要開第二個人物槽」的地方（見
+     photoSlotCount 讀 state.photos.length）。新增時明講 photoOrder=[1,0]——
+     使用者規則②「人物1的圖層在人物2上面」，若讓 photoOrderFor() 的預設遞補
+     （ascending）決定，結果會是人物2在上面，跟規則相反，所以這裡要明寫。 */
+  function hasPerson2(st) { return (st.photos || []).length > 1; }
+  function paintPersonToggle() {
+    const b = $('#btnAddPerson2'); if (!b) return;
+    b.textContent = hasPerson2(S()) ? '− 移除人物2（改回單人）' : '+ 新增人物2（左右並排）';
+  }
+  $('#btnAddPerson2').onclick = () => {
+    const st = S();
+    if (hasPerson2(st)) {
+      const arr = (st.photos || []).slice(0, 1);
+      H.set(Object.assign({}, st, { photos: arr, photoOrder: [] }), {});
+      if (view.slot > 0) view.slot = 0;
+      XD.toast('已移除人物2，改回單人版面（可用 Ctrl+Z 復原）');
+    } else {
+      const arr = (st.photos || []).slice();
+      while (arr.length < 2) arr.push(Object.assign({}, EMPTY_PHOTO));
+      H.set(Object.assign({}, st, { photos: arr, photoOrder: [1, 0] }), {});
+      view.slot = 1;
+      XD.toast('已新增人物2——兩邊都上傳照片後會自動左右並排（重疊約 8%，人物1在上層）');
+    }
+  };
+  $('#btnEditPhoto').onclick = () => {
+    const st = S(), i = activeSlot(st), src = photoUrl(st, i);
+    if (!src) return;
+    /* 圖素是相對路徑，編輯器要的是能直接餵給 <img> 的 src；編出來的一律是 dataURL，
+       所以編過的圖素就變成「自己的照片」，不再跟著 photo-assets.js 走。 */
+    window.LogoEditor.open(photoSrc(src), dataUrl => {
+      /* 編過的圖（不管原本是圖素還是照片）從此變成「自己的照片」，
+         記進 ownUrl——之後誤按圖素縮圖也能靠切分頁救回這次編輯結果。 */
+      setPhotoAt(S(), i, { url: dataUrl, ownUrl: dataUrl });
+      XD.toast('已更新' + photoSlotName(S(), i));
+    }, err => { console.error(err); XD.toast('開啟編輯器失敗：' + err.message); });
+  };
+  /* ---- 圖素縮圖列：點一下就套進人物框 ---- */
+  function paintStock() {
+    const row = $('#stockRow'); if (!row) return;
+    const items = stockItems();
+    if (!items.length) {
+      row.innerHTML = '<span class="mini hint">packs/bn/photo-assets.js 沒有列任何圖素</span>';
+      return;
+    }
+    paintThumbs('#stockRow', 'data-stock',
+      items.map(it => ({ key: it.id, name: it.name, img: photoSrc(stockUrl(it)) })),
+      stockIdOf(photoUrl(S(), activeSlot(S()))));
+  }
+  /* ---- 人物框的兩個模式：圖素／人物照片（使用者 2026-09-16 要求拆開） ----
+     模式決定「右欄現在給你哪一組工具」，**也會切回那個模式最後用過的內容**：
+     每個槽記住 ownUrl（最後一次自己上傳/編輯的照片）與 stockId（最後選的圖素），
+     點一下另一個分頁的縮圖不會清掉另一邊的資料——2026-09-17 使用者回報「不小心
+     按到圖素縮圖，切回人物照片也叫不回原本的照片」：原本切分頁只換工具面板、
+     不換內容，於是誤按圖素縮圖直接覆蓋掉 url，沒有任何路徑救得回來。
+     現在切到某個分頁時，如果框裡目前顯示的不是那個分頁該有的內容、而且那個分頁
+     之前有記住東西，就自動換回去（並重設位移/縮放/角度，跟換照片同一套規則）；
+     兩邊都沒記住就什麼都不做（維持原狀，跟舊行為一樣）。 */
+  function frameMode() { return view.frameMode === 'photo' ? 'photo' : 'stock'; }
+  function paintFrameMode() {
+    const m = frameMode();
+    XD.$$('#frameTabs .vtab').forEach(b => b.classList.toggle('on', b.dataset.fmode === m));
+    $('#paneStock').style.display = m === 'stock' ? '' : 'none';
+    $('#panePhoto').style.display = m === 'photo' ? '' : 'none';
+    const url = photoUrl(S(), activeSlot(S()));
+    const sid = stockIdOf(url);
+    const it = sid ? stockItem(sid) : null;
+    $('#frameNow').innerHTML = '目前框裡：<b>' +
+      (it ? esc(it.name) : url ? '自己上傳的照片' : '（空的）') + '</b>';
+  }
+  $('#frameTabs').onclick = e => {
+    const btn = e.target.closest('[data-fmode]'); if (!btn) return;
+    const mode = btn.dataset.fmode;
+    view.frameMode = mode;
+    const st = S(), i = activeSlot(st), ph = photoAt(st, i);
+    let restored = false;
+    if (mode === 'photo' && ph && ph.ownUrl && slotIsStock(st, i)) {
+      setPhotoAt(st, i, Object.assign({ url: ph.ownUrl }, PHOTO_T_RESET));
+      XD.toast('已切回' + photoSlotName(st, i));
+      restored = true;
+    } else if (mode === 'stock' && ph && ph.stockId && !slotIsStock(st, i)) {
+      const it = stockItem(ph.stockId);
+      if (it) {
+        setPhotoAt(st, i, Object.assign({ url: stockUrl(it) }, PHOTO_T_RESET));
+        XD.toast('已切回圖素「' + it.name + '」');
+        restored = true;
+      }
+    }
+    /* 有 setPhotoAt 就會經 H.subscribe 自動重畫＋重繪這兩個函式；沒有才要自己補畫。 */
+    if (!restored) { paintFrameMode(); paintPhotoAdjust(); }
+  };
+  $('#stockRow').onclick = e => {
+    const btn = e.target.closest('[data-stock]'); if (!btn) return;
+    const it = stockItem(btn.dataset.stock); if (!it) return;
+    const st = S(), i = activeSlot(st);
+    view.frameMode = 'stock';
+    /* 換圖素＝換照片：整體設定與逐版位的手動調整一起歸零（跟上傳新照片同一套規則），
+       不然新圖素會套到上一張調好的位移/角度上，看起來像工具壞了。
+       只寫 stockId、不動 ownUrl——上傳過的照片留著，切回「人物照片」分頁還在。 */
+    setPhotoAt(st, i, Object.assign({ url: stockUrl(it), stockId: it.id }, PHOTO_T_RESET));
+    XD.toast('已套用' + it.name);
+  };
+  function paintPhotoLayers() {
+    const st = S(), n = photoSlotCount(st), row = $('#phLayers');
+    row.style.display = n > 1 ? '' : 'none';
+    $('#fPhotoWho').textContent = n > 1 ? '（' + photoSlotName(st, activeSlot(st)) + '）' : '';
+    if (n <= 1) { row.innerHTML = ''; return; }
+    const order = photoOrderFor(st).filter(i => i < n);
+    const cur = activeSlot(st);
+    let h = '';
+    /* 由上而下顯示最上層 → 最底層（PS 慣例），所以把 order 反過來走 */
+    order.slice().reverse().forEach((i, k) => {
+      const ph = photoAt(st, i), url = (ph && ph.url) || '', off = !!(ph && ph.hidden);
+      h += '<div class="ph-lay' + (i === cur ? ' on' : '') + (off ? ' off' : '') +
+           '" data-slot="' + i + '">' +
+           (url ? '<img class="th" src="' + photoSrc(url) + '" alt="">' : '<span class="th"></span>') +
+           '<span class="nm">人物' + (i + 1) + (url ? '' : '（未上傳）') + '</span>' +
+           '<span class="tag">' + (k === 0 ? '最上層' : '') + '</span>' +
+           '<button type="button" data-lay="hide" title="' +
+             (off ? '改成顯示' : '不顯示（畫面與匯出都不畫）') + '">' + (off ? '○' : '●') + '</button>' +
+           '<button type="button" data-lay="up" title="往上疊一層"' +
+             (k === 0 ? ' disabled' : '') + '>↑</button>' +
+           '</div>';
+    });
+    row.innerHTML = h;
+  }
+  $('#phLayers').onclick = e => {
+    const rowEl = e.target.closest('[data-slot]'); if (!rowEl) return;
+    const i = +rowEl.dataset.slot, btn = e.target.closest('[data-lay]');
+    if (btn && btn.dataset.lay === 'hide') {
+      setPhotoAt(S(), i, { hidden: !photoHidden(S(), i) });
+      return;
+    }
+    if (btn && btn.dataset.lay === 'up') {
+      const st = S(), o = photoOrderFor(st).slice(), at = o.indexOf(i);
+      if (at >= 0 && at < o.length - 1) {
+        o[at] = o[at + 1]; o[at + 1] = i;
+        H.set(Object.assign({}, st, { photoOrder: o }), {});
+      }
+      return;
+    }
+    /* 點圖層＝切到那一位。畫布上已經選著某塊板時把選取框一起搬過去——兩人的影像
+       重疊時（例如刻意左右交換後），這是最可靠的「選到人物2」的方式；那一位在這塊板
+       沒東西可選才退回只切右欄。 */
+    view.slot = i;
+    if (view.selBoard && photoUrl(S(), i) && !photoHidden(S(), i)) view.selIdx = i;
+    else view.selBoard = null;
+    paintPhotoLayers(); paintPhotoAdjust(); paintPhotoOverlay();
+  };
+
+  /* ============ 人物照片：位置/縮放調整 ============
+     承 01_蝦導播 v14 js/product-zoom-plugin.js 的商品圖縮放語意（0.2～5 倍、滾輪＋按鈕）：
+     **上傳當下固定在範圍內**＝zoom 1＝object-fit:contain，整張圖剛好塞進定位框，
+     不會有任何一角跑到框外；**之後手動調整就不再受框限制**，可以放大到超出框、
+     也可以拖到框外（真正的邊界只剩版位本身 .cv 的 overflow:hidden）。
+     所以這裡不再有舊版那個 panLimit()——它是為了「cover 滿框後不准露出背景」而存在的，
+     現在改成 contain 打底、允許溢出，反而會把使用者想要的調整鎖死。
+     位移量存成百分比（相對定位框自己的尺寸），套到 CSS transform 的 translate(%) 上——
+     translate 的 % 一律是相對「元素自己的框」換算，同一組數字套到畫布上
+     每個版位各自不同大小/長寬比的人物框，會各自照自己的框換算，比例觀感一致，
+     不用替每個版位分別存一份位移量。
+     PAN_LIMIT 只是「別讓照片被甩到天邊回不來」的保險（±300%，遠超過任何版位需要的範圍），
+     不是設計上的範圍限制；真的拖歪了還有 ⟲ 一鍵回到「固定在範圍內」。 */
+  const PHOTO_ZOOM_MIN = 0.2, PHOTO_ZOOM_MAX = 5, PHOTO_ZOOM_STEP = 0.12, PAN_LIMIT = 300;
+  /* 換照片就把「整體設定」與「逐版位手動調整」一起歸零：新照片的構圖跟舊的無關，
+     留著舊的位移/角度只會讓人以為工具壞了。 */
+  const PHOTO_T_RESET = { zoom: 1, x: 0, y: 0, r: 0, boards: {} };
+  const EMPTY_PHOTO = { url: '', zoom: 1, x: 0, y: 0, r: 0, boards: {}, ownUrl: '', stockId: '' };
+  /* ---- 人物槽存取（st.photos[i]，i 對應公版定位的「人物(i+1)」） ---- */
+  function photoAt(st, i) { return (st.photos || [])[i] || null; }
+  function photoUrl(st, i) { const p = photoAt(st, i); return (p && p.url) || ''; }
+  function anyPhoto(st) { return (st.photos || []).some(p => p && p.url); }
+  /* 寫回某一個槽（不可變更新；陣列不夠長就先補空槽，這樣使用者可以只上傳人物2） */
+  function setPhotoAt(st, i, patch, opts) {
+    const arr = (st.photos || []).slice();
+    while (arr.length <= i) arr.push(Object.assign({}, EMPTY_PHOTO));
+    arr[i] = Object.assign({}, arr[i] || EMPTY_PHOTO, patch);
+    H.set(Object.assign({}, st, { photos: arr }), opts || {});
+  }
+  /* 疊放順序：回傳一個合法的排列（0..n-1），state 裡缺的/多的/重複的都補正。
+     第一個＝畫在最底下。只影響 z-order，不影響哪一位用哪個定位框。 */
+  function photoOrderFor(st) {
+    const n = Math.max(photoSlotCount(st), (st.photos || []).length);
+    const seen = {}, out = [];
+    (st.photoOrder || []).forEach(i => {
+      if (typeof i === 'number' && i >= 0 && i < n && !seen[i]) { seen[i] = 1; out.push(i); }
+    });
+    for (let i = 0; i < n; i++) if (!seen[i]) out.push(i);
+    return out;
+  }
+  /* 圖層關掉＝畫面與匯出都不畫（不是只有預覽隱藏——那種狀態很容易忘記而匯錯） */
+  function photoHidden(st, i) { const p = photoAt(st, i); return !!(p && p.hidden); }
+  /* 右欄目前在編哪一個槽（不進歷史：只是視角狀態，跟 selBoard 同性質） */
+  function activeSlot(st) {
+    const n = photoSlotCount(st);
+    return Math.max(0, Math.min(view.slot, Math.max(0, n - 1)));
+  }
+
+  /* 一組變形＝{x,y（相對定位框的位移%）, z（等比倍率）, r（角度）}。
+     CSS 函式的合成順序是「寫在右邊的先套用」，transform-origin 預設是元素中心：
+     translate(位移) rotate(角度) scale(倍率) [translate(墨迹基準)]
+     ＝「看得到的內容中心＝定位框中心＋位移，並繞那個中心旋轉＋等比縮放」，
+     畫布上的把手幾何就是照這個模型推的（見 photoGeom）。
+     位移基準一律是**定位框的 px**（不是 img 自己的邊框盒）——img 的尺寸是算好的
+     contain 值、圖素還會比框大，用 % 會縮水成 t.x%×img寬，拖曳中預覽就跟不上游標。 */
+  function photoImgTransform(t, bw, bh) {
+    return 'translate(' + (t.x / 100 * bw) + 'px,' + (t.y / 100 * bh) + 'px) rotate(' +
+           t.r + 'deg) scale(' + t.z + ')';
+  }
+  /* 一張人物框圖的 inline style——畫布與右欄共編器共用同一套數學（兩邊分家過一次，
+     結果就是「預覽跟匯出不一樣」那種 bug，不再重蹈）。
+       · 看得到的內容（圖素＝墨迹、照片＝整張）contain 進定位框 → rc
+       · img 本身可能比框大（圖素的透明邊）：尺寸 = rc ÷ 墨迹佔比
+       · 用 left/top:50% ＋ 負 margin 讓 img 中心對齊框心（flex 置中在「子元素比容器大」
+         時的溢出行為不見得可靠，而且 html2canvas 只認版面位置）
+       · 再把「墨迹中心」搬到框心（base，疊在 scale/rotate 右邊＝先套用，所以縮放旋轉
+         都是繞墨迹中心轉，不是繞含透明邊的畫布中心） */
+  function photoImgStyle(bw, bh, t, i, ink) {
+    const rc = containRect(bw, bh, i, ink);
+    const iw = ink ? rc[0] / ink.fillW : rc[0];
+    const ih = ink ? rc[1] / ink.fillH : rc[1];
+    const qx = ink ? (ink.cx - 0.5) * iw : 0;
+    const qy = ink ? (ink.cy - 0.5) * ih : 0;
+    const base = (qx || qy) ? ' translate(' + (-qx) + 'px,' + (-qy) + 'px)' : '';
+    return { w: iw, h: ih, base: base,
+             css: 'width:' + iw + 'px;height:' + ih + 'px;margin-left:' + (-iw / 2) +
+                  'px;margin-top:' + (-ih / 2) + 'px;transform:' +
+                  photoImgTransform(t, bw, bh) + base + ';' };
+  }
+  /* 這塊板實際要用哪一組：這張照片有手動調整過（photos[i].boards[id]）就用它，
+     沒有才跟著右欄的整體設定走。這就是「手動調過的版位不會被整體調整取代」。 */
+  function photoTFor(st, i, boardId) {
+    const ph = photoAt(st, i);
+    if (!ph) return { x: 0, y: 0, z: 1, r: 0 };
+    const o = (ph.boards || {})[boardId];
+    if (o) return { x: o.x || 0, y: o.y || 0, z: o.z == null ? 1 : o.z, r: o.r || 0 };
+    return globalPhotoT(st, i);
+  }
+  function globalPhotoT(st, i) {
+    const ph = photoAt(st, i);
+    if (!ph) return { x: 0, y: 0, z: 1, r: 0 };
+    return { x: ph.x || 0, y: ph.y || 0, z: ph.zoom == null ? 1 : ph.zoom, r: ph.r || 0 };
+  }
+  function boardsWithOverride(st, i) {
+    const ph = photoAt(st, i);
+    return Object.keys((ph && ph.boards) || {});
+  }
+  /* 把某一塊板的照片變形直接寫進 DOM（不重畫整個畫布）——拖曳中每個 pointermove
+     都重畫 innerHTML 太貴，而且會把正在拖的節點抽掉。 */
+  function applyPhotoTFor(boardId, i, t) {
+    XD.$$('.slot.photo[data-photo-board]').forEach(el => {
+      if (el.dataset.photoBoard !== boardId || +el.dataset.photoIdx !== i) return;
+      const im = el.querySelector('img'); if (!im) return;
+      /* 基準＝定位框（.slot.photo）自己的寬高，跟 photoHTML/geomFrom 的 bw/bh 同一個。
+         圖素的墨迹基準位移在渲染時就算好存在 data-ink-tf，這裡原樣接回去——
+         漏了它拖曳中圖會先跳一下（跳掉透明邊的偏移），放開重畫又跳回來。 */
+      im.style.transform = photoImgTransform(t, el.offsetWidth, el.offsetHeight) +
+                           (im.dataset.inkTf ? ' ' + im.dataset.inkTf : '');
+    });
+  }
+  /* 整體設定改變時只更新「沒有手動調整過」的版位（右欄小預覽一定跟著整體走）。 */
+  function applyPhotoTransformDOM(i, t) {
+    const st = S(), ph = photoAt(st, i), ov = (ph && ph.boards) || {};
+    const img = $('#photoAdjust').querySelector('[data-pf-img="' + i + '"]');
+    if (img && img.parentElement) {
+      const fr = img.parentElement;
+      img.style.transform = photoImgTransform(t, fr.offsetWidth, fr.offsetHeight) +
+                            (img.dataset.inkTf ? ' ' + img.dataset.inkTf : '');
+    }
+    XD.$$('.slot.photo[data-photo-board]').forEach(el => {
+      if (+el.dataset.photoIdx !== i) return;
+      if (ov[el.dataset.photoBoard]) return;
+      const im = el.querySelector('img'); if (!im) return;
+      im.style.transform = photoImgTransform(t, el.offsetWidth, el.offsetHeight) +
+                           (im.dataset.inkTf ? ' ' + im.dataset.inkTf : '');
+    });
+    const hint = $('#photoAdjustHint');
+    if (hint) hint.textContent = photoSlotName(S(), i) + ' 整體　' +
+                                 Math.round(t.z * 100) + '%・' + Math.round(t.r) + '°';
+  }
+  /* ---- 共編預覽：綁一塊真實版位，把它的 N 個人物框照實際相對位置畫出來 ----
+     為什麼不用「平均值捏一個排列」：量過 15 塊板（雙人版定位）——
+       · 單一人物框的長寬比幾乎一致：0.782~0.934，標準差 0.032（差 1.19 倍）
+         ⇒ 一個人的框形狀拿任一塊板當代表都夠準（這是舊版只顯示一個框時的做法）
+       · 但「人物2 相對人物1 的偏移」差到 7.9 倍（0.108~0.859 個框寬），
+         而且跟版位長寬比幾乎無關（相關係數 r=0.15）
+         ⇒ 兩人的相對位置沒有公式算得出來，只能照某塊板的實際資料畫。
+     所以預覽一定要指定是「哪一塊板」，並讓使用者換著看（selPvBoard）。
+     這也是為什麼 photoOrder/變形都存成「相對自己定位框的比例」——那部分是
+     版位無關的，換版位預覽不會改變已經調好的值。 */
+  function pvBoardList(st) {
+    return PACK.boards.filter(b => st.on.indexOf(b.id) >= 0 &&
+                                   photoBoxes(placementFor(st, b.id)).length).map(b => b.id);
+  }
+  function pvBoardId(st) {
+    const list = pvBoardList(st);
+    return list.indexOf(view.pvBoard) >= 0 ? view.pvBoard : (list[0] || null);
+  }
+  const PV_PAD = 0.13;   /* 框外留白比例，看得到照片跑出框多少（沿用原本的 13%） */
+  function panelLayout() {
+    const st = S(), bid = pvBoardId(st);
+    if (!bid) return null;
+    /* 圖素與照片各用自己的框，所以這裡也要走 photoBoxAt（不然預覽框跟畫布不一樣大） */
+    const n = Math.max(photoSlotCount(st), (st.photos || []).length, 1);
+    const boxes = [];
+    for (let i = 0; i < n; i++) {
+      const bx = photoBoxAt(st, i, bid);
+      if (bx) boxes[i] = bx;
+    }
+    if (!boxes.filter(Boolean).length) return null;
+    /* 外接矩形（兩個框的聯集）縮到面板寬度 */
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    boxes.forEach(b => {
+      if (!b) return;
+      x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]);
+      x1 = Math.max(x1, b[0] + b[2]); y1 = Math.max(y1, b[1] + b[3]);
+    });
+    const uw = x1 - x0, uh = y1 - y0;
+    if (!(uw > 0) || !(uh > 0)) return null;
+    const availW = $('#photoAdjust').clientWidth || 240;
+    const k = (availW * (1 - PV_PAD * 2)) / uw;
+    const padX = availW * PV_PAD, padY = uh * k * PV_PAD;
+    return {
+      bid: bid, k: k, h: uh * k + padY * 2,
+      frames: boxes.map(b => b && { left: padX + (b[0] - x0) * k, top: padY + (b[1] - y0) * k,
+                                    w: b[2] * k, h: b[3] * k }),
+    };
+  }
+  /* 把 N 個框（含各自的照片與變形）畫進共編器 */
+  function paintPanelFrames() {
+    const st = S(), host = $('#photoAdjust'), lay = panelLayout();
+    if (!lay) { host.innerHTML = ''; host.style.height = ''; return; }
+    host.style.height = lay.h + 'px';
+    const cur = activeSlot(st);
+    let h = '';
+    photoOrderFor(st).forEach(i => {
+      const fr = lay.frames[i];
+      if (!fr || photoHidden(st, i)) return;
+      const url = photoUrl(st, i);
+      /* 圖跟畫布走同一支 photoImgStyle（含圖素的墨迹貼合），所以預覽框裡看到的
+         大小/位置就是畫布上的比例 */
+      const sty = photoImgStyle(fr.w, fr.h, globalPhotoT(st, i), i, slotInk(st, i));
+      h += '<div class="photo-adjust-frame' + (i === cur ? ' on' : '') + '" data-pf="' + i + '"' +
+           ' style="left:' + fr.left + 'px;top:' + fr.top + 'px;width:' + fr.w +
+           'px;height:' + fr.h + 'px">' +
+           (url ? '<img data-pf-img="' + i + '" src="' + photoSrc(url) + '" alt="" style="' +
+                  sty.css + '"' + (sty.base ? ' data-ink-tf="' + sty.base.trim() + '"' : '') + '>'
+                : '') + '</div>';
+    });
+    host.innerHTML = h;
+  }
+  function paintPvBoard() {
+    const st = S(), list = pvBoardList(st), sel = $('#selPvBoard');
+    /* 只有雙人（多個框）才需要選版位——單人版每塊板的框形狀幾乎一樣，選了沒差 */
+    $('#pvBoardRow').style.display = (photoSlotCount(st) > 1 && list.length > 1) ? '' : 'none';
+    const cur = pvBoardId(st);
+    const sig = list.join('|');
+    if (sel.dataset.sig !== sig) {
+      sel.dataset.sig = sig;
+      sel.innerHTML = list.map(id => '<option value="' + esc(id) + '">' + esc(id) + '</option>').join('');
+    }
+    if (cur) sel.value = cur;
+  }
+  $('#selPvBoard').onchange = e => { view.pvBoard = e.target.value; paintPhotoAdjust(); };
+  /* 人物槽的人話名稱：只有一個槽就叫「人物照片」，多個才編號 */
+  function photoSlotName(st, i) {
+    return photoSlotCount(st) > 1 ? '人物' + (i + 1) : '人物照片';
+  }
+  /* 每個槽的 url 各記一份，換槽/換圖才重新量長寬比（量測是 async，不要每次重畫都跑） */
+  const LAST_PHOTO_URL = [];
+  function paintPhotoAdjust() {
+    const st = S(), i = activeSlot(st), url = photoUrl(st, i), ph = photoAt(st, i);
+    /* 所有槽的長寬比都要維持最新：畫布上兩張同時在畫，不能只量正在編的那一張 */
+    const n = photoSlotCount(st);
+    for (let k = 0; k < Math.max(n, (st.photos || []).length); k++) {
+      const u = photoUrl(st, k);
+      if (LAST_PHOTO_URL[k] !== u) { LAST_PHOTO_URL[k] = u; measurePhotoAR(k, u); }
+    }
+    /* 共編器只要「有人」就顯示（雙人版要兩人一起看得到相對位置），
+       但下面那排按鈕作用在「目前選取的那一位」，所以按鈕跟著 url 決定 disabled。 */
+    const shown = anyPhoto(st);
+    $('#photoAdjustWrap').style.display = shown ? '' : 'none';
+    $('#btnEditPhoto').disabled = !url;
+    $('#btnPhotoApplyAll').disabled = !url;
+    /* 只看 ownUrl（自己上傳的那張），不是「目前框裡不管顯示什麼」——
+       避免使用者在「人物照片」分頁按下去，實際清掉的卻是圖素。 */
+    $('#btnClearPhoto').disabled = !(ph && ph.ownUrl);
+    paintPvBoard();
+    if (!shown) { $('#photoAdjust').innerHTML = ''; $('#photoAdjustOv').innerHTML = '';
+                  paintPhotoScope(); return; }
+    paintPanelFrames();
+    paintPanelOverlay();
+    paintPhotoScope();
+  }
+  /* 右欄下方那行：讓人一眼知道「這裡調的是整體」以及有幾塊板已經自己調過、
+     不會被整體設定蓋掉。「套用至所有版位」永遠在（黃色＝會蓋掉別人手動成果的動作），
+     真的有手動版位時才會跳三選一確認。 */
+  function paintPhotoScope() {
+    const st = S(), i = activeSlot(st), n = boardsWithOverride(st, i).length;
+    const el = $('#photoScope'); if (!el) return;
+    const who = photoSlotCount(st) > 1 ? photoSlotName(st, i) + '：' : '';
+    el.innerHTML = n
+      ? who + '有 <b>' + n + '</b> 個版位在畫布上單獨調整過，<b>不會</b>被上面的整體調整覆蓋。'
+      : who + '目前所有版位都跟著整體設定走。到畫布模式點人物照片可以單獨調整某一塊板。';
+  }
+
+  /* ---- 「套用至所有版位」：有手動版位才問，三選一 ---- */
+  function closePhConfirm() { $('#phConfirm').hidden = true; }
+  $('#btnPhotoApplyAll').onclick = () => {
+    const st = S(), i = activeSlot(st); if (!photoUrl(st, i)) return;
+    const n = boardsWithOverride(st, i).length;
+    if (!n) { XD.toast('所有版位本來就跟著整體設定，不用再套用'); return; }
+    $('#phConfirmN').textContent = n;
+    $('#phConfirm').hidden = false;
+  };
+  $('#phcAll').onclick = () => {
+    const st = S(), i = activeSlot(st), n = boardsWithOverride(st, i).length;
+    closePhConfirm();
+    /* 只清掉「目前這一位」的逐版位覆蓋，另一位的手動調整不受影響 */
+    setPhotoAt(st, i, { boards: {} });
+    XD.toast('已把' + photoSlotName(st, i) + '套用至所有版位，含 ' + n +
+             ' 個原本手動調整過的版位（可用 Ctrl+Z 復原）');
+  };
+  $('#phcSafe').onclick = () => {
+    const n = boardsWithOverride(S(), activeSlot(S())).length;
+    closePhConfirm();
+    /* 未手動調整的版位本來就即時跟著整體設定走，不用再寫一次狀態；
+       這個選項的意義是「確認過了，而且不要動我手動調過的那幾塊」。 */
+    XD.toast('未手動調整的版位已套用整體設定；保留 ' + n + ' 個手動調整的版位');
+  };
+  $('#phcCancel').onclick = closePhConfirm;
+  $('#phConfirm').addEventListener('pointerdown', e => { if (e.target.id === 'phConfirm') closePhConfirm(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#phConfirm').hidden) closePhConfirm(); });
+
+  /* ---- 右欄整體調整：跟畫布上同一套選取框（拖曳移動／四角等比縮放／把手旋轉） ----
+     原本這裡是「滾輪縮放」，使用者回報在右欄捲動時很常誤觸，改掉了：現在滾輪不做任何事，
+     縮放一律走選取框四角（或下面的 ±／⟲ 按鈕，那是明確點擊、不會誤觸）。
+     幾何座標系＝ .photo-adjust 這個盒子（選取框圖層 .ph-layer2 就是蓋在它上面同一個範圍），
+     定位框在裡面的位置用 offsetLeft/offsetTop 取得（.photo-adjust 是 position:relative）。 */
+  function panelGeomFor(i) {
+    const fr = $('#photoAdjust').querySelector('[data-pf="' + i + '"]');
+    if (!fr || !fr.offsetWidth || !fr.offsetHeight) return null;
+    return geomFrom(fr.offsetLeft, fr.offsetTop, fr.offsetWidth, fr.offsetHeight,
+                    globalPhotoT(S(), i), i, slotInk(S(), i));
+  }
+  function panelGeom() { return panelGeomFor(activeSlot(S())); }
+  /* 跟畫布同一套命中測試（見 photoHitAt）：座標基準是 .photo-adjust，
+     框的位置本來就是用 offsetLeft/offsetTop 算的，所以基準一致。 */
+  function panelHitAt(e) {
+    const host = $('#photoAdjust'), r = host.getBoundingClientRect();
+    return photoHitAt(S(), e.clientX - r.left, e.clientY - r.top, panelGeomFor);
+  }
+  function paintPanelOverlay() {
+    const ov = $('#photoAdjustOv'); if (!ov) return;
+    const st = S();
+    const g = photoUrl(st, activeSlot(st)) ? panelGeom() : null;
+    ov.innerHTML = g ? ovFrameHTML(g) : '';
+  }
+  function commitPhotoAdjust(t) {
+    const st = S(), i = activeSlot(st);
+    setPhotoAt(st, i, { x: t.x, y: t.y, zoom: t.z, r: t.r }, { key: 'photoAdjust:' + i });
+  }
+  $('#photoAdjustWrap').addEventListener('pointerdown', e => {
+    if (e.target.closest('.photo-adjust-zoom')) return;
+    /* 把手與「點在哪個框上」都要在重畫之前先問——重畫會把節點換掉 */
+    const h = e.target.closest('[data-ph]');
+    const inPhoto = !!e.target.closest('#photoAdjust');
+    if (!h && !inPhoto) return;
+    /* 點到另一位就先切過去（雙人版兩人一起顯示，點誰就是在調誰），
+       切完重畫後再取幾何，同一個手勢就能直接接著拖。
+       「點到誰」照實際畫出來的影像判斷（跟畫布同一套），不是點在哪個框裡——
+       兩人的框會重疊，而且位移一大影像就不在自己的框裡了。 */
+    if (!h) {
+      const pi = panelHitAt(e);
+      if (pi < 0) return;                  /* 點在空白處＝不抓（避免誤把照片拖走） */
+      if (pi !== activeSlot(S())) {
+        view.slot = pi; view.selBoard = null;
+        paintPhotoLayers(); paintPhotoAdjust();
+      }
+    }
+    if (!photoUrl(S(), activeSlot(S()))) return;
+    const g = panelGeom(); if (!g) return;
+    e.preventDefault();
+    beginTransformDrag(e, {
+      mode: h ? (h.dataset.ph === 'rot' ? 'rot' : 'scale') : 'move',
+      corner: h ? h.dataset.ph : null,
+      g: g, geoEl: $('#photoAdjust'),
+      live: t => { applyPhotoTransformDOM(activeSlot(S()), t);
+                   positionOverlayIn($('#photoAdjustOv'), g, t); },
+      commit: commitPhotoAdjust,
+    });
+    if (!h) $('#photoAdjust').classList.add('grabbing');
+    $('#photoAdjustWrap').setPointerCapture(e.pointerId);
+  });
+  $('#photoAdjustWrap').addEventListener('pointermove', moveTransformDrag);
+  const endPanelDrag = () => {
+    $('#photoAdjust').classList.remove('grabbing');
+    endTransformDrag();
+  };
+  $('#photoAdjustWrap').addEventListener('pointerup', endPanelDrag);
+  $('#photoAdjustWrap').addEventListener('pointercancel', endPanelDrag);
+  /* 面板寬度會隨視窗變（右欄是彈性寬），框的位置與選取框都是絕對 px，得跟著重算。
+     ⚠ 只在「寬度」變了才重畫版面：paintPanelFrames() 會設 height，若高度變化也觸發
+     重畫就會無限迴圈（clientWidth 不受 height 影響，所以拿寬度當閘門是安全的）。 */
+  let PV_W = 0;
+  if (typeof ResizeObserver === 'function')
+    new ResizeObserver(() => {
+      const w2 = $('#photoAdjust').clientWidth;
+      if (Math.abs(w2 - PV_W) > 0.5) { PV_W = w2; paintPhotoAdjust(); }
+      else paintPanelOverlay();
+    }).observe($('#photoAdjust'));
+
+  /* ±按鈕：倍率式（乘除）不是加減固定值——0.2～5 這麼大的範圍用加減的話，
+     小倍率時每格都跳很大、大倍率時又幾乎不動，乘除才會整段手感一致。 */
+  function zoomPhotoBy(f) {
+    const st = S(), i = activeSlot(st); if (!photoUrl(st, i)) return;
+    const t = globalPhotoT(st, i);
+    commitPhotoAdjust({ x: t.x, y: t.y, z: clamp(t.z * f, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX), r: t.r });
+  }
+  $('#photoZoomIn').onclick = () => zoomPhotoBy(1 + PHOTO_ZOOM_STEP);
+  $('#photoZoomOut').onclick = () => zoomPhotoBy(1 / (1 + PHOTO_ZOOM_STEP));
+  $('#photoZoomReset').onclick = () => {
+    if (photoUrl(S(), activeSlot(S()))) commitPhotoAdjust({ x: 0, y: 0, z: 1, r: 0 });
+  };
+
+  /* ============ 人物照片變形：右欄（整體）與畫布（單一版位）共用的一套 ============
+     兩邊的操作語意完全一樣（拖曳移動／四角等比縮放，固定對角／上方把手繞中心旋轉，
+     Shift 吸附 15°），差別只在「幾何從哪來、改完寫進哪一組狀態」，所以幾何計算、
+     選取框 HTML、拖曳數學都抽成共用函式，只有 live/commit 由呼叫端決定。
+     互動語意承 01_蝦導播 v14 js/anchor-transform.js。
+
+     座標系：畫布這邊是「.cv 內的版面 px」——畫布縮放是把座標乘上 view.zoom 重新排版的
+     （見 render() 的說明），#world 只有 translate 沒有 scale，所以 1 版面 px＝1 螢幕 px，
+     用 getBoundingClientRect 減去基準元素左上角就能直接換算，不用再除倍率；
+     右欄那邊基準元素換成 .photo-adjust，其餘完全相同。 */
+  /* 照片原生長寬比，每個人物槽各一份（0＝還沒量到）。兩張照片的比例通常不同，
+     contain 尺寸與選取框都得照各自的比例算，不能共用一個值。 */
+  let PHOTO_AR = [];
+  function measurePhotoAR(i, url) {
+    if (!url) { PHOTO_AR[i] = 0; return; }
+    ensurePhotoMask(photoSrc(url));     /* 命中測試要用的 alpha 遮罩，見 photoHitAt */
+    const im = new Image();
+    im.onload = () => {
+      PHOTO_AR[i] = im.naturalWidth / im.naturalHeight;
+      /* 量測是 async；render() 在呼叫這支函式的當下已經用「量到之前」的舊 PHOTO_AR
+         畫完畫布了（同一個 slot 換過另一張照片/圖素時尤其明顯——舊值可能是完全
+         不同長寬比）。量到新值只重繪選取框（paintPhotoOverlay/paintPanelOverlay）
+         不會改到已經畫出來的 <img> 尺寸，畫面會卡在「錯的長寬比」直到下一次不相關的
+         互動觸發重畫。2026-09-17 使用者回報「undo 之後人物照片預覽變很小，要點一下
+         或動一下才變回原本大小」正是這個空窗——undo 把 url 換回另一張照片，但這裡
+         漏了補一次真正的重畫。跟 LOGO_INK_READY／syncVendorInk 完成時的做法一致，
+         量到就補一次 renderAny()。 */
+      renderAny();
+      paintPhotoOverlay(); paintPanelOverlay();
+    };
+    im.src = photoSrc(url);
+  }
+  /* object-fit:contain 之後，影像在定位框裡實際畫出來的大小（框內置中）。
+     選取框要貼著「看得到的照片」而不是定位框——去背人像 contain 之後左右會留一大段透明，
+     把手畫在框邊看起來會離照片很遠。 */
+  /* 「看得到的內容」contain 進框之後的尺寸。圖素看**墨迹**的長寬比（ink.ratio）、
+     照片看整張的長寬比（PHOTO_AR）——選取框要貼的也是這個矩形。 */
+  function containRect(bw, bh, i, ink) {
+    const ar = (ink && ink.ratio) || PHOTO_AR[i || 0] || (bw / bh);
+    return ar > bw / bh ? [bw, bw / ar] : [bh * ar, bh];
+  }
+  /* 一組幾何：定位框在座標系裡的位置/大小 + 這組變形算出來的影像中心與半寬高 */
+  function geomFrom(bx, by, bw, bh, t, i, ink) {
+    const rc = containRect(bw, bh, i, ink);
+    return { t: t, bw: bw, bh: bh,
+             ox: bx + bw / 2, oy: by + bh / 2,                    /* 定位框中心＝位移的原點 */
+             cx: bx + bw / 2 + t.x / 100 * bw,
+             cy: by + bh / 2 + t.y / 100 * bh,
+             hw: rc[0] * t.z / 2, hh: rc[1] * t.z / 2, rw: rc[0], rh: rc[1] };
+  }
+  function photoGeom(b, st, s, i) {
+    const box = photoBoxAt(st, i, b.id);
+    if (!box || !photoUrl(st, i)) return null;
+    return geomFrom(box[0] * s, box[1] * s, box[2] * s, box[3] * s,
+                    photoTFor(st, i, b.id), i, slotInk(st, i));
+  }
+  /* ============ 命中測試：點在「看得到的影像」上才算抓到照片 ============
+     2026-09-17 使用者回報：「位移過大、左右交換的時候，人物1 的選取區域不符合圖片，
+     抓空白處也會抓到圖片，而且很難選取到人物2」。原因是命中測試靠 .slot.photo
+     這個**定位框**吃滑鼠，而框是固定的、影像是 transform 出來的，兩者會分開。
+     實測 Shopee DDC_531×792（雙人拆框：p1 x 21~285、p2 x 245~509）：
+       · 沒位移時，照片 contain 進框後只佔框高 35%（445px 的框、影像 154px）
+         ⇒ 框裡 65% 是空白，點下去照樣抓到照片。
+       · 把 p1 推到 x=+60%、p2 推到 x=-60%（左右交換）後，p1 的影像實際落在
+         200~423（整個在 p2 的框裡）、p2 的影像落在 87~351（在 p1 的框裡）
+         ⇒ 點人物2 的臉抓到人物1，而且 p1 的框疊在上層，人物2 幾乎選不到。
+     改成照 photoGeom（＝選取框貼的那個矩形，圖素貼墨迹、照片貼整張）逐張問，
+     由最上層往下，並用低解析 alpha 遮罩讓去背人像的透明處「穿透」到下一位
+     （或交還畫布平移）。量不到遮罩就退回整個矩形，維持舊行為不會壞掉。 */
+  /* src -> {w,h,a}（有遮罩）／null（量過了但不需要遮罩）／'pending'（還在量）。
+     三態分開才知道「還沒量到」不是「不需要」——量測中先當沒有遮罩用（退回整個矩形），
+     量完自然就準了，不用等、也不會卡住互動。 */
+  const PHOTO_MASK = {};
+  const MASK_PENDING = 'pending';
+  const MASK_MAX = 128;                 /* 長邊取樣上限：一格約 1/128 張圖，點擊容差剛好 */
+  function ensurePhotoMask(src) {
+    if (!src || PHOTO_MASK[src] !== undefined) return;
+    PHOTO_MASK[src] = MASK_PENDING;     /* 先占位，避免同一張同時排隊量兩次 */
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const k = Math.min(1, MASK_MAX / Math.max(im.naturalWidth, im.naturalHeight, 1));
+        const w = Math.max(1, Math.round(im.naturalWidth * k));
+        const h = Math.max(1, Math.round(im.naturalHeight * k));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
+        const d = g.getImageData(0, 0, w, h).data, a = new Uint8Array(w * h);
+        let opaque = 0;
+        for (let q = 0; q < w * h; q++) { a[q] = d[q * 4 + 3] > 24 ? 1 : 0; opaque += a[q]; }
+        /* 整張都不透明（一般 JPEG）就不用留遮罩，省一次查表 */
+        PHOTO_MASK[src] = opaque >= w * h ? null : { w: w, h: h, a: a };
+      } catch (err) { PHOTO_MASK[src] = null; }   /* tainted 就退回矩形（見技術原則 #4） */
+    };
+    im.onerror = () => { PHOTO_MASK[src] = null; };
+    im.src = src;
+  }
+  /* 把座標系上的一點換算成「這張影像自己的 0~1 座標」，落在影像矩形外回 null。
+     g 的矩形已經含位移/縮放/旋轉，所以要先繞影像中心反旋轉回來。 */
+  function photoLocalUV(g, px, py, ink) {
+    if (!(g.hw > 0) || !(g.hh > 0)) return null;
+    const dx = px - g.cx, dy = py - g.cy;
+    const rad = -g.t.r * Math.PI / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+    const lx = dx * cs - dy * sn, ly = dx * sn + dy * cs;
+    if (Math.abs(lx) > g.hw || Math.abs(ly) > g.hh) return null;
+    let u = lx / g.hw / 2 + 0.5, v = ly / g.hh / 2 + 0.5;
+    /* 圖素的矩形貼的是「墨迹」，要換回整張畫布的座標才對得上遮罩（見 slotInk/ink.cx） */
+    if (ink) {
+      u = (ink.cx - ink.fillW / 2) + u * ink.fillW;
+      v = (ink.cy - ink.fillH / 2) + v * ink.fillH;
+    }
+    return { u: u, v: v };
+  }
+  function photoOpaqueAt(src, uv) {
+    const m = PHOTO_MASK[src];
+    if (!m || !m.a) return true;        /* 沒有遮罩（或還沒量到）＝整個矩形都算命中 */
+    const x = Math.min(m.w - 1, Math.max(0, Math.floor(uv.u * m.w)));
+    const y = Math.min(m.h - 1, Math.max(0, Math.floor(uv.v * m.h)));
+    return !!m.a[y * m.w + x];
+  }
+  /* 這一點抓到哪一張（-1＝沒抓到）。geoFor(i) 由呼叫端給——畫布給版位的幾何、
+     右欄共編器給面板裡那幾個框的幾何，兩邊共用同一套判斷。 */
+  function photoHitAt(st, px, py, geoFor) {
+    const order = photoOrderFor(st);
+    for (let k = order.length - 1; k >= 0; k--) {     /* 反向＝由最上層往下問 */
+      const i = order[k];
+      if (!photoUrl(st, i) || photoHidden(st, i)) continue;
+      const g = geoFor(i); if (!g) continue;
+      const uv = photoLocalUV(g, px, py, slotInk(st, i));
+      if (!uv) continue;
+      if (photoOpaqueAt(photoSrc(photoUrl(st, i)), uv)) return i;
+    }
+    return -1;
+  }
+  /* 選取框本體（會跟著照片一起旋轉，把手當它的子節點就自動貼在四角） */
+  function ovFrameHTML(g) {
+    return '<div class="ph-ov" style="left:' + g.cx + 'px;top:' + g.cy + 'px;width:' + (g.hw * 2) +
+      'px;height:' + (g.hh * 2) + 'px;transform:translate(-50%,-50%) rotate(' + g.t.r + 'deg)">' +
+      '<span class="ph-stem"></span><i class="rot" data-ph="rot" title="拖曳旋轉（Shift 吸附 15°）"></i>' +
+      '<i class="nw" data-ph="nw"></i><i class="ne" data-ph="ne"></i>' +
+      '<i class="sw" data-ph="sw"></i><i class="se" data-ph="se"></i></div>';
+  }
+  /* 拖曳中只搬選取框，不重畫（重畫會把正在拖的節點抽掉） */
+  function positionOverlayIn(layer, g, t) {
+    if (!layer) return;
+    const ov = layer.querySelector('.ph-ov'); if (!ov) return;
+    const cx = g.ox + t.x / 100 * g.bw, cy = g.oy + t.y / 100 * g.bh;
+    const hw = g.rw * t.z / 2, hh = g.rh * t.z / 2;
+    ov.style.left = cx + 'px'; ov.style.top = cy + 'px';
+    ov.style.width = (hw * 2) + 'px'; ov.style.height = (hh * 2) + 'px';
+    ov.style.transform = 'translate(-50%,-50%) rotate(' + t.r + 'deg)';
+    const hud = layer.querySelector('.ph-hud');
+    if (hud) {
+      hud.style.left = cx + 'px'; hud.style.top = (cy + hh + 14) + 'px';
+      const val = hud.querySelector('[data-ph-val]');
+      if (val) val.textContent = Math.round(t.z * 100) + '%・' + Math.round(t.r) + '°';
+    }
+  }
+
+  /* ---- 共用的拖曳數學 ---- */
+  let TDRAG = null;
+  function beginTransformDrag(e, opts) {
+    const g = opts.g, r = opts.geoEl.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    TDRAG = { o: opts, g: g, sx: px, sy: py, t: Object.assign({}, g.t) };
+    if (opts.mode === 'scale') {
+      const c = opts.corner;
+      const sgx = (c === 'ne' || c === 'se') ? 1 : -1;
+      const sgy = (c === 'sw' || c === 'se') ? 1 : -1;
+      const rad = g.t.r * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+      /* 固定對角（旋轉後的座標）：拖 se 就釘住 nw，依此類推 */
+      TDRAG.ax = g.cx + (-sgx * g.hw) * cos - (-sgy * g.hh) * sin;
+      TDRAG.ay = g.cy + (-sgx * g.hw) * sin + (-sgy * g.hh) * cos;
+      TDRAG.d0 = Math.hypot(g.hw * 2, g.hh * 2) || 1;     /* 起始「對角→被拖的角」距離 */
+    } else if (opts.mode === 'rot') {
+      TDRAG.a0 = Math.atan2(py - g.cy, px - g.cx);
+      TDRAG.r0 = g.t.r;
+    }
+  }
+  function moveTransformDrag(e) {
+    if (!TDRAG) return;
+    const o = TDRAG.o, g = TDRAG.g;
+    const r = o.geoEl.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let t;
+    if (o.mode === 'move') {
+      t = { x: clamp(g.t.x + (px - TDRAG.sx) / g.bw * 100, -PAN_LIMIT, PAN_LIMIT),
+            y: clamp(g.t.y + (py - TDRAG.sy) / g.bh * 100, -PAN_LIMIT, PAN_LIMIT),
+            z: g.t.z, r: g.t.r };
+    } else if (o.mode === 'scale') {
+      const z = clamp(g.t.z * (Math.hypot(px - TDRAG.ax, py - TDRAG.ay) / TDRAG.d0),
+                      PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
+      const f = z / g.t.z;                                 /* 夾過上下限後回推真正倍率，中心才不會飄 */
+      t = { x: (TDRAG.ax + (g.cx - TDRAG.ax) * f - g.ox) / g.bw * 100,
+            y: (TDRAG.ay + (g.cy - TDRAG.ay) * f - g.oy) / g.bh * 100, z: z, r: g.t.r };
+    } else {
+      let deg = TDRAG.r0 + (Math.atan2(py - g.cy, px - g.cx) - TDRAG.a0) * 180 / Math.PI;
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      t = { x: g.t.x, y: g.t.y, z: g.t.z, r: deg };
+    }
+    TDRAG.t = t;
+    o.live(t);
+  }
+  function endTransformDrag() {
+    if (!TDRAG) return;
+    const o = TDRAG.o, t = TDRAG.t;
+    TDRAG = null;
+    o.commit(t);                                           /* 放開才寫入歷史，拖曳不會堆滿 undo */
+  }
+
+  /* ============ 畫布上：單獨變形某一塊板的人物照片 ============
+     在畫布模式點某個版位的人物照片就選取它。一旦在這裡動過，這塊板就登記成
+     photos[i].boards[id]，之後右欄的整體調整不會再蓋掉它（要蓋掉得按右欄的黃色
+     「套用至所有版位」並在跳出的確認選「覆蓋手動調整的版位」，或按選取框下方的 ⟲
+     只還原這一塊）。 */
+  function selectedGeom() {
+    const st = S(), id = view.selBoard;
+    if (!id) return null;
+    const b = PACK.boards.find(x => x.id === id);
+    if (!b || st.on.indexOf(id) < 0) return null;
+    const g = photoGeom(b, st, view.zoom, view.selIdx);
+    return g ? { b: b, g: g } : null;
+  }
+  function paintPhotoOverlay() {
+    XD.$$('.ph-layer').forEach(el => el.remove());
+    if (view.mode !== 'canvas') return;
+    const sel = selectedGeom(); if (!sel) return;
+    const cv = document.querySelector('.cv[data-cv="' + CSS.escape(view.selBoard) + '"]');
+    const card = cv && cv.closest('.bncard'); if (!card) return;
+    const g = sel.g;
+    const lay = document.createElement('div');
+    lay.className = 'ph-layer';
+    lay.style.cssText = 'left:' + cv.offsetLeft + 'px;top:' + cv.offsetTop +
+                        'px;width:' + cv.offsetWidth + 'px;height:' + cv.offsetHeight + 'px';
+    const stNow = S();
+    const phNow = photoAt(stNow, view.selIdx);
+    const own = !!((phNow && phNow.boards) || {})[view.selBoard];
+    const who = photoSlotCount(stNow) > 1 ? photoSlotName(stNow, view.selIdx) + '　' : '';
+    lay.innerHTML = ovFrameHTML(g) +
+      '<div class="ph-hud" style="left:' + g.cx + 'px;top:' + (g.cy + g.hh + 14) + 'px">' +
+        '<span data-ph-val>' + who + Math.round(g.t.z * 100) + '%・' + Math.round(g.t.r) + '°</span>' +
+        (own ? '<button data-ph="reset" title="回到右欄的整體設定">⟲ 還原</button>'
+             : '<span class="dim">跟隨整體設定</span>') +
+      '</div>';
+    card.appendChild(lay);
+  }
+  function setBoardPhotoT(id, i, t) {
+    const st = S(), ph = photoAt(st, i) || EMPTY_PHOTO;
+    const pb = Object.assign({}, ph.boards || {});
+    pb[id] = { x: t.x, y: t.y, z: t.z, r: t.r };
+    setPhotoAt(st, i, { boards: pb }, { key: 'photoBoard:' + i + ':' + id });
+  }
+  const world = $('#world');
+  /* 這塊板上的命中測試。座標換算成「.cv 內的版面 px」——畫布縮放是把座標乘上
+     view.zoom 重新排版的（見 render()），#world 只有 translate 沒有 scale，
+     所以 1 版面 px＝1 螢幕 px，減掉 .cv 左上角就能直接用。 */
+  function cvHitAt(st, cv, e) {
+    const b = PACK.boards.find(x => x.id === cv.dataset.cv);
+    if (!b) return -1;
+    const r = cv.getBoundingClientRect();
+    return photoHitAt(st, e.clientX - r.left, e.clientY - r.top,
+                      i => photoGeom(b, st, view.zoom, i));
+  }
+  world.addEventListener('pointerdown', e => {
+    if (view.mode !== 'canvas') return;
+    const st = S();
+    const h = e.target.closest('[data-ph]');
+    if (h && h.dataset.ph === 'reset') return;            /* 交給下面的 click 處理 */
+    let id, idx;
+    if (h) {                                               /* 拖把手＝維持目前選取的那一張 */
+      id = view.selBoard; idx = view.selIdx;
+    } else {
+      /* 點哪一張就選哪一張——照實際畫出來的影像判斷（photoHitAt），不是點在哪個
+         定位框裡。點照片的空白處／版位空白處都算沒抓到，取消選取並交還畫布平移。 */
+      const cv = e.target.closest('.cv[data-cv]');
+      idx = cv ? cvHitAt(st, cv, e) : -1;
+      if (idx < 0) {
+        if (view.selBoard) { view.selBoard = null; paintPhotoOverlay(); }
+        return;
+      }
+      id = cv.dataset.cv;
+    }
+    if (!id || !photoUrl(st, idx)) return;
+    e.preventDefault(); e.stopPropagation();               /* 不要同時觸發畫布平移 */
+    if (view.selBoard !== id || view.selIdx !== idx) {
+      view.selBoard = id; view.selIdx = idx;
+      /* 右欄跟著跳到同一位，不然畫布在調人物2、右欄卻顯示人物1 */
+      if (view.slot !== idx) { view.slot = idx; paintPhotoLayers(); paintPhotoAdjust(); }
+      paintPhotoOverlay();
+    }
+    const sel = selectedGeom(); if (!sel) return;
+    const cv = document.querySelector('.cv[data-cv="' + CSS.escape(id) + '"]');
+    beginTransformDrag(e, {
+      mode: h ? (h.dataset.ph === 'rot' ? 'rot' : 'scale') : 'move',
+      corner: h ? h.dataset.ph : null,
+      g: sel.g, geoEl: cv,
+      live: t => { applyPhotoTFor(id, idx, t);
+                   positionOverlayIn(document.querySelector('.ph-layer'), sel.g, t); },
+      commit: t => setBoardPhotoT(id, idx, t),
+    });
+    world.setPointerCapture(e.pointerId);
+  });
+  world.addEventListener('pointermove', moveTransformDrag);
+  world.addEventListener('pointerup', endTransformDrag);
+  world.addEventListener('pointercancel', endTransformDrag);
+  /* 游標提示：抓得到才顯示 move。照片的空白處要交還給畫布平移，游標就不該說「抓得到」
+     ——命中規則既然不是「整個框」，就得讓人看得出真正的可抓範圍在哪。 */
+  let CUR_CV = null;
+  world.addEventListener('pointermove', e => {
+    if (TDRAG || view.mode !== 'canvas') return;
+    const cv = e.target.closest('.cv[data-cv]');
+    if (CUR_CV && CUR_CV !== cv) { CUR_CV.style.cursor = ''; CUR_CV = null; }
+    if (!cv) return;
+    CUR_CV = cv;
+    cv.style.cursor = cvHitAt(S(), cv, e) >= 0 ? 'move' : '';
+  });
+  world.addEventListener('click', e => {
+    const btn = e.target.closest('[data-ph="reset"]'); if (!btn) return;
+    e.stopPropagation();
+    const st = S(), i = view.selIdx, ph = photoAt(st, i) || EMPTY_PHOTO;
+    const pb = Object.assign({}, ph.boards || {});
+    delete pb[view.selBoard];
+    setPhotoAt(st, i, { boards: pb });
+    XD.toast('已還原這個版位的' + photoSlotName(st, i) + '，改回跟著整體設定');
+  });
+
+  /* ============ 工單匯入：解析完直接套用，不用再按一次確認 ============
+     解析細節（哪個尺寸對到哪個版位）不在畫面上展開報告——只在主控台留紀錄，
+     使用者只需要一句話知道「匯入好了、套了什麼、選了幾張」。 */
+  let WO = null;
+  $('#fWo').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      WO = await XD.bnWorkorder.parse(await f.arrayBuffer(), PACK.boards);
+      await applyWo();
+    } catch (err) { console.error(err); XD.toast('匯入失敗：' + err.message); }
+    e.target.value = '';
+  };
+  /* 匯入一次改很多欄位 → 併成單一步歷史，undo 一次就整份倒回。
+     工單如果有指定廠商LOGO檔名：素材包已經上傳過就當場比對套用；
+     還沒上傳就先記住檔名（PENDING_VENDOR_NAMES），等素材包上傳時再比對。 */
+  async function applyWo() {
+    if (!WO) return;
+    const c = WO.consensus;
+    H.beginBatch();
+    const next = Object.assign({}, S());
+    if (c.main) next.title = c.main.value;
+    if (c.sub)  next.sub   = c.sub.value;
+    if (c.cta)  next.cta   = c.cta.value;
+    if (c.extra) next.small = c.extra.value;
+    /* AR 版位的文案是工單獨立一格「AR案型」，不走 consensus（那是全版位共用的那份） */
+    if (WO.arText) next.arText = WO.arText;
+    if (WO.onIds && WO.onIds.length) next.on = WO.onIds.slice();
+
+    /* 工單指定主題就自動選（比對 packs/bn/themes.js 的 name/id，忽略大小寫/頭尾空白）；
+       找不到就當作沒指定，不擋匯入——維持原本選的主題或空白，只在訊息裡提醒。 */
+    let themeBits = '';
+    if (WO.themeName) {
+      const wanted = String(WO.themeName).trim();
+      const found = ((XD.packs.bnThemes && XD.packs.bnThemes.themes) || [])
+        .find(t => t.name === wanted || t.id === wanted || normName(t.name) === normName(wanted));
+      if (found) { next.theme = found.id; themeBits = '／主題「' + found.name + '」'; }
+      else themeBits = '／⚠工單指定的主題「' + wanted + '」找不到對應設定';
+    }
+
+    /* 蝦皮直播 LOGO：工單明講才改。null＝工單沒這一欄，維持畫面上目前的狀態
+       （不要因為工單沒寫就把使用者手動打開的關掉）。 */
+    let liveBits = '';
+    if (WO.liveLogo !== null && WO.liveLogo !== undefined) {
+      next.liveLogo = !!WO.liveLogo;
+      liveBits = '／蝦皮直播 LOGO ' + (WO.liveLogo ? '顯示' : '不顯示');
+    }
+
+    let vendorBits = '';
+    if (WO.vendorLogoNames && WO.vendorLogoNames.length) {
+      PENDING_VENDOR_NAMES = WO.vendorLogoNames;
+      if (Object.keys(ASSET_POOL).length) {
+        const hit = matchByNames(PENDING_VENDOR_NAMES).filter(Boolean);
+        if (hit.length) {
+          next.vendorLogos = hit;
+          vendorBits = '／依工單檔名套用 ' + hit.length + ' 個廠商 LOGO';
+        }
+      }
+    }
+
+    let photoBits = '';
+    if (WO.personImageNames && WO.personImageNames.length) {
+      /* 工單的「人物圖片1／人物圖片2」依序配進人物槽（core/bn-workorder.js 收的
+         本來就是陣列，不限數量；先前只用了 [0]）。 */
+      PENDING_PHOTO_NAMES = WO.personImageNames.slice();
+      if (Object.keys(ASSET_FILES).length) {
+        const hits = await photosFromNames(PENDING_PHOTO_NAMES);
+        if (hits.length) {
+          next.photos = mergePhotos(next, hits);
+          photoBits = '／依工單檔名套用 ' + hits.length + ' 張人物照片';
+        }
+      }
+    }
+    H.set(next, {});
+    H.endBatch();
+    syncVendorInk();
+
+    const bits = [];
+    if (c.main) bits.push('主標「' + c.main.value + '」');
+    if (WO.arText) bits.push('AR 文案「' + WO.arText + '」');
+    bits.push('勾選 ' + S().on.length + ' 個版位');
+    let msg = '已匯入工單：' + bits.join('／') + themeBits + liveBits + vendorBits + photoBits;
+    if (WO.warnings && WO.warnings.length) {
+      msg += '（⚠ ' + WO.warnings.length + ' 項提醒，詳見主控台）';
+      WO.warnings.forEach(w => console.warn('[BN工單]', w));
+    }
+    XD.toast(msg);
+  }
+
+  /* ============ 下載整包：每個勾選版位各出一張 PNG＋一份暫存 JSON，打包成 zip ============
+     承 02_吸底 exportBatch 的做法（JSZip＋一次觸發下載），渲染改成離屏 DOM
+     （s=1＝版位原生 px，跟 actualSize() 的 100% 是同一件事），拍好圖再收掉容器，
+     不會動到畫面上使用者正在看的畫布。
+     沒選主題時螢幕預覽用格紋佔位，但那只是「還沒做視覺」的提示，不該真的出現在
+     交付的圖檔裡，所以匯出用的底色改成純色，不帶格紋。 */
+  function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, ''); }
+  function cvBgStyleExport(b, st) {
+    const th = themeFor(st);
+    const url = th && themeAssetFor(th, b.id);
+    if (url) return "background-color:#DCE4F2;background-image:url('" + url + "');" +
+                     'background-size:cover;background-position:center;';
+    return 'background-color:#DCE4F2;background-image:none;';
+  }
+  /* containRect() 需要 PHOTO_AR（照片原生長寬比），它是在 <img> onload 後才有值。
+     匯出前若還沒量到，contain 尺寸會退回整個定位框，圖就會被拉伸——所以先等它。 */
+  function ensurePhotoAR(st) {
+    /* 每一張人物照片都要量到（雙人版有兩張，少量一張那張就會被拉伸） */
+    const jobs = [];
+    (st.photos || []).forEach((ph, i) => {
+      if (!ph || !ph.url || PHOTO_AR[i]) return;
+      jobs.push(new Promise(resolve => {
+        const im = new Image();
+        im.onload = () => { PHOTO_AR[i] = im.naturalWidth / im.naturalHeight; resolve(); };
+        im.onerror = () => resolve();
+        im.src = photoSrc(ph.url);
+      }));
+    });
+    return Promise.all(jobs);
+  }
+  async function downloadPackage() {
+    const st = S();
+    const list = PACK.boards.filter(b => st.on.indexOf(b.id) >= 0);
+    if (!list.length) { XD.toast('左邊沒有勾選任何版位'); return; }
+    const btn = $('#btnDownload'), oldLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = '匯出中…';
+    try {
+      await ensurePhotoAR(st);
+      /* LOGO 圖案邊界要量完才匯出，否則首開就按下載會輸出「照畫布 contain」
+         的版本（直播 LOGO 會偏小），跟畫面上看到的不一致。 */
+      await LOGO_INK_READY;
+      const items = await XD.withOffscreen(async container => {
+        const out = [];
+        for (const b of list) {
+          const el = document.createElement('div');
+          el.className = 'cv export';
+          el.style.cssText = 'width:' + b.w + 'px;height:' + b.h + 'px;' + cvBgStyleExport(b, st);
+          el.innerHTML = boardInnerHTML(b, st, 1);
+          container.appendChild(el);
+          fitTexts(el, 1);
+          try {
+            const r = await XD.captureNodeH2C(el, { background: '#DCE4F2' });
+            out.push({ name: safeName(b.id) + '.png', dataUrl: r.dataUrl });
+          } catch (err) {
+            throw new Error('版位「' + b.id + '」擷取失敗：' + (err && err.message ? err.message : err));
+          }
+          container.removeChild(el);
+        }
+        return out;
+      });
+      const projectJson = {
+        title: st.title, sub: st.sub, cta: st.cta, small: st.small,
+        arText: st.arText, arSplit: st.arSplit, theme: st.theme,
+        vendorLogos: st.vendorLogos,
+        photoSet: st.photoSet, photos: st.photos,
+        on: st.on,
+        exportedAt: new Date().toISOString(),
+      };
+      const fn = 'BN_' + new Date().toISOString().slice(0, 10) + '.zip';
+      await XD.zipAndDownload(items, projectJson, 'project.json', fn);
+      XD.toast('已下載 ' + items.length + ' 張圖＋暫存 JSON：' + fn);
+    } catch (err) {
+      console.error(err); XD.toast('下載失敗：' + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false; btn.textContent = oldLabel;
+    }
+  }
+  $('#btnDownload').onclick = downloadPackage;
+
+  /* ============ 訂閱：狀態一變就重畫（依目前模式） ============ */
+  let photoStoreWarned = false;
+  const save = XD.debounce(() => {
+    const st = S();
+    /* 照片的 dataURL 走自己的 key（見 PHOTO_STORE 說明），主狀態只留變形參數——
+       1800px 去背 PNG 一張約 1.7MB，跟文案/勾選塞同一筆會整筆 QuotaExceeded。
+       ownUrl 跟 url 一樣可能是巨大的 dataURL，同樣要從主狀態拿掉。 */
+    const light = Object.assign({}, st);
+    light.photos = (st.photos || []).map(p => Object.assign({}, p, { url: '', ownUrl: '' }));
+    XD.store.set(STORE, light);
+    /* o 只在跟 u 不同時才存——多數時候使用者正在看的內容就是 ownUrl 本身
+       （u===ownUrl），沒必要重複存一份把額度用掉兩倍；o 存在的意義只在
+       「目前顯示圖素、但還記得一張自己的照片」這個情境。 */
+    const sides = (st.photos || []).map(p => {
+      const u = (p && p.url) || '', o = (p && p.ownUrl) || '';
+      return { u: u, o: (o && o !== u) ? o : '' };
+    });
+    try {
+      if (sides.some(s => s.u || s.o)) localStorage.setItem(PHOTO_STORE, JSON.stringify(sides));
+      else localStorage.removeItem(PHOTO_STORE);
+    } catch (err) {
+      /* 兩張 1800px 照片約 3.4MB，很可能超過 localStorage 額度。整批存不下時
+         退一步只存第一槽（優先保留目前顯示的內容 u，捨棄記住的另一邊 o），
+         至少重新整理後不是全空；連一槽都存不下才整個清掉。 */
+      let kept = 0;
+      try {
+        if (sides[0] && (sides[0].u || sides[0].o)) {
+          localStorage.setItem(PHOTO_STORE, JSON.stringify([{ u: sides[0].u, o: '' }]));
+          kept = 1;
+        } else localStorage.removeItem(PHOTO_STORE);
+      } catch (e2) {
+        try { localStorage.removeItem(PHOTO_STORE); } catch (e3) {}
+      }
+      if (!photoStoreWarned) {
+        photoStoreWarned = true;
+        XD.toast(kept
+          ? '兩張人物照片太大，瀏覽器暫存只放得下第一張（畫面與下載整包都不受影響，重新整理後第二張要再上傳）'
+          : '人物照片太大，瀏覽器暫存放不下（畫面與下載整包都不受影響，只是重新整理後要再上傳一次）');
+      }
+    }
+  }, 300);
+  H.subscribe(() => {
+    paintList(); renderAny(); syncInputs(); paintHistoryBtns();
+    paintThemeGrid(); paintVendorCount(); paintVendorPreview();
+    paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust(); paintPersonToggle(); save();
+  });
+  function paintHistoryBtns() {
+    $('#btnUndo').disabled = !H.canUndo();
+    $('#btnRedo').disabled = !H.canRedo();
+  }
+  $('#btnUndo').onclick = () => { if (!H.undo()) XD.toast('沒有可以復原的步驟'); };
+  $('#btnRedo').onclick = () => { if (!H.redo()) XD.toast('沒有可以重做的步驟'); };
+  XD.bindUndoKeys(H, ok => { if (!ok) XD.toast('沒有更多步驟了'); });
+
+  /* ============ 開機（預設總覽，仔細檢查才切畫布） ============ */
+  paintList(); syncInputs(); paintHistoryBtns(); paintThemeGrid(); paintVendorCount(); paintVendorPreview();
+  paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust(); paintPersonToggle();
+  setMode('overview');
+
+  /* 三支字型檔各 18MB，tokens.css 是 font-display:swap——在下載完成前瀏覽器會先用
+     備援字（微軟正黑體）畫。備援字有 Bold 沒有 Medium，所以主標/副標(700)看起來正常、
+     小字(500)卻退成 Regular 的樣子，這就是「小字看起來不是 Medium」的來源
+     （CSS 一直是 500，量 computed style 與 canvas advance width 都證實對到 Medium）。
+     這裡開機就主動把實際用到的 400/500/700 三個字重抓下來，載好再重畫一次，
+     把「看到錯字重」的空窗期壓到最短；配合 .cv 的 font-synthesis:none，
+     備援期也不會再合成一個假的中間字重來混淆。 */
+  /* 置中補償量測：算出「行框置中」與「墨迹置中」的差，寫進 --ink-fix（見 .slot > .ink）。
+     量測基準刻意固定用全形漢字，不用當下的實際文案——同一支字型下，帶括號/數字的字串
+     量到的墨迹範圍會不一樣（Noto Sans TC 差到 0.116em vs 0.045em），若每次跟著文案變，
+     使用者一邊打字文字就會上下跳，而且各版位的視覺基線不一致。
+     必須等字型真的載入才量，否則量到的是備援字的度量。 */
+  function applyInkFix() {
+    try {
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = '500 1000px ' + getComputedStyle(document.body).getPropertyValue('--font-ms');
+      const m = c.measureText('國字漢書報名去電商賣家');
+      if (!m.fontBoundingBoxAscent) return;   /* 舊瀏覽器沒有這些度量就不補償 */
+      const A = m.fontBoundingBoxAscent / 1000, D = m.fontBoundingBoxDescent / 1000;
+      const aA = m.actualBoundingBoxAscent / 1000, aD = m.actualBoundingBoxDescent / 1000;
+      const off = (A - D) / 2 - (aA - aD) / 2;
+      if (!isFinite(off) || Math.abs(off) > 0.2) return;   /* 量出離譜的值就不套 */
+      document.documentElement.style.setProperty('--ink-fix', off.toFixed(4) + 'em');
+    } catch (e) { /* 量不到就維持 0，不影響其他功能 */ }
+  }
+  applyInkFix();
+  if (document.fonts && document.fonts.load) {
+    Promise.all(['400 16px "Shopee Noto Sans content"', '500 16px "Shopee Noto Sans content"',
+                 '700 16px "Shopee Noto Sans content"']
+      .map(f => document.fonts.load(f, '主標文案0123')))
+      .then(() => { applyInkFix(); renderAny(); })
+      .catch(() => {});
+  }
+  /* 量每張 LOGO 的圖案邊界（見 measureLogoInk 的說明），量完重畫一次——
+     跟上面字型載入完重畫是同一個模式：第一次渲染先用畫布比例（跟改版前一樣），
+     量到之後才切換成圖案比例，不會有「等素材量完才看得到畫面」的空窗。
+     這是匯出前一定要完成的事，所以另外留一個 Promise 給 downloadPackage 等。 */
+  const LOGO_INK_READY = (function () {
+    const LOGO = XD.packs.bnLogoAssets || {};
+    const srcs = [];
+    ['live', 'shopee'].forEach(k => {
+      const e = LOGO[k];
+      if (!e) return;
+      if (typeof e === 'string') srcs.push(assetUrl(e));
+      else Object.keys(e).forEach(v => srcs.push(assetUrl(e[v])));
+    });
+    /* 圖素也要量：它貼合的是墨迹不是畫布（見 slotInk），而且匯出前一定要量完，
+       否則「一開機就按下載」會輸出照畫布 contain 的偏小版本、跟畫面不一致。 */
+    stockItems().forEach(it => srcs.push(photoSrc(stockUrl(it))));
+    return Promise.all(srcs.map(src =>
+      measureLogoInk(src).then(ink => { if (ink) LOGO_INK[src] = ink; })
+    )).then(() => syncVendorInk())      /* 暫存裡還原回來的廠商 LOGO 也要量 */
+      .then(() => { renderAny(); })
+      .catch(() => {});
+  })();
+
+  window.__api = {
+    get state() { return S(); }, H, view,
+    render, renderOverview, renderAny, setMode, focusBoard,
+    fit, actualSize, zoomBy, zoomAt, applyWo,
+    get WO() { return WO; },
+    parseWo: buf => XD.bnWorkorder.parse(buf, PACK.boards).then(r => (WO = r, r)),
+    setCopy: (k, v) => { const el = $('#in' + k[0].toUpperCase() + k.slice(1));
+                         el.value = v; el.dispatchEvent(new Event('input')); },
+    get boards() { return PACK.boards; },
+    setTheme: id => { const b = document.querySelector('[data-theme="' + (id || '') + '"]');
+                      if (b) b.click(); return !!b; },
+    paintThemeGrid, themeThumbUrl, frameMode, paintFrameMode,
+    setFrameMode: m => { const b = document.querySelector('[data-fmode="' + m + '"]');
+                         if (b) b.click(); return !!b; },
+    LOGO_INK, syncVendorInk, findLogoFiles, isCentered, themeFor, placementFor, downloadPackage, boardInnerHTML, cvBgStyleExport,
+    downscaleToDataURL, photoFromPool, findAssetKey, matchByNames, PHOTO_MAX, LOGO_MAX,
+    photoTFor, photoGeom, photoImgStyle, paintPhotoOverlay, setBoardPhotoT, arLines, arWraps,
+    photoBoxAt, slotInk, slotIsStock, stockFrame, measureLogoInk,
+    photoHitAt, photoLocalUV, photoOpaqueAt, ensurePhotoMask, panelHitAt, panelGeomFor,
+    get photoMask() { return PHOTO_MASK; },
+    cvHitAt: (id, cx, cy) => { const cv = document.querySelector('.cv[data-cv="' + CSS.escape(id) + '"]');
+                               return cv ? cvHitAt(S(), cv, { clientX: cx, clientY: cy }) : -2; },
+    twoPersonActive, splitDuoFrame, DUO_OVERLAP, hasPerson2,
+    photoBoxes, photoSlotCount, photoAt, photoUrl, anyPhoto, setPhotoAt, placementSetId,
+    photoOrderFor, photoHidden, panelLayout, pvBoardList, pvBoardId,
+    get pvBoard() { return view.pvBoard; },
+    setPvBoard: id => { const el = $('#selPvBoard'); el.value = id; el.dispatchEvent(new Event('change')); },
+    photosFromNames, boardsWithOverride, globalPhotoT,
+    get photoSlot() { return view.slot; },
+    setPhotoSlot: i => { view.slot = i; paintPhotoLayers(); paintPhotoAdjust(); paintPhotoOverlay(); },
+    get stock() { return STOCK; }, stockIdOf, stockUrl, defaultStockUrl, photoSrc, paintStock,
+    pickStock: id => { const b = document.querySelector('[data-stock="' + id + '"]');
+                       if (b) b.click(); return !!b; },
+    fitTexts, computeTileMax, applyInkFix, CTA_RADIUS, containRect,
+    arcHTML, ARC_BOARDS, arcYAt, darkenHex,
+    ARC_SHADOW_ALPHA, ARC_SHADOW_DARKEN, ARC_SHADOW_BLUR, ARC_BLEED,
+    get photoAR() { return PHOTO_AR; }, set photoAR(v) { PHOTO_AR = v; },
+    get selBoard() { return view.selBoard; }, get selIdx() { return view.selIdx; },
+    selectBoardPhoto: (id, i) => { view.selBoard = id; view.selIdx = i || 0; paintPhotoOverlay(); },
+    get assetPool() { return ASSET_POOL; }, get pendingVendorNames() { return PENDING_VENDOR_NAMES; },
+    get pendingPhotoNames() { return PENDING_PHOTO_NAMES; },
+    get pendingPhotoName() { return PENDING_PHOTO_NAMES && PENDING_PHOTO_NAMES[0]; },
+  };
+})();
+</script>
+<!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
+     會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
+     body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
+     結束標籤時它就會挑 svg 的，把一整段 HTML 插進 JS 字串中間 -> SyntaxError
+     -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
+     註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
+</body>

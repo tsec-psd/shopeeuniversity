@@ -1,0 +1,2772 @@
+<meta charset="utf-8">
+<title>MS 工單生成器（蝦大端）</title>
+<!-- 載入順序契約：tokens.css → xd-core → atoms → flow-engine → workorder → packs → 頁面腳本 -->
+<style>
+/* inlined: ../core/tokens.css */
+/* =========================================================
+   蝦大素材工具 — 設計 token（唯一調整處）
+   來源：Seller Talk_MS.psd 量測（2026-08-31，spike/psd-probe）
+   PSD 校準只改這裡，不要動各工具頁的版面 CSS。
+   ========================================================= */
+/* 字型：蝦皮品牌字「蝦皮思源黑（內文）」＝ ShopeeNotoSans (content)。
+   2026-09-11 由 ttf 換成 woff2（54MB → 24MB）——部署到網址之後每個訪客
+   首次造訪都要下載這幾支，ttf 沒有壓縮、woff2 是專為網頁傳輸設計的格式。
+   ⚠ 只列 woff2 不留 ttf 備援是刻意的：現代瀏覽器全部支援 woff2，留 ttf
+   只會讓不支援的老瀏覽器多下載一份 18MB。換字型檔時三支要一起換。 */
+@font-face{font-family:"Shopee Noto Sans content";font-weight:400;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Regular.woff2") format("woff2")}
+@font-face{font-family:"Shopee Noto Sans content";font-weight:500;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Medium.woff2") format("woff2")}
+@font-face{font-family:"Shopee Noto Sans content";font-weight:700;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Bold.woff2") format("woff2")}
+
+:root{
+  /* --- 產出物（活動頁）--- */
+  --c-page:#2358E6;        /* 頁底藍（EDM 實測） */
+  --c-pill-bg:#FFEB00;     /* 區段標題藥丸底 */
+  --c-pill-text:#2358E6;   /* 藥丸字色 */
+  --c-card:#F3FDFF;        /* 表格格底／卡片底 */
+  --c-lab:#FEFBEA;         /* 標籤格底（米黃） */
+  --c-line:#BFD7F5;        /* 表格線（暫估，C 階段校準） */
+  --c-text:#1C3887;        /* 主字色（表頭、標題） rgb(28,56,135) */
+  --c-body:#1A4F90;        /* 內文字色 rgb(26,79,144) */
+  --c-blue:#2357E6;        /* 強調藍字 rgb(35,87,230) */
+  --c-accent:#FB4312;      /* 強調橘 rgb(251,67,18) */
+  --c-slogan:#FFF68F;      /* 亮點標語黃 rgb(255,246,143) */
+  --c-badge:#FEF495;       /* 共創 badge 底 */
+  --c-badge-text:#0A236C;  /* 共創 badge 字 rgb(10,35,108) */
+  --c-white:#FFFFFF;
+
+  --font-ms:"Shopee Noto Sans content","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+
+  /* 字級（PSD 有效字級；含 transform 換算） */
+  --fs-pill:64px;          /* 區段標題（量測 70，含藥丸內縮視覺調整） */
+  --fs-head:50px;          /* 表頭 */
+  --fs-topic:35px;         /* 主題標題 */
+  --fs-body:33px;          /* 表格內文 */
+  --fs-sub:29px;           /* 小註記 */
+  --fs-practice:32px;      /* 實作環節（藍） */
+  --fs-time:35px;          /* 時間欄 */
+  --fs-price:46px;         /* 價格 */
+  --fs-star:33px;          /* 星註／獲得說明（藍） */
+  --fs-cname:40px;         /* 顧問名 */
+  --fs-cbul:28px;          /* 顧問卡條列 */
+  --fs-slogan:72px;        /* 亮點標語 */
+  --fs-hbody:38px;         /* 亮點內文 */
+  --fs-notice:34px;        /* 注意事項聯絡 */
+  --fs-nbul:28px;          /* 注意事項條列 */
+
+  --r-card:24px; --w-line:3px;
+  --pad-cell:26px 30px; --gap-atom:12px;
+  --sec-pad:72px 60px 64px;
+  --kv-h:550px;            /* KV 實際尺寸 1200×550 */
+
+  /* --- 工具介面（深色，跟產出物完全分開）---
+     色票對齊 shrimp2choice：工具是暗的，產出物照樣是自己的顏色。
+     改這裡會同時影響 ms-editor / ms-studio / bn-editor。 */
+  --ui-bg:#1A1A1A;          /* 工作區底（畫布區） */
+  --ui-topbar:#242424;      /* 頂列 */
+  --ui-panel:#303030;       /* 左右面板 */
+  --ui-surface:#383838;     /* 輸入框、卡片、按鈕底 */
+  --ui-surface2:#2E2E2E;    /* hover */
+  --ui-line:#383838;        /* 分隔線 */
+  --ui-line2:#444444;       /* 較亮的框線 */
+  --ui-text:#F0F0F0;
+  --ui-dim:#999999;
+  --ui-dim2:#666666;
+  --ui-accent:#EE4D2D;      /* Shopee 橘 */
+  --ui-accent-dim:rgba(238,77,45,.14);
+  --ui-success:#3D9970;
+  --ui-warn:#E9A23B;
+  --ui-danger:#E5544B;
+  --ui-r:15px;              /* 按鈕圓角 */
+  --ui-rf:8px;              /* 輸入框圓角 */
+}
+
+</style>
+<style>
+/* inlined: ../core/ui.css */
+/* =========================================================
+   ui.css — 三支工具共用的介面外殼（深色）
+   版面比例與色票參考 shrimp2choice：頂列 44px ＋ 三欄 220/1fr/288。
+   這裡只放「工具的殼」；產出物本身的樣式留在各工具頁。
+   載入順序：tokens.css → ui.css → 頁面自己的 <style>
+   ========================================================= */
+
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+     color:var(--ui-text);background:var(--ui-bg);height:100vh;
+     display:flex;flex-direction:column;overflow:hidden}
+
+/* ---------- 頂列 ---------- */
+header{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;
+       background:var(--ui-topbar);border-bottom:1px solid var(--ui-line)}
+header h1{font-size:13px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
+header h1 small{font-weight:400;color:var(--ui-dim);font-size:11px;
+       background:var(--ui-surface);border:1px solid var(--ui-line2);
+       padding:1px 6px;border-radius:3px;letter-spacing:.3px}
+.spacer{flex:1}
+
+/* ---------- 控制項 ---------- */
+button,select,label.btn,a.btn{font:inherit;font-size:12px}
+button,label.btn,a.btn{height:28px;padding:0 12px;border-radius:var(--ui-r);
+       border:1px solid var(--ui-line2);background:var(--ui-surface);color:var(--ui-dim);
+       font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+       white-space:nowrap;transition:all .15s;text-decoration:none;box-sizing:border-box}
+button:hover,label.btn:hover,a.btn:hover{color:var(--ui-text);background:var(--ui-surface2)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.1);color:#fff}
+button.ghost{background:transparent}
+label.btn input{display:none}
+select{height:28px;padding:0 8px;border:1px solid var(--ui-line2);border-radius:var(--ui-rf);
+       background:var(--ui-surface);color:var(--ui-text)}
+
+/* ---------- 三欄版面 ---------- */
+main{flex:1;display:grid;grid-template-columns:220px 1fr 288px;min-height:0}
+main.two-col{grid-template-columns:288px 1fr}
+.sidebar,.right-panel{background:var(--ui-panel);display:flex;flex-direction:column;overflow:hidden}
+.sidebar{border-right:1px solid var(--ui-line)}
+.right-panel{border-left:1px solid var(--ui-line)}
+.pane-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0 20px}
+
+/* 分組（右欄的段落） */
+.sg{border-bottom:1px solid var(--ui-line)}
+.sg:last-child{border-bottom:none}
+.sg-label{font-size:13px;font-weight:700;color:#fff;padding:18px 16px 8px;
+          display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sg-body{padding:0 12px 14px}
+
+/* 欄位 */
+.field{margin-bottom:14px}
+.field-label{display:flex;justify-content:space-between;align-items:center;
+             font-size:11px;color:var(--ui-dim);margin-bottom:4px}
+.cc{font-size:10px;color:var(--ui-dim2);font-variant-numeric:tabular-nums}
+.cc.over{color:var(--ui-accent);font-weight:700}
+.fi{width:100%;padding:7px 10px;background:var(--ui-surface);border:1px solid var(--ui-line);
+    border-radius:var(--ui-rf);color:var(--ui-text);font:inherit;font-size:12px;
+    transition:border-color .15s;-webkit-appearance:none}
+.fi::placeholder{color:var(--ui-dim2)}
+.fi:focus{outline:none;border-color:var(--ui-line2);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+.fi.over{border-color:var(--ui-accent);box-shadow:0 0 0 3px var(--ui-accent-dim)}
+
+/* 提示文字 */
+.hint{font-size:12px;color:var(--ui-dim);line-height:1.65}
+kbd{background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:5px;
+    padding:1px 6px;font-size:11px;color:var(--ui-dim)}
+
+/* ---------- 畫布區 ---------- */
+#stage{background:var(--ui-bg);overflow:hidden;position:relative}
+
+/* 縮放列（右下角浮動） */
+.zoombar{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:4px;
+         background:rgba(36,36,36,.94);border:1px solid var(--ui-line2);border-radius:var(--ui-r);
+         padding:4px 6px;z-index:30;backdrop-filter:blur(6px)}
+.zoombar button{height:24px;padding:0 9px;border-radius:9px;font-size:12px;
+                background:transparent;border-color:transparent}
+.zoombar button:hover{background:var(--ui-surface)}
+.zoom-readout{font-size:11px;color:var(--ui-text);min-width:44px;text-align:center;
+              font-variant-numeric:tabular-nums}
+.zoom-hint{font-size:10px;color:var(--ui-dim2);margin-left:6px;padding-right:4px}
+
+/* ---------- 底部列 ---------- */
+footer{flex:none;background:var(--ui-topbar);border-top:1px solid var(--ui-line);
+       padding:7px 16px;font-size:11.5px;color:var(--ui-dim);
+       display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+
+/* ---------- toast ---------- */
+#msg{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);
+     background:#0D0D0D;border:1px solid var(--ui-line2);color:#fff;
+     padding:9px 17px;border-radius:10px;font-size:13px;opacity:0;
+     pointer-events:none;transition:.2s;z-index:99;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#msg.on{opacity:1}
+
+
+/* ---------- 對話框（core/xd-core.js XD.dialog；取代原生 alert/confirm/prompt） ---------- */
+.xd-modal{position:fixed;inset:0;z-index:10050;display:none;padding:24px;
+          align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+.xd-modal.open{display:flex}
+.xd-modal [hidden]{display:none!important}
+.xd-mbox{width:min(92vw,400px);background:var(--ui-panel);color:var(--ui-text);
+         border:1px solid var(--ui-line2);border-radius:12px;padding:20px 20px 15px;
+         box-shadow:0 18px 50px rgba(0,0,0,.55);animation:xd-pop .13s ease-out}
+@keyframes xd-pop{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.xd-mtitle{font-size:14px;font-weight:700;margin-bottom:7px}
+.xd-mtext{font-size:13px;line-height:1.7;color:var(--ui-dim);white-space:pre-wrap}
+.xd-minput{width:100%;height:32px;margin-top:13px;padding:0 10px;font:inherit;font-size:13px;
+           color:var(--ui-text);background:var(--ui-surface);
+           border:1px solid var(--ui-line2);border-radius:var(--ui-rf)}
+.xd-minput:focus{outline:none;border-color:var(--ui-accent)}
+.xd-macts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.xd-macts button{height:30px;padding:0 16px}
+.xd-mok:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.xd-mok.danger{background:#C4362B;border-color:#C4362B;color:#fff}
+.xd-mok.danger:hover{filter:brightness(1.12);color:#fff}
+
+/* ---------- LOGO 編輯器 Modal（core/logo-editor.js，改寫自 02_吸底 imageEditor） ---------- */
+.crop-panel button.mini{height:24px;padding:0 9px;font-size:11px}
+.crop-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;
+            align-items:center;justify-content:center;z-index:10020}
+.crop-modal.open{display:flex}
+.crop-panel{width:min(90vw,860px);background:var(--ui-panel);border:1px solid var(--ui-line2);
+            border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.crop-panel header{height:auto;display:flex;align-items:center;justify-content:space-between;
+                   padding:10px 14px;background:var(--ui-topbar);border-bottom:1px solid var(--ui-line);
+                   font-size:13px;color:var(--ui-text)}
+.crop-body{padding:26px;background:#111}
+.crop-body.checker,.crop-body .cropper-canvas,.crop-body .cropper-view-box{
+  background-color:#2a2a2a;
+  background-image:linear-gradient(45deg,#3c3c3c 25%,transparent 25%,transparent 75%,#3c3c3c 75%),
+                   linear-gradient(45deg,#3c3c3c 25%,transparent 25%,transparent 75%,#3c3c3c 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+.crop-body .cropper-modal{opacity:.5}
+.crop-body img{max-width:100%;max-height:52vh;display:block;margin:0 auto}
+.crop-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 14px;
+            border-top:1px solid var(--ui-line)}
+.crop-group-label{font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--ui-dim2);
+                  width:34px;flex-shrink:0}
+.crop-slider{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ui-dim);margin-left:auto}
+.crop-slider input[type="range"]{width:130px;accent-color:var(--ui-accent);cursor:pointer}
+.crop-slider span{min-width:28px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-text)}
+.crop-actions{display:flex;align-items:center;gap:8px;padding:10px 14px;
+             border-top:1px solid var(--ui-line);background:var(--ui-topbar)}
+.crop-status{flex:1;font-size:11px;color:var(--ui-dim);text-align:right}
+
+/* ---------- 捲軸 ---------- */
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--ui-line2);border-radius:4px}
+*::-webkit-scrollbar-thumb:hover{background:#555}
+
+</style>
+<style>
+/* inlined: ../core/paper.css */
+/* =========================================================
+   paper.css — 產出物（1200px 活動長圖）本身的樣式
+   三支 MS 工具共用：ms-editor（蝦大端排版）／ms-studio（設計師端）／
+   ms-live（線上編輯器）。以前這一整份是各自複製一份，加一個新 atom
+   要改兩、三個地方，2026-09-04 抽出來。
+
+   界線：這裡只放「畫出來的東西長什麼樣」，全部由 tokens.css 的 --c-* /
+   --fs-* 驅動；工具的操作介面（把手、選取框、面板）留在各工具頁。
+   載入順序：tokens.css → ui.css → paper.css → 頁面自己的 <style>
+   ========================================================= */
+
+.paper{width:1200px;background:var(--c-page);border-radius:26px;overflow:hidden;
+       transform-origin:top left;font-family:var(--font-ms)}
+.sec{position:relative;padding:var(--sec-pad)}
+.msno{position:absolute;top:14px;left:16px;background:rgba(255,255,255,.92);color:#16277F;
+      font-size:15px;font-weight:700;padding:3px 12px;border-radius:99px;z-index:6;
+      font-family:"Noto Sans TC",sans-serif}
+/* 膠囊標題：2026-09-08 起是一種列型積木（x_pill 的 pill 欄位），
+   不再由區段自動吐出。所以樣式掛在 atom class 上，位置交給它所在的那一列。 */
+.a-pill{display:block;width:max-content;max-width:90%;margin:0 auto;background:var(--c-pill-bg);
+      color:var(--c-pill-text);font-size:var(--fs-pill);line-height:1.25;font-weight:700;
+      padding:6px 74px;border-radius:999px}
+.prow.pillrow{padding:0;margin-bottom:18px}   /* 18 + .plainrun 的 26 = 44，與改版前的 .pill 一致 */
+
+/* 表格面 */
+.grid{display:grid;background:var(--c-line);gap:var(--w-line);
+      border:var(--w-line) solid var(--c-line);border-radius:var(--r-card);overflow:hidden;margin-bottom:26px}
+.cell{background:var(--c-card);padding:var(--pad-cell);display:flex;flex-direction:column;
+      gap:var(--gap-atom);justify-content:center;min-width:0;position:relative}
+.cell.lab{background:var(--c-lab)}
+.cell.ctr{align-items:center;text-align:center}
+.cell.pad0{padding:0}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;background:var(--c-line);gap:var(--w-line);height:100%}
+.subgrid .cell{padding:var(--pad-cell)}
+/* plain 面的子網格不畫表格線（亮點的 icon 三卡／等式列／痛點三卡） */
+.subgrid.plain{background:transparent;gap:34px;height:auto}
+.subgrid.plain>.cell{background:transparent;padding:0}
+
+/* 無框面（亮點、注意事項） */
+.plainrun{display:flex;flex-direction:column;gap:30px;margin-bottom:26px}
+.prow{position:relative;text-align:center;padding:0 46px}
+.pcell{display:flex;flex-direction:column;gap:var(--gap-atom)}
+
+/* 卡片面（顧問牆） */
+.cards{display:flex;flex-direction:column;gap:34px;margin-bottom:26px}
+.ccard{position:relative;display:flex;gap:44px;align-items:center;background:var(--c-card);
+       border-radius:var(--r-card);padding:44px 52px}
+.ccol{display:flex;flex-direction:column;gap:14px;min-width:0;flex:1}
+.ccol.cava{flex:0 0 250px;align-items:center}
+.cbadge{position:absolute;top:34px;right:44px;background:var(--c-badge);color:var(--c-badge-text);
+        font-size:28px;font-weight:700;line-height:1.2;text-align:center;
+        padding:14px 16px;border-radius:14px}
+
+/* KV：滿版圖片欄（無標題） */
+.sec.kv{padding:0}
+.kvwrap{width:100%;height:var(--kv-h);position:relative;cursor:pointer}
+.kvwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.kvwrap .kvph{position:absolute;inset:26px;border:3px dashed rgba(255,255,255,.5);border-radius:18px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#fff}
+.kvph b{font-size:34px}.kvph span{font-size:18px;opacity:.85}.kvph i{font-size:14px;opacity:.6;font-style:normal}
+.kvdel{position:absolute;top:12px;right:14px;background:var(--ui-danger);color:#fff;border:2px solid #fff;
+      border-radius:99px;font-size:13px;font-weight:700;padding:4px 12px;opacity:0;transition:.15s;z-index:6}
+.kvwrap:hover .kvdel{opacity:1}
+
+/* 匯出時關掉只給編輯看的東西（序號標籤、KV 佔位提示） */
+.paper.export .msno,.paper.export .kvdel,.paper.export .kvph{display:none}
+
+/* ---------- 字樣（token 字級，語意角色一一對應） ---------- */
+.a-head{font-size:var(--fs-head);font-weight:700;color:var(--c-text);text-align:center;line-height:1.3}
+.a-label{font-size:var(--fs-head);font-weight:700;color:var(--c-text);line-height:1.3}
+.a-time{font-size:var(--fs-time);font-weight:700;color:var(--c-body);text-align:center;line-height:1.4}
+.a-text{font-size:var(--fs-body);color:var(--c-body);line-height:1.5}
+.a-star{font-size:var(--fs-star);font-weight:700;color:var(--c-blue);line-height:1.45}
+.a-topic{font-size:var(--fs-topic);font-weight:700;color:var(--c-text);line-height:1.4}
+.a-practice{font-size:var(--fs-practice);font-weight:700;color:var(--c-blue)}
+.a-price{font-size:var(--fs-price);font-weight:700;color:var(--c-blue);line-height:1.35}
+.a-note{font-size:var(--fs-sub);color:var(--c-body)}
+.a-slogan{font-size:var(--fs-slogan);font-weight:700;color:var(--c-slogan);line-height:1.4}
+.a-hbody{font-size:var(--fs-hbody);color:var(--c-white);line-height:1.6}
+.a-wtext{font-size:var(--fs-notice);color:var(--c-white);line-height:1.6}
+.a-cname{font-size:var(--fs-cname);font-weight:700;color:var(--c-text)}
+.a-tag{font-size:var(--fs-head);font-weight:700;color:var(--c-slogan);line-height:1.25}
+.a-part{font-size:var(--fs-topic);font-weight:700;color:var(--c-blue);line-height:1.4}
+.a-wnote{font-size:var(--fs-sub);color:var(--c-white);opacity:.78;line-height:1.6}
+.a-eqop{font-size:var(--fs-slogan);font-weight:700;color:var(--c-white);line-height:1}
+
+ul.a-bul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;text-align:left}
+ul.a-bul li{font-size:var(--fs-body);color:var(--c-body);line-height:1.5;padding-left:34px;position:relative}
+ul.a-bul li:before{content:"・";position:absolute;left:0}
+ul.a-bul-w li{font-size:var(--fs-nbul);color:var(--c-white)}
+ul.a-bul-w li:before{content:"●";font-size:.6em;top:.5em}
+ul.a-bul-s li{font-size:var(--fs-cbul);color:var(--c-text)}
+ul.a-bul-sq li:before{content:"■";font-size:.6em;top:.5em}
+ul.a-bul-ok li:before{content:"✓";font-weight:700;color:var(--c-blue)}
+ul.a-bul-ng li{opacity:.72}
+ul.a-bul-ng li:before{content:"✗";font-weight:700;color:var(--c-accent)}
+
+/* 講者：頭像圈是 .avatar 的一個變體（av-speaker），跟照片檔名／圖示／圖片共用
+   同一套上傳／裁切/縮放樣式，見下面 .avatar.av-speaker */
+.spk{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spk .bd{font-size:var(--fs-sub);color:var(--c-body)}
+.spk .nm2{font-size:var(--fs-topic);font-weight:700;color:var(--c-text)}
+
+/* 圖片欄：圓形照片／方形圖示／矩形圖片／講者頭像圈 */
+.avatar{width:250px;height:250px;border-radius:50%;background:#D8E0F7;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:6px;color:#7C8DC4;font-weight:700;font-size:30px;
+        overflow:hidden}
+.avatar em{font-style:normal;font-size:15px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar em.dim{opacity:.65}
+/* .imgwrap 撐滿整個佔位框、扛照片位置／縮放的 transform；<img> 本身永遠是
+   object-fit:cover 填滿 .imgwrap，兩層分工見 atoms.js 的註解 */
+.avatar.has{position:relative}
+.avatar.has .imgwrap{position:absolute;inset:0}
+.avatar.has .imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar.av-icon{width:112px;height:112px;border-radius:24px;font-size:17px;gap:3px}
+.avatar.av-icon em{font-size:11px;max-width:96px}
+.avatar.av-rect{width:100%;height:200px;border-radius:14px;font-size:20px}
+.avatar.av-rect em{font-size:13px;max-width:88%}
+.avatar.av-speaker{width:120px;height:120px;font-size:40px;flex:none}
+
+/* 空區段 */
+.empty{border:3px dashed rgba(255,255,255,.42);border-radius:16px;padding:64px 30px;text-align:center;color:#fff}
+.empty b{display:block;font-size:26px;margin-bottom:8px}
+.empty span{font-size:17px;opacity:.85}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* inlined: ../core/xd-core.js */
+/* =========================================================
+   xd-core.js — 全域 namespace 與共用小工具
+   載入順序契約：tokens.css → xd-core → atoms → flow-engine → workorder → 頁面腳本
+   Classic script（不用 ES modules，file:// 下才能雙擊直開）。
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = (window.XD = window.XD || {});
+  XD.version = '0.1.0';
+  XD.packs = XD.packs || {};
+
+  /* DOM */
+  XD.$  = (s, el) => (el || document).querySelector(s);
+  XD.$$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+
+  /* 資料 */
+  XD.clone = o => JSON.parse(JSON.stringify(o));
+  let _uid = 0;
+  XD.uid = (p) => (p || 'r') + (++_uid) + '_' + Date.now().toString(36).slice(-4);
+  XD.esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+    m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[m]));
+
+  /* toast：頁面要有 #msg 元素 */
+  XD.toast = function (t) {
+    const m = XD.$('#msg'); if (!m) return console.log('[toast]', t);
+    m.textContent = t; m.classList.add('on');
+    clearTimeout(m._t); m._t = setTimeout(() => m.classList.remove('on'), 2000);
+  };
+
+  /* ---------- 對話框：頁內 modal，取代 alert / confirm / prompt ----------
+     不用瀏覽器原生對話框：實測在 Windows 多螢幕／系統縮放下常常點不到，
+     而且原生框會凍住整頁 JS（匯出跑到一半跳一個就整個卡死）。
+     同一個節點重複使用不重建——ms-editor 有 MutationObserver 盯著 body 的
+     childList，每次 append/remove 都會多跑一次 applyZoom。
+     一律回傳 Promise：confirm → true/false，prompt → 字串／null，alert → true。 */
+  let _dlg = null;
+  function dlgEl() {
+    if (_dlg) return _dlg;
+    const d = document.createElement('div');
+    d.className = 'xd-modal';
+    d.innerHTML =
+      '<div class="xd-mbox" role="dialog" aria-modal="true">' +
+        '<div class="xd-mtitle"></div><div class="xd-mtext"></div>' +
+        '<input class="xd-minput" type="text" spellcheck="false">' +
+        '<div class="xd-macts"><button class="xd-mcancel ghost"></button>' +
+        '<button class="xd-mok primary"></button></div></div>';
+    /* 工具頁在 document／#paper 上有自己的 click、keydown 選取邏輯，
+       在對話框裡的操作不該被當成「點到畫布」 */
+    ['click', 'mousedown', 'mouseup', 'dblclick', 'keydown', 'keyup', 'input']
+      .forEach(t => d.addEventListener(t, e => e.stopPropagation()));
+    document.body.appendChild(d);
+    return (_dlg = d);
+  }
+
+  XD.dialog = function (opts) {
+    opts = opts || {};
+    const d = dlgEl(), el = s => d.querySelector(s);
+    const tit = el('.xd-mtitle'), txt = el('.xd-mtext'), inp = el('.xd-minput');
+    const bOk = el('.xd-mok'), bNo = el('.xd-mcancel');
+    const ask = opts.input === true;
+    tit.textContent = opts.title || ''; tit.hidden = !opts.title;
+    txt.textContent = opts.text || '';  txt.hidden = !opts.text;
+    inp.hidden = !ask;
+    if (ask) {
+      inp.value = opts.value == null ? '' : String(opts.value);
+      if (opts.maxlength) inp.maxLength = opts.maxlength; else inp.removeAttribute('maxlength');
+    }
+    bOk.textContent = opts.ok || '確定';
+    bNo.textContent = opts.cancel || '取消';
+    bNo.hidden = opts.cancel === false;            /* alert：只留一顆 */
+    bOk.classList.toggle('danger', !!opts.danger);
+    const prev = document.activeElement;
+
+    return new Promise(resolve => {
+      function done(v) {
+        d.classList.remove('open');
+        bOk.onclick = bNo.onclick = d.onclick = d.onkeydown = null;
+        try { if (prev && prev.focus) prev.focus(); } catch (e) {}
+        resolve(v);
+      }
+      const yes = () => done(ask ? inp.value : true);
+      const bail = () => done(ask ? null : false);
+      bOk.onclick = yes;
+      bNo.onclick = bail;
+      d.onclick = e => { if (e.target === d) bail(); };        /* 點背景＝取消 */
+      d.onkeydown = e => {
+        if (e.key === 'Escape') { e.preventDefault(); bail(); }
+        else if (e.key === 'Enter') { e.preventDefault(); yes(); }
+      };
+      d.classList.add('open');
+      setTimeout(() => { (ask ? inp : bOk).focus(); if (ask) inp.select(); }, 0);
+    });
+  };
+  XD.confirm = (text, opts) => XD.dialog(Object.assign({ text: text }, opts));
+  XD.prompt  = (text, value, opts) =>
+    XD.dialog(Object.assign({ text: text, input: true, value: value }, opts));
+  XD.alert   = (text, opts) => XD.dialog(Object.assign({ text: text, cancel: false }, opts));
+
+  /* storage：key 一律 xd_ 前綴，避免與 BODA 同網域互染 */
+  XD.store = {
+    get(k, dft) {
+      try { const v = localStorage.getItem('xd_' + k); return v == null ? dft : JSON.parse(v); }
+      catch (e) { return dft; }
+    },
+    set(k, v) { try { localStorage.setItem('xd_' + k, JSON.stringify(v)); } catch (e) {} },
+    del(k)    { try { localStorage.removeItem('xd_' + k); } catch (e) {} },
+  };
+
+  /* 下載 blob */
+  XD.download = function (blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  };
+
+  XD.debounce = function (fn, ms) {
+    let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); };
+  };
+
+  /* 字數：中文／全形算 1，英數半形算 0.5（與 shrimp2choice 的 cc() 同規則）。
+     用途是「這行字在版面上佔多寬」，不是字元數。 */
+  XD.countUnits = function (text) {
+    const s = String(text == null ? '' : text);
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.codePointAt(i);
+      if ((c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
+          (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x3000 && c <= 0x303F) ||
+          (c >= 0xFF00 && c <= 0xFF60) || (c >= 0xAC00 && c <= 0xD7AF)) n += 1;
+      else if (c > 0xFFFF) { n += 1; i++; }
+      else n += 0.5;
+    }
+    return n;
+  };
+
+  /* 字數提示：軟性警告，不硬擋。
+     超字仍然打得進去、畫面照畫，只是輸入框與計數轉成強調色——
+     擋死會讓人繞路改用別的工具，反而更糟（承 02_吸底 的 textLimit 決策）。 */
+  XD.applyCount = function (inputEl, countEl, max) {
+    const n = XD.countUnits(inputEl.value);
+    const over = n > max;
+    if (countEl) {
+      countEl.textContent = (Number.isInteger(n) ? n : n.toFixed(1)) + ' / ' + max;
+      countEl.classList.toggle('over', over);
+    }
+    inputEl.classList.toggle('over', over);
+    return { units: n, over };
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../core/atoms.js */
+/* =========================================================
+   atoms.js — 欄位元件目錄與渲染
+   一個 atom = 版面上一個可填的最小單位。
+   xlsx 對應規則：
+     一般 atom   → 一個單行綠格
+     multi atom  → 一個多行綠格（Alt+Enter 換行）
+     bullets     → 一個多行綠格（一行＝一條）
+     speaker     → 品牌＋姓名 兩個綠格
+     photo       → 一個檔名綠格（可留白走自動配對）
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD;
+
+  /* cls  = 預覽字樣 class；ph = 佔位字；max = 字數上限（multi 為每行上限）
+     list = 條列（mod 可再指定符號變體）；photo = 圖片檔名欄（av 決定佔位框形狀）
+     deco = 純裝飾字（會畫但不進工單，例如等式的 ＋ ＝） */
+  /* 2026-09-09：除了 eqop（裝飾用的運算符號，line 一律不給打字進去，見 atomHTML 的
+     deco 判斷）以外全部補上 multi——使用者要「全部都能手動斷行」，短欄位（標籤、
+     價格…）平常還是一行，多按一個 Enter 純粹是使用者自己要斷才會斷，不影響既有內容。 */
+  XD.ATOMS = {
+    head:     { cls:'a-head',     nm:'標題',     ph:'欄位標題',            max:10, multi:true },
+    label:    { cls:'a-label',    nm:'標籤',     ph:'標籤',                max:6,  multi:true },
+    time:     { cls:'a-time',     nm:'時間',     ph:'00:00 - 00:00',       max:14, multi:true },
+    text:     { cls:'a-text',     nm:'內文',     ph:'內文文字，會自動換行並撐開列高。', max:40, multi:true },
+    star:     { cls:'a-star',     nm:'重點說明', ph:'★ 星註重點文字',      max:20, multi:true },
+    topic:    { cls:'a-topic',    nm:'主題標題', ph:'主題標題',            max:16, multi:true },
+    practice: { cls:'a-practice', nm:'實作環節', ph:'實作環節：說明文字',  max:30, multi:true },
+    price:    { cls:'a-price',    nm:'價格',     ph:'$0,000 / 人',         max:14, multi:true },
+    note:     { cls:'a-note',     nm:'註記',     ph:'（註記文字）',        max:20, multi:true },
+    slogan:   { cls:'a-slogan',   nm:'標語',     ph:'活動標語大字',        max:16, multi:true },
+    hbody:    { cls:'a-hbody',    nm:'亮點內文', ph:'亮點說明文字',        max:24, multi:true },
+    wtext:    { cls:'a-wtext',    nm:'白字內文', ph:'白字說明文字',        max:40, multi:true },
+    cname:    { cls:'a-cname',    nm:'顧問名稱', ph:'品牌 - 姓名',         max:20, multi:true },
+    bullets:  { list:true,        nm:'條列',     ph:'條列項目',            max:26 },
+    wbullets: { list:true, white:true, nm:'條列', ph:'條列項目',           max:40 },
+    cbullets: { list:true, small:true, nm:'介紹條列', ph:'顧問介紹',       max:30 },
+    /* photo:true＋av:'speaker' 讓講者頭像圈跟 photo/icon/pic 共用同一套上傳／拖曳
+       調整位置／縮放／裁切虛線（見 atomHTML 的 def.spk 分支），不是另外接一套。 */
+    speaker:  { spk:true, photo:true, av:'speaker', nm:'講者', ph:'品牌／姓名', max:12, multi:true },
+    photo:    { photo:true, av:'circle', nm:'照片檔名', ph:'',             max:40 },
+
+    /* ---- 2026-09-08 新增：膠囊標題 ----
+       以前是 flow-engine 對每個區段無條件吐的 <span class="pill">，
+       不是欄位；改成 atom 之後它就跟其他欄位一樣可加可刪可搬。 */
+    pill:     { cls:'a-pill',     nm:'膠囊標題', ph:'區段標題',            max:10, multi:true },
+
+    /* ---- 2026-09-04 新增（來源：蝦大MS.xlsx 七檔規律分析） ---- */
+    tag:      { cls:'a-tag',      nm:'標籤詞',   ph:'標籤詞',              max:8,  multi:true },
+    part:     { cls:'a-part',     nm:'章節標題', ph:'《 Part 1 章節標題 》', max:20, multi:true },
+    wnote:    { cls:'a-wnote',    nm:'白字註記', ph:'（註記文字）',        max:40, multi:true },
+    eqop:     { cls:'a-eqop',     nm:'運算符',   ph:'＋',                  max:2, deco:true },
+    sqbul:    { list:true, mod:'a-bul-sq', nm:'重點條列', ph:'重點項目',   max:30 },
+    okbul:    { list:true, mod:'a-bul-ok', nm:'適合對象', ph:'適合的對象描述',   max:30 },
+    ngbul:    { list:true, mod:'a-bul-ng', nm:'不建議對象', ph:'不建議的對象描述', max:30 },
+    icon:     { photo:true, av:'icon', nm:'圖示檔名', ph:'',               max:40 },
+    pic:      { photo:true, av:'rect', nm:'圖片檔名', ph:'',               max:40 },
+  };
+
+  /* 圖片側表：atom 只存 imgId，dataURL 放這裡（見 atomHTML 的說明） */
+  XD.IMAGES = XD.IMAGES || {};
+  /* 判斷一個 photo atom「現在真的有圖可以畫」——不是只看 imgId 有沒有存在。
+     重新整理瀏覽器時，圖片側表存不下（localStorage 塞爆）就會被整包丟掉，
+     但 atom 上的 imgId／檔名還在，變成「有參照但沒圖」的孤兒狀態。
+     兩邊都用這個判斷，才不會有的地方覺得「有圖」有的地方覺得「沒圖」。 */
+  XD.photoResolved = a => !!(a && (a.img || (a.imgId && XD.IMAGES[a.imgId])));
+
+  const A   = (t, v) => ({ t, v: v === undefined ? XD.ATOMS[t].ph : v });
+  const BUL = (t, items) => ({ t, items: Array.isArray(items) ? items :
+                Array.from({ length: items || 2 }, () => XD.ATOMS[t].ph) });
+  XD.A = A; XD.BUL = BUL;
+
+  /* 圓形／方形／矩形佔位框的畫法，photo/icon/pic 與講者頭像圈共用同一份——
+     講者圈只是多一個 av 變體（av-speaker），upload／拖曳移動／縮放／裁切虛線
+     全部走同一套 CSS class（.avatar[.has] .imgwrap），不必另外接一套 JS。
+     placeholder＝沒有圖時畫在框裡的內容，兩邊各自的空狀態長相不同所以留給呼叫端傳。 */
+  function avatarBoxHTML(a, def, di, live, placeholder) {
+    const box = 'avatar av-' + (def.av || 'circle');
+    const im = (live && di) ? ' data-img="' + di + '"' : '';
+    /* 圖可以直接掛在 atom 上（ms-studio 的素材包配對），也可以只存一個 id、
+       真正的 dataURL 放 XD.IMAGES 這張側表——線上編輯器走後者，
+       因為 undo 是整份 state 複本，幾 MB 的 base64 不能每打一個字就複製一次。 */
+    a = a.img ? a : (a.imgId && XD.IMAGES[a.imgId]
+                      ? Object.assign({}, a, { img: XD.IMAGES[a.imgId] }) : a);
+    /* 照片位置／縮放（tf＝{x,y,z}，% 位移 + 倍率）：只有線上編輯器讓人拖／縮，
+       但存在 atom 上，任何一支工具重新畫都會照樣套用——不是 ms-live 專屬的畫法。
+       ⚠ transform 刻意掛在多包的 .imgwrap，不是直接掛在 <img> 上：PNG 匯出
+       （export-png.js 的 pinObjectFit）擷取前會把 object-fit:cover 的 <img>
+       改寫成「絕對定位＋算好的尺寸」讓 html2canvas 讀得到，尺寸常常跟 100%/100%
+       不一樣——如果 % 位移直接掛在 img 上，匯出時位移解讀的參照框會跟著換，畫面
+       就會跟預覽對不起來。.imgwrap 永遠是 inset:0 撐滿整個佔位框，不會被
+       pinObjectFit 動到，位移的參照框在編輯與匯出兩邊保證一致。 */
+    const tf = a.tf;
+    const tfStyle = tf && (tf.x || tf.y || tf.z !== 1)
+      ? ' style="transform:translate(' + tf.x + '%,' + tf.y + '%) scale(' + tf.z + ')"' : '';
+    return a.img
+      ? '<div class="' + box + ' has"' + im + '><span class="imgwrap"' + tfStyle + '>' +
+        '<img src="' + a.img + '" alt=""></span></div>'
+      : '<div class="' + box + '"' + im + '>' + placeholder + '</div>';
+  }
+
+  /* ---------- 預覽渲染 ----------
+     di   ＝ 欄位位址 [iid|rowId|ci|si|ai]，有值才畫移除鈕
+     live ＝ 線上編輯模式：文字類掛 contenteditable、圖片類掛 data-img（點了換圖）。
+            位址一律沿用 di，讓工具頁用同一套 split('|') 解析。
+            講者一個 atom 有品牌／姓名兩欄，位址後面再接第 6 段區分。 */
+  XD.atomHTML = function (a, di, live) {
+    const esc = XD.esc, def = XD.ATOMS[a.t] || {};
+    const ed = (live && di && !def.deco)
+      ? ' contenteditable="true" spellcheck="false" data-ed="' + di + '"' : '';
+    let core;
+    if (def.list) {
+      const cls = 'a-bul' + (def.white ? ' a-bul-w' : '') + (def.small ? ' a-bul-s' : '') +
+                  (def.mod ? ' ' + def.mod : '');
+      core = '<ul class="' + cls + '"' + ed + '>' +
+             a.items.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>';
+    } else if (def.spk) {
+      /* 頭像圈跟 photo/icon/pic 共用 avatarBoxHTML（上傳／拖曳／縮放／裁切虛線
+         全部跟著一起有），空狀態維持原本那顆大大的「講」字（框太小放不下
+         「點一下上傳」那句提示）。品牌／姓名兩個文字格不受影響。 */
+      const e2 = k => (live && di) ? ' contenteditable="true" spellcheck="false" data-ed="' +
+                                     di + '|' + k + '"' : '';
+      /* has-photo 給 ms-live 判斷「這一顆選取外框要不要畫」——有照片時外框
+         交給照片自己的操作框＋裁切虛線接手（跟 .avatar:not(.has) 同一個道理，
+         只是這裡多一層 .spk 包住品牌／姓名，不能只看 .avatar 本身）。 */
+      const av = avatarBoxHTML(a, def, di, live, '<span>講</span>');
+      core = '<div class="spk' + (XD.photoResolved(a) ? ' has-photo' : '') + '">' + av +
+             '<div class="bd"' + e2('brand') + '>' +
+             esc(a.brand).replace(/\n/g, '<br>') + '</div><div class="nm2"' + e2('name') + '>' +
+             esc(a.name).replace(/\n/g, '<br>') + '</div></div>';
+    } else if (def.photo) {
+      const placeholder = '<span>' + esc(def.nm.replace('檔名', '')) + '</span>' +
+        (a.v ? '<em>' + esc(a.v) + '</em>'
+             : '<em class="dim">' + (live ? '點一下上傳' : '檔名可留白') + '</em>');
+      core = avatarBoxHTML(a, def, di, live, placeholder);
+    } else {
+      core = '<div class="' + def.cls + '"' + ed + '>' + esc(a.v).replace(/\n/g, '<br>') + '</div>';
+    }
+    /* 右上角那顆 ✕ 只給工單生成器（不能打字，需要一個點的目標）。
+       線上編輯器（live）不畫——積在每個欄位角上很吵，而且常壓到內容；
+       那邊改成「欄位空了按 Backspace／Delete 就删掉」。 */
+    return '<div class="aw"' + (di ? ' data-aw="' + di + '"' : '') + '>' + core +
+           (di && !live ? '<button class="adel" data-di="' + di + '" title="移除這個欄位">✕</button>' : '') + '</div>';
+  };
+
+  /* ---------- 語意角色目錄（給編輯器選的東西） ----------
+     這是「自由度放在組合、不放在樣式參數」的落點：使用者選的是
+     『這句話是什麼』（大標／內文／條列…），不是『這句話多大、多粗』。
+     長相一律由 tokens.css 決定，PSD 校準才不會被使用者調壞。
+
+     ⚠ ROLES 不是 ATOMS 的別名，是刻意收斂過的另一層（2026-09-04 改）：
+       ATOMS＝版面上實際存在的欄位型別（27 種，渲染與工單都靠它）
+       ROLES＝使用者要挑的東西（一個面 4~12 個）
+     收斂的四條規則：
+       ① 只差底色的合成一個角色（內文/亮點內文/白字內文 → 一個「內文」），
+          由容器的「面」決定實際用哪個 atom —— 這件事工具自己知道，不該問使用者
+       ② 條列符號（・●■✓✗）與圖片框型（圓/方/矩形）不是角色，是角色底下的
+          styles，只在選到該角色時才出現（Word 的「項目符號」下拉是同一個道理）
+       ③ 模板專屬的（實作環節／講者／運算符）標 only，不開放新增，
+          只有版面上已經在用時才會出現在清單裡
+       ④ face：'card'＝白底表格格／卡片，'plain'＝藍底無框列。
+          兩個面的角色幾乎不重疊，光是照面過濾就把 27 選 1 變成 6 或 12 選 1。
+     hot＝常用，預設攤開；其餘收在「更多樣式」。 */
+  XD.ROLES = [
+    /* --- 白底表格格／卡片 --- */
+    { id:'head',  nm:'表頭',   face:'card', set:'head',  hot:1, sample:'表頭文字',   ds:'欄位標題那一排' },
+    { id:'topic', nm:'小標',   face:'card', set:'topic', hot:1, sample:'段落小標',   ds:'段落的小標題' },
+    { id:'text',  nm:'內文',   face:'card', set:'text',  hot:1, sample:'內文文字會長這樣', ds:'一般說明文字' },
+    { id:'bul',   nm:'條列',   face:'card', set:'bullets', hot:1, sample:'條列項目', ds:'一行一條',
+      styles:[['bullets','・'], ['sqbul','■'], ['okbul','✓'], ['ngbul','✗'], ['cbullets','・小']] },
+    { id:'note',  nm:'小註記', face:'card', set:'note',  hot:1, sample:'（補充說明）', ds:'括號補充、提醒' },
+    { id:'label', nm:'欄位標籤',   face:'card', set:'label', sample:'標　籤',        ds:'米黃標籤格裡的字' },
+    { id:'cname', nm:'人名／品牌', face:'card', set:'cname', sample:'品牌 - 姓名',   ds:'顧問、講師、品牌名' },
+    { id:'star',  nm:'藍色重點',   face:'card', set:'star',  sample:'★ 要跳出來的一句', ds:'藍色粗體重點' },
+    { id:'price', nm:'價格',       face:'card', set:'price', sample:'$0,000',        ds:'金額大字' },
+    { id:'time',  nm:'時間',       face:'card', set:'time',  sample:'00:00 - 00:00', ds:'時段，置中' },
+    { id:'part',  nm:'章節 Part',  face:'card', set:'part',  sample:'《 Part 1 》',  ds:'流程的章節分隔' },
+    { id:'img',   nm:'圖片',       face:'card', set:'photo', sample:'圖片框', img:1,  ds:'點框上傳',
+      styles:[['photo','圓形'], ['icon','方形'], ['pic','矩形']] },
+
+    /* --- 藍底無框列 --- */
+    { id:'slogan', nm:'大標語', face:'plain', set:'slogan', hot:1, sample:'活動大標語', ds:'黃色大字' },
+    { id:'pbody',  nm:'內文',   face:'plain', set:'hbody', also:['wtext'], hot:1,
+      sample:'白色說明文字', ds:'落在藍底上的說明文字' },
+    { id:'pbul',   nm:'條列',   face:'plain', set:'wbullets', hot:1, sample:'條列項目', ds:'白色圓點條列',
+      styles:[['wbullets','●']] },
+    { id:'pnote',  nm:'小註記', face:'plain', set:'wnote', hot:1, sample:'（小字備註）', ds:'白色小字' },
+    { id:'tag',    nm:'標籤詞', face:'plain', set:'tag',   sample:'標籤詞',   ds:'黃色標籤字' },
+    { id:'pillt',  nm:'膠囊標題', face:'plain', set:'pill', sample:'區段標題', ds:'黃底圓角大標' },
+    { id:'pimg',   nm:'圖片',   face:'plain', set:'photo', sample:'圖片框', img:1, ds:'點框上傳',
+      styles:[['photo','圓形'], ['icon','方形'], ['pic','矩形']] },
+
+    /* --- 模板專屬：不開放新增，只有已經在用時才顯示 --- */
+    { id:'practice', nm:'實作環節', face:'card',  set:'practice', only:1, sample:'實作環節：說明' },
+    { id:'speaker',  nm:'講者',     face:'card',  set:'speaker',  only:1, sample:'品牌／姓名' },
+    { id:'eqop',     nm:'運算符',   face:'plain', set:'eqop',     only:1, sample:'＋' },
+  ];
+
+  const roleHas = (r, t) => r.set === t ||
+    (r.also || []).indexOf(t) >= 0 || (r.styles || []).some(s => s[0] === t);
+
+  /* 這個面可以新增／切換的角色（不含 only 的模板專屬角色） */
+  XD.rolesFor = face => XD.ROLES.filter(r => r.face === face && !r.only);
+  /* 某個 atom 型別現在算哪個角色（先在同一個面找，找不到才跨面） */
+  XD.roleOf = function (t, face) {
+    return XD.ROLES.find(r => r.face === face && roleHas(r, t)) ||
+           XD.ROLES.find(r => roleHas(r, t)) || null;
+  };
+  /* 「＋ 加欄位」的三顆快速鈕：每個面各自對到合適的 atom */
+  XD.QUICK_ADD = {
+    card:  [['text', '＋ 文字'], ['bullets', '＋ 條列'], ['photo', '＋ 圖片']],
+    plain: [['hbody', '＋ 文字'], ['wbullets', '＋ 條列'], ['photo', '＋ 圖片']],
+  };
+
+  /* 換角色：盡量把既有內容帶過去，帶不過去的用該角色的佔位字。
+     文字↔條列用換行／合併互轉（這正是「加入項目符號」的實作）。 */
+  XD.convertAtom = function (a, t) {
+    const from = XD.ATOMS[a.t] || {}, to = XD.ATOMS[t] || {};
+    if (!to.nm || a.t === t) return a;
+    const asText = from.list ? (a.items || []).join('\n')
+                 : from.spk  ? [a.brand, a.name].filter(Boolean).join(' ')
+                 : String(a.v == null ? '' : a.v);
+    const keepImg = from.photo && to.photo ? a.img : null;
+    for (const k of Object.keys(a)) delete a[k];
+    a.t = t;
+    if (to.list) {
+      const items = asText.split('\n').map(s => s.trim()).filter(Boolean);
+      a.items = items.length ? items : [to.ph];
+    } else if (to.spk) {
+      const parts = asText.split(/[\s　\-–—/｜|]+/).filter(Boolean);
+      a.brand = parts[0] || '品牌'; a.name = parts.slice(1).join(' ') || '姓名';
+    } else if (to.photo) {
+      a.v = from.photo ? asText : '';
+      if (keepImg) a.img = keepImg;
+    } else {
+      a.v = asText || to.ph;
+    }
+    return a;
+  };
+
+  /* ---------- 子格名稱（工單欄位名的前綴） ----------
+     cell.subNames 由列型自帶（如 ['卡一','卡二','卡三']）；
+     沒寫的沿用雙軌列的舊稱呼，舊版面 JSON 因此不會變樣。 */
+  const subPrefix = (cell, sub) => {
+    if (sub == null) return '';
+    const nm = (cell.subNames || [])[sub];
+    return (nm || (sub === 0 ? '左軌' : sub === 1 ? '右軌' : '第 ' + (sub + 1) + ' 格')) + '・';
+  };
+
+  /* ---------- 攤平成可填欄位（工單用） ---------- */
+  /* 回傳 [{id,nm,v,max,multi,lines,photo,sub}]；deco 裝飾字不列入 */
+  /* 同一格出現同型別第二次時，id 後面接 2、3…
+     合併格會把右邊那格的欄位接過來，不加後綴就會撞名。
+     第一次不加，所以舊工單的 id 完全沒變。
+     fieldsOf 與 applyFields 必須用同一套規則（各自數，走訪順序相同）。 */
+  const idCounter = () => {
+    const seen = {};
+    return (pfx, t) => {
+      const k = pfx + '|' + t;
+      seen[k] = (seen[k] || 0) + 1;
+      return pfx + '_' + t + (seen[k] > 1 ? String(seen[k]) : '');
+    };
+  };
+
+  XD.fieldsOf = function (cell, prefix) {
+    const out = [];
+    const uid = idCounter();
+    const push = (a, sub) => {
+      const def = XD.ATOMS[a.t] || {};
+      if (def.deco) return;
+      const p = prefix + (sub != null ? '_' + sub : '');
+      const pre = subPrefix(cell, sub);
+      if (def.list) {
+        out.push({ id: uid(p, a.t), nm: pre + def.nm + '（一行一條）',
+                   v: a.items.join('\n'), max: def.max, multi: true, lines: a.items.length, sub });
+      } else if (def.spk) {
+        out.push({ id: uid(p, 'brand'), nm: pre + '講者品牌', v: a.brand, max: def.max, sub,
+                   multi: !!def.multi, lines: def.multi ? String(a.brand || '').split('\n').length : 1 });
+        out.push({ id: uid(p, 'name'),  nm: pre + '講者姓名', v: a.name,  max: def.max, sub,
+                   multi: !!def.multi, lines: def.multi ? String(a.name || '').split('\n').length : 1 });
+      } else if (def.photo) {
+        /* id 用 atom 型別（photo 維持舊的 _photo，icon/pic 各自成欄，同格不撞名） */
+        out.push({ id: uid(p, a.t), nm: pre + def.nm, v: a.v, max: def.max, photo: true, sub });
+      } else {
+        out.push({ id: uid(p, a.t), nm: pre + def.nm, v: a.v, max: def.max,
+                   multi: !!def.multi, lines: def.multi ? String(a.v || '').split('\n').length : 1, sub });
+      }
+    };
+    if (cell.sub) cell.sub.forEach((s, si) => s.atoms.forEach(a => push(a, si)));
+    else (cell.atoms || []).forEach(a => push(a, null));
+    return out;
+  };
+
+  /* ---------- 工單值寫回（匯入用） ----------
+     與 fieldsOf 完全相同的走訪順序與 id 規則，把 valueMap 裡的值塞回 atom。
+     回傳套用的欄位數。 */
+  XD.applyFields = function (cell, prefix, valueMap) {
+    let applied = 0;
+    const uid = idCounter();
+    const get = id => {
+      const v = valueMap[id];
+      return (v == null || String(v).trim() === '') ? null : String(v);
+    };
+    const apply = (a, sub) => {
+      const def = XD.ATOMS[a.t] || {};
+      if (def.deco) return;
+      const p = prefix + (sub != null ? '_' + sub : '');
+      if (def.list) {
+        const v = get(uid(p, a.t));
+        if (v != null) { a.items = v.split('\n').map(s => s.trim()).filter(Boolean); applied++; }
+      } else if (def.spk) {
+        const b = get(uid(p, 'brand')), n = get(uid(p, 'name'));
+        if (b != null) { a.brand = b; applied++; }
+        if (n != null) { a.name = n; applied++; }
+      } else if (def.photo) {
+        const v = get(uid(p, a.t));
+        if (v != null) { a.v = v; applied++; }
+      } else {
+        const v = get(uid(p, a.t));
+        if (v != null) { a.v = v; applied++; }
+      }
+    };
+    if (cell.sub) cell.sub.forEach((s, si) => s.atoms.forEach(a => apply(a, si)));
+    else (cell.atoms || []).forEach(a => apply(a, null));
+    return applied;
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../core/flow-engine.js */
+/* =========================================================
+   flow-engine.js — 內容驅動高度的區段渲染引擎
+   （BODA schema-renderer 是絕對定位，不能用於 flow，故新寫）
+
+   一個區段 = 連續的列（row），每列來自一個列型 preset。
+   preset.mode 決定列的呈現面：
+     grid  （預設）連續表格：欄軌全表共用，表格線＝容器底色+gap 透出
+     plain  無框列：文字直接落在頁底上（亮點、注意事項、表外註記）
+     card   卡片列：每列一張獨立圓角卡（顧問牆）
+   連續同 mode 的列會合成一個 batch 一起畫；
+   跨列（group/lead）只會發生在 grid batch 內。
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD;
+  const flow = (XD.flow = {});
+
+  /* ---------- 分批 ---------- */
+  flow.batches = function (rows, presets) {
+    const out = [];
+    rows.forEach((row, i) => {
+      const mode = (presets[row.preset] || {}).mode || 'grid';
+      const last = out[out.length - 1];
+      if (last && last.mode === mode) { last.rows.push(row); last.idx.push(i); }
+      else out.push({ mode, rows: [row], idx: [i] });
+    });
+    return out;
+  };
+
+  /* ---------- 佔用表（grid batch 內） ----------
+     算出每個 cell 的欄位、跨欄、跨列；lead 格向下跨滿整組。 */
+  flow.place = function (rows, nCol) {
+    const occ = [], out = [];
+    const take = (r, c, rs, cs) => { for (let i = r; i < r + rs; i++) { occ[i] = occ[i] || [];
+                                     for (let j = c; j < c + cs; j++) occ[i][j] = true; } };
+    rows.forEach((row, r) => {
+      occ[r] = occ[r] || [];
+      const items = [];
+      if (row.lead) {
+        const span = rows.filter(x => x.gid === row.gid).length;
+        items.push({ cell: row.lead, col: 0, cs: 1, rs: span, row, isLead: true, r });
+        take(r, 0, span, 1);
+      }
+      let c = 0;
+      row.cells.forEach(cell => {
+        while (occ[r][c]) c++;
+        const cs = Math.min(cell.cs || 1, nCol - c);
+        items.push({ cell, col: c, cs, rs: 1, row, r });
+        take(r, c, 1, cs);
+        c += cs;
+      });
+      out.push({ r, row, items });
+    });
+    return out;
+  };
+
+  /* ---------- 還原點 ---------- */
+  flow.stampDef = function (row) {
+    if (row.lead && !row.lead._def) row.lead._def = XD.clone(row.lead.atoms);
+    row.cells.forEach(c => {
+      if (c.sub) c.sub.forEach(x => { if (!x._def) x._def = XD.clone(x.atoms); });
+      else if (!c._def) c._def = XD.clone(c.atoms);
+    });
+  };
+
+  /* ---------- 渲染 ---------- */
+  /* 列內子網格：欄數／欄寬由列型自帶的 cell.subCols 決定（沒寫＝沿用雙軌列的 1fr 1fr）。
+     這是「欄軌由區段固定」的例外，也是唯一的例外：子網格只活在單一格內、
+     不影響區段欄軌，所以 icon 三卡／等式列／並排小卡這類列型不必為它改欄軌。 */
+  const subStyle = c => c.subCols ? ' style="grid-template-columns:' + c.subCols + '"' : '';
+  /* 子格與外層格共用同一組旗標（lab／ctr／pad0），子格不自動吃 pad0 */
+  const cellCls = (c, outer) => ['cell', c.lab && 'lab', c.ctr && 'ctr',
+    ((outer && c.sub) || c.pad0) && 'pad0'].filter(Boolean).join(' ');
+
+  /* data-cell＝格位址 [iid|rowId|ci|si]，線上編輯器靠它做「在這一格加欄位」 */
+  const cellAddr = (iid, rowId, ci, si) => [iid, rowId, ci, si == null ? '' : si].join('|');
+
+  function subgridHTML(c, di, extraCls, live, iid, rowId, ci) {
+    return '<div class="subgrid' + (extraCls ? ' ' + extraCls : '') + '"' + subStyle(c) + '>' +
+      c.sub.map((sx, si) => '<div class="' + cellCls(sx) + '"' +
+        (live ? ' data-cell="' + cellAddr(iid, rowId, ci, si) + '"' : '') + '>' +
+        sx.atoms.map((a, ai) => XD.atomHTML(a, di(ai, si), live)).join('') + '</div>').join('') + '</div>';
+  }
+
+  function cellHTML(it, iid, editable, live) {
+    const c = it.cell, row = it.row;
+    const ci = it.isLead ? -1 : row.cells.indexOf(c);
+    const cls = cellCls(c, true);
+    const style = 'grid-column:' + (it.col + 1) + ' / span ' + it.cs +
+                  ';grid-row:' + (it.r + 1) + ' / span ' + it.rs + ';';
+    const di = (ai, si) => editable ? [iid, row.id, ci, si == null ? '' : si, ai].join('|') : '';
+    let inner;
+    if (c.sub) {
+      inner = subgridHTML(c, di, '', live, iid, row.id, ci);
+    } else {
+      inner = c.atoms.map((a, ai) => XD.atomHTML(a, di(ai, null), live)).join('');
+    }
+    /* data-row：讓工具頁能從任何一格反查它屬於哪一列（列選取用）。
+       plain 的 .prow 與 card 的 .ccard 本來就有，grid 面補上才三種面一致。 */
+    return '<div class="' + cls + '" data-row="' + row.id + '"' +
+           (live && !c.sub ? ' data-cell="' + cellAddr(iid, row.id, ci) + '"' : '') +
+           ' style="' + style + '">' + inner + '</div>';
+  }
+
+  function rowAtomsHTML(row, iid, editable, live) {
+    return row.cells.map((c, ci) => {
+      const di = (ai, si) => editable ? [iid, row.id, ci, si == null ? '' : si, ai].join('|') : '';
+      /* plain 面也吃子網格（亮點的 icon 三卡／等式列／痛點三卡）：
+         同一份 cell.sub 結構，只是不畫表格線（.subgrid.plain）。 */
+      if (c.sub) return subgridHTML(c, di, 'plain', live, iid, row.id, ci);
+      const inner = (c.atoms || []).map((a, ai) => XD.atomHTML(a, di(ai, null), live)).join('');
+      return live ? '<div class="pcell" data-cell="' + cellAddr(iid, row.id, ci) + '">' + inner + '</div>'
+                  : inner;
+    }).join('');
+  }
+
+  /* ---------- 區段縮圖 ----------
+     兩支工具的左欄都要畫「這個區段長怎樣」。列型積木卡本來就有縮圖，區段卡沒有——
+     這是「只看到活動資訊四個字，不知道是幾欄的表」的主因（2026-09-08）。
+     px 欄照實際寬度、1fr 平分剩下的，所以縮圖的欄寬比例跟版面上一致。
+     face 只是這個區段的代表面（實際的面由列型決定）。 */
+  flow.secThumb = function (sdef, opts) {
+    const o = opts || {}, W = o.w || 218, H = o.h || 40, pad = 2, gap = 2.5;
+    const CARD = '#F3FDFF', LAB = '#FEFBEA', LINE = '#8FB4E8', BLUE = '#2358E6';
+    const box = (x, y, w, h, fill, extra) =>
+      '<rect x="' + x + '" y="' + y + '" width="' + Math.max(w, 3) + '" height="' + Math.max(h, 3) +
+      '" rx="2.5" fill="' + fill + '"' + (extra || '') + '/>';
+    const inner = W - pad * 2;
+    /* 不畫膠囊——標題不屬於區段，是自己加上去的一塊積木 */
+    let body = box(0, 0, W, H, BLUE);
+    const top = pad, bh = H - pad * 2;
+
+    if (sdef.kv) {
+      body += box(pad, top, inner, bh, CARD, ' opacity=".45"');
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' + body + '</svg>';
+    }
+    if (o.face === 'plain' || sdef.face === 'plain') {
+      body += box(pad + inner * .18, top + 1, inner * .64, 5, '#FFF68F');
+      body += box(pad + inner * .10, top + 10, inner * .80, 4, CARD, ' opacity=".85"');
+      body += box(pad + inner * .22, top + 18, inner * .56, 4, CARD, ' opacity=".85"');
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' + body + '</svg>';
+    }
+    if (sdef.face === 'card') {
+      const ch = (bh - gap) / 2;
+      [0, 1].forEach(i => {
+        const y = top + i * (ch + gap);
+        body += box(pad, y, inner, ch, CARD);
+        body += '<circle cx="' + (pad + inner * .13) + '" cy="' + (y + ch / 2) + '" r="' +
+                Math.min(ch / 2 - 2, 7) + '" fill="' + LINE + '" opacity=".5"/>';
+        body += box(pad + inner * .26, y + ch / 2 - 4, inner * .30, 3, LINE, ' opacity=".55"');
+        body += box(pad + inner * .26, y + ch / 2 + 1, inner * .55, 3, LINE, ' opacity=".35"');
+      });
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' + body + '</svg>';
+    }
+    if (sdef.face === 'photo') {
+      const cw = (inner - gap) / 2, ch = (bh - gap) / 2;
+      [0, 1].forEach(r => [0, 1].forEach(c => {
+        body += box(pad + c * (cw + gap), top + r * (ch + gap), cw, ch, CARD);
+      }));
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' + body + '</svg>';
+    }
+    /* grid：欄軌照 1200px 的實際比例攤開，第一欄是固定窄欄就畫成米黃標籤欄 */
+    const cols = sdef.cols || ['1fr'];
+    const isPx = c => /px$/.test(String(c));
+    const fixed = cols.reduce((n, c) => n + (isPx(c) ? parseFloat(c) : 0), 0);
+    const frN = cols.filter(c => !isPx(c)).length || 1;
+    const rest = Math.max(1200 - fixed, 1);
+    const wRaw = cols.map(c => isPx(c) ? parseFloat(c) : rest / frN);
+    const total = wRaw.reduce((a, b) => a + b, 0);
+    const avail = inner - gap * (cols.length - 1);
+    const ch = (bh - gap) / 2;
+    const labCol = cols.length > 1 && isPx(cols[0]);
+    [0, 1].forEach(r => {
+      let x = pad;
+      wRaw.forEach((raw, ci) => {
+        const w = avail * raw / total;
+        body += box(x, top + r * (ch + gap), w, ch, (labCol && ci === 0) ? LAB : CARD);
+        x += w + gap;
+      });
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' + body + '</svg>';
+  };
+
+  /* 區段內容（不含外框 chrome，由工具頁包） */
+  flow.sectionBodyHTML = function (sec, sdef, presets, opts) {
+    const o = opts || {};
+    /* KV：無標題，滿版圖片欄（點選或拖入由工具頁接線） */
+    if (sdef.kv) {
+      /* KV 圖同樣支援「只存 id、dataURL 放 XD.IMAGES」（線上編輯器的 undo 快照才不會扛著整張圖） */
+      const kv = sec.kvImg || (sec.kvImgId && XD.IMAGES ? XD.IMAGES[sec.kvImgId] : null);
+      if (kv)
+        return '<div class="kvwrap has" data-kv="1"><img src="' + kv + '" alt="KV">' +
+               '<button class="kvdel" title="移除 KV 圖">✕</button></div>';
+      return '<div class="kvwrap" data-kv="1"><div class="kvph"><b>KV 主視覺</b>' +
+             '<span>點一下上傳完稿圖，或直接把圖拖進來</span>' +
+             '<i>1200 × ' + (sdef.kvH || 550) + '</i></div></div>';
+    }
+    /* 標題不在這裡畫——2026-09-08 起膠囊是一塊列型積木（x_pill），
+       所以「沒有標題」「一顆標題管兩張表」「一個區段兩顆標題」都排得出來。 */
+    let html = '';
+    if (!sec.rows.length) {
+      html += '<div class="empty"><b>這一段還沒有內容</b><span>從側邊選一個列型加進來</span></div>';
+      return html;
+    }
+    sec.rows.forEach(flow.stampDef);
+    flow.batches(sec.rows, presets).forEach(batch => {
+      if (batch.mode === 'grid') {
+        const placed = flow.place(batch.rows, sdef.cols.length);
+        html += '<div class="grid" data-batch="1" style="grid-template-columns:' + sdef.cols.join(' ') + '">';
+        placed.forEach(p => p.items.forEach(it => { html += cellHTML(it, sec.iid, o.editable, o.live); }));
+        html += '</div>';
+      } else if (batch.mode === 'card') {
+        html += '<div class="cards" data-batch="1">';
+        batch.rows.forEach(row => {
+          /* badge＝每張卡自己可切換的旗標（row.badge），沒設過才退回列型自帶的預設值
+             （c_badge 預設開／c_card 預設關）——不再是「這個列型永遠有/永遠沒有」。 */
+          const badge = row.badge != null ? !!row.badge : !!(presets[row.preset] || {}).badge;
+          html += '<div class="ccard" data-row="' + row.id + '">' +
+                  (badge ? '<div class="cbadge">賣家<br>共創</div>' : '') +
+                  /* cava＝固定寬的照片欄。列型可用 cell.ava 明講（並排小卡三格都不是照片欄）；
+                     沒寫的沿用「第一格就是照片欄」，舊版面 JSON 不受影響。 */
+                  row.cells.map((c, ci) => '<div class="ccol' +
+                    ((c.ava != null ? c.ava : ci === 0) ? ' cava' : '') + '"' +
+                    (o.live ? ' data-cell="' + cellAddr(sec.iid, row.id, ci) + '"' : '') + '>' +
+                    (c.atoms || []).map((a, ai) =>
+                      XD.atomHTML(a, o.editable ? [sec.iid, row.id, ci, '', ai].join('|') : '',
+                                  o.live)).join('') +
+                  '</div>').join('') + '</div>';
+        });
+        html += '</div>';
+      } else { /* plain */
+        html += '<div class="plainrun" data-batch="1">';
+        batch.rows.forEach(row => {
+          /* rowCls＝列型自帶的修飾 class（目前只有膠囊列用來吃它自己的下緣間距） */
+          const rc = (presets[row.preset] || {}).rowCls;
+          html += '<div class="prow' + (rc ? ' ' + rc : '') + '" data-row="' + row.id + '">' +
+                  rowAtomsHTML(row, sec.iid, o.editable, o.live) + '</div>';
+        });
+        html += '</div>';
+      }
+    });
+    return html;
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../core/workorder.js */
+/* =========================================================
+   workorder.js — 試算表工單 產出／解析
+   XIADA_WORKORDER_V1 契約的唯一定義處。
+
+   填寫表結構：
+     A 欄＝隱藏鍵欄（每個綠格那一列寫 fieldId，匯入靠它定位，不靠位址）
+     B..G 欄＝內容區（各區段的表格欄依比例映射到這 6 欄）
+     深藍橫條＝區段（▓ MS_01｜活動亮點）
+     藍色橫條＝積木（▍第 N 列｜積木名）
+     灰色小字＝欄位名；其正下方綠格＝填寫處
+     多行欄位：一行一條，Alt+Enter 換行（條列數量靠行數，不准插列）
+   _META（veryHidden）：magic、版面 JSON、fieldId 對照表
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD;
+  const wo = (XD.workorder = {});
+  wo.MAGIC = 'XIADA_WORKORDER_V1';
+
+  const C = {
+    line:'FF2C49CE', lab:'FFEAEFFC', fill:'FFDFF3E1', lock:'FFF2F3F5',
+    head:'FF16277F', warn:'FFFFF6D9', name:'FF8A93A6', nameBg:'FFF7F8FA',
+    band:'FFD7E0F9', secBand:'FF1C3887', key:'FFB9C0CC',
+  };
+  const thin  = { style:'thin', color:{ argb:C.line } };
+  const box   = { top:thin, left:thin, bottom:thin, right:thin };
+  const solid = a => ({ type:'pattern', pattern:'solid', fgColor:{ argb:a } });
+
+  const COL0 = 2, COLN = 7;             /* 內容區 B..G */
+  const spanMap = { 1:[[2,7]], 2:[[2,3],[4,7]], 3:[[2,3],[4,5],[6,7]] };
+
+  /* 把 cL..cR 這段欄位平分成 n 段（列內子網格用；欄數不足時尾段擠在最後一欄）。
+     n=2 且 cL..cR=B..G 時結果與舊的「取中點對半切」相同，舊工單版面不變。 */
+  function splitSpan(cL, cR, n) {
+    const total = cR - cL + 1, out = [];
+    let start = cL;
+    for (let i = 0; i < n; i++) {
+      const w = Math.round(total * (i + 1) / n) - Math.round(total * i / n);
+      const s = Math.min(start, cR);
+      const e = Math.min(cR, Math.max(s, s + w - 1));
+      out.push([s, e]);
+      start = e + 1;
+    }
+    return out;
+  }
+
+  const PHOTO_PROMPT = '填素材包裡的圖片檔名（例：黃佐奇.png）。也可以留白：系統會用姓名／品牌自動配對。';
+
+  wo.makePageXlsx = async function (page, presets, sectionDefs, opts) {
+    if (typeof ExcelJS === 'undefined') throw new Error('ExcelJS 尚未載入（需要連網）');
+    const o = opts || {};
+    const secs = page.sections.filter(s => !(sectionDefs[s.type] || {}).kv);
+    if (!secs.length) throw new Error('頁面上還沒有可填寫的區段');
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = '蝦大素材工具 ms-editor v' + XD.version;
+    const ws = wb.addWorksheet('填寫表', { views:[{ showGridLines:false, state:'frozen', ySplit:3 }] });
+    const mt = wb.addWorksheet('_META'); mt.state = 'veryHidden';
+
+    ws.getColumn(1).width = 4; ws.getColumn(1).hidden = true;
+    for (let c = COL0; c <= COLN; c++) ws.getColumn(c).width = 19;
+
+    /* ---- 表頭三行 ---- */
+    ws.mergeCells(1, COL0, 1, COLN);
+    Object.assign(ws.getCell(1, COL0), {
+      value: '蝦大活動頁工單　' + (o.eventName || ''),
+      font: { size:15, bold:true, color:{ argb:C.head } } });
+    ws.getRow(1).height = 26;
+    ws.mergeCells(2, COL0, 2, COLN);
+    const t2 = ws.getCell(2, COL0);
+    t2.value = '深藍橫條＝區段｜藍色橫條＝版面上的一塊積木｜灰色小字＝欄位名（不要動）｜正下方綠色格＝內容填這裡';
+    t2.font = { size:11, color:{ argb:'FF6B7280' } }; t2.fill = solid(C.warn);
+    ws.getRow(2).height = 18;
+    ws.mergeCells(3, COL0, 3, COLN);
+    const t3 = ws.getCell(3, COL0);
+    t3.value = '多行欄位一行填一條（換行按 Alt+Enter），請不要插入或刪除列。照片欄填素材包檔名，留白＝用姓名自動配對。';
+    t3.font = { size:11, color:{ argb:'FF6B7280' } }; t3.fill = solid(C.warn);
+    ws.getRow(3).height = 18;
+
+    const metaRows = [];
+    let cur = 5;
+
+    /* ---- 寫一組欄位（灰字列＋綠格列）到 cL..cR ---- */
+    const writePairs = (fields, r0, r1, cL, cR) => {
+      let r = r0;
+      fields.forEach(fd => {
+        if (r + 1 > r1) return;
+        if (cR > cL) ws.mergeCells(r, cL, r, cR);
+        const lab = ws.getCell(r, cL);
+        lab.value = fd.nm;
+        lab.font = { size:8, italic:true, color:{ argb:C.name } };
+        lab.fill = solid(C.nameBg);
+        lab.border = { left:thin, right:thin, top:thin };
+        lab.alignment = { vertical:'bottom' };
+        ws.getRow(r).height = 12;
+        r++;
+        if (cR > cL) ws.mergeCells(r, cL, r, cR);
+        const inp = ws.getCell(r, cL);
+        inp.value = '';
+        inp.fill = solid(C.fill);
+        inp.border = { left:thin, right:thin, bottom:thin };
+        inp.alignment = { vertical:'top', wrapText:true };
+        inp.protection = { locked:false };
+        const lines = fd.multi ? Math.max(2, fd.lines || 2) : 1;
+        ws.getRow(r).height = fd.multi ? (14 * (lines + 1)) : 20;
+        const maxChars = fd.multi ? fd.max * (lines + 2) : fd.max;
+        inp.dataValidation = {
+          type:'textLength', operator:'lessThanOrEqual', formulae:[maxChars],
+          allowBlank:true, showInputMessage:true,
+          promptTitle: fd.nm + (fd.multi ? '（每行約 ' + fd.max + ' 字內）' : '（上限 ' + fd.max + ' 字）'),
+          prompt: fd.photo ? PHOTO_PROMPT
+                : (fd.multi ? '一行一條，Alt+Enter 換行。原本的樣子：' : '原本的樣子：') +
+                  String(fd.v == null ? '' : fd.v).replace(/\n/g, ' / ').slice(0, 60),
+          showErrorMessage:true, errorStyle:'warning',
+          errorTitle:'超過建議字數',
+          error:'超過建議字數，版面會變長。確定要這樣填嗎？',
+        };
+        const key = ws.getCell(r, 1);   /* 并排欄位共用同一列 → 逗號串接 */
+        key.value = key.value ? key.value + ',' + fd.id : fd.id;
+        key.font = { size:7, color:{ argb:C.key } };
+        metaRows.push([fd.id, fd.nm, inp.address, fd.max, fd.multi ? 1 : 0]);
+        r++;
+      });
+      if (r <= r1) {                      /* 塊內剩餘空間鎖起來 */
+        if (r1 > r || cR > cL) ws.mergeCells(r, cL, r1, cR);
+        const g = ws.getCell(r, cL);
+        g.fill = solid(C.lock); g.border = box;
+      }
+    };
+
+    const bandRow = (label) => {
+      ws.mergeCells(cur, COL0, cur, COLN);
+      const h = ws.getCell(cur, COL0);
+      h.value = '▍' + label;
+      h.font = { size:10, bold:true, color:{ argb:C.head } };
+      h.fill = solid(C.band);
+      ws.getRow(cur).height = 15;
+      cur++;
+    };
+
+    /* ---- 逐區段 ---- */
+    secs.forEach((sec, si) => {
+      const sdef = sectionDefs[sec.type];
+      const msNo = 'MS_' + String(si + 1).padStart(2, '0');
+      ws.getRow(cur).height = 10; cur++;
+      ws.mergeCells(cur, COL0, cur, COLN);
+      const b = ws.getCell(cur, COL0);
+      b.value = '▓ ' + msNo + '｜' + sec.title;
+      b.font = { size:12, bold:true, color:{ argb:'FFFFFFFF' } };
+      b.fill = solid(C.secBand);
+      ws.getRow(cur).height = 22;
+      cur++;
+
+      const sid = 's' + (si + 1) + '_' + sec.type;
+
+      /* 2026-09-08 起沒有「區段標題」這個區段屬性欄位——
+         黃底膠囊現在是一塊列型積木（x_pill），跟其他欄位一樣逐列寫出。
+         sec.title 退成內部的區段名，只用在上面那條深藍分組橫條。 */
+
+      /* 視覺塊：主題組整組算一塊 */
+      const blocks = [];
+      sec.rows.forEach((r, i) => {
+        if (r.gid && i > 0 && sec.rows[i - 1].gid === r.gid) blocks[blocks.length - 1].rows.push(i);
+        else blocks.push({ rows: [i], nm: (presets[r.preset] || {}).nm || r.preset, mode: (presets[r.preset] || {}).mode || 'grid' });
+      });
+
+      const nCol = (sdef.cols || ['1fr']).length;
+      const spans = spanMap[nCol] || spanMap[1];
+      const gridRows = sec.rows;
+      const placedAll = XD.flow.place(gridRows, nCol);
+
+      const subNeed = f => {                       /* 子網格：取最高的那一格 */
+        const per = {};
+        f.forEach(x => { per[x.sub] = (per[x.sub] || 0) + 2; });
+        return Math.max.apply(null, [2].concat(Object.keys(per).map(k => per[k])));
+      };
+      const stackH = it => {
+        const f = XD.fieldsOf(it.cell, 'x');
+        return it.cell.sub ? subNeed(f) : Math.max(2, f.length * 2);
+      };
+
+      blocks.forEach((blk, bi) => {
+        ws.getRow(cur).height = 6; cur++;
+        bandRow('第 ' + (bi + 1) + ' 塊｜' + blk.nm);
+        const pid = sid + '.b' + (bi + 1);
+
+        if (blk.mode === 'plain') {
+          blk.rows.forEach(ri => {
+            gridRows[ri].cells.forEach((cell, ci) => {
+              const f = XD.fieldsOf(cell, pid + '.c' + ci);
+              if (cell.sub) {                       /* 亮點的 icon 三卡／等式列：橫向並排 */
+                const need = subNeed(f);
+                const parts = splitSpan(COL0, COLN, cell.sub.length);
+                cell.sub.forEach((sx, si2) =>
+                  writePairs(f.filter(x => x.sub === si2), cur, cur + need - 1,
+                             parts[si2][0], parts[si2][1]));
+                cur += need;
+              } else {
+                const need = f.length * 2;
+                writePairs(f, cur, cur + need - 1, COL0, COLN);
+                cur += need;
+              }
+            });
+          });
+        } else if (blk.mode === 'card') {
+          blk.rows.forEach(ri => {
+            const row = gridRows[ri];
+            const perCol = row.cells.map((cell, ci) => XD.fieldsOf(cell, pid + '.c' + ci));
+            const need = Math.max.apply(null, perCol.map(f => f.reduce((t, fd) => t + 2, 0)));
+            const sp = spanMap[Math.min(row.cells.length, 3)] || spanMap[1];
+            perCol.forEach((f, ci) => {
+              const s = sp[Math.min(ci, sp.length - 1)];
+              writePairs(f, cur, cur + need - 1, s[0], s[1]);
+            });
+            cur += need;
+          });
+        } else { /* grid */
+          const rowH = {};
+          blk.rows.forEach(ri => {
+            let h = 2;
+            placedAll[ri].items.forEach(it => { if (!it.isLead && it.rs === 1) h = Math.max(h, stackH(it)); });
+            rowH[ri] = h;
+          });
+          const lead0 = placedAll[blk.rows[0]].items.find(it => it.isLead);
+          if (lead0) {
+            const need = XD.fieldsOf(lead0.cell, 'x').length * 2;
+            const have = blk.rows.reduce((t, ri) => t + rowH[ri], 0) + (blk.rows.length - 1);
+            if (need > have) rowH[blk.rows[blk.rows.length - 1]] += need - have;
+          }
+          const bandStart = cur, rowStart = {};
+          blk.rows.forEach((ri, k) => {
+            if (k > 0) { ws.getRow(cur).height = 4; cur++; }
+            rowStart[ri] = cur; cur += rowH[ri];
+          });
+          const blockEnd = cur - 1;
+          blk.rows.forEach(ri => {
+            placedAll[ri].items.forEach(it => {
+              const f = XD.fieldsOf(it.cell, pid + '.r' + ri + 'c' + it.col);
+              if (it.isLead) {
+                writePairs(f, bandStart, blockEnd, spans[0][0], spans[0][1]);
+              } else if (it.cell.sub) {
+                const s = spans[Math.min(it.col, spans.length - 1)];
+                const csSpan = [s[0], (spans[Math.min(it.col + it.cs - 1, spans.length - 1)] || s)[1]];
+                const parts = splitSpan(csSpan[0], csSpan[1], it.cell.sub.length);
+                it.cell.sub.forEach((sx, si2) => {
+                  writePairs(f.filter(x => x.sub === si2), rowStart[ri], rowStart[ri] + rowH[ri] - 1,
+                             parts[si2][0], parts[si2][1]);
+                });
+              } else {
+                const s0 = spans[Math.min(it.col, spans.length - 1)];
+                const s1 = spans[Math.min(it.col + it.cs - 1, spans.length - 1)] || s0;
+                writePairs(f, rowStart[ri], rowStart[ri] + rowH[ri] - 1, s0[0], s1[1]);
+              }
+            });
+          });
+        }
+      });
+    });
+
+    ws.protect('', { selectLockedCells:true, selectUnlockedCells:true,
+                     formatColumns:true, formatRows:true,
+                     insertRows:false, deleteRows:false, sort:false });
+
+    /* ---- _META ---- */
+    mt.addRow([wo.MAGIC]);
+    mt.addRow(['tool', 'ms-editor', XD.version, new Date().toISOString()]);
+    const layout = JSON.stringify({
+      sections: page.sections.map(s => ({
+        iid: s.iid, type: s.type, title: s.title,
+        rows: (s.rows || []).map(r => ({ preset: r.preset, gid: r.gid || null, cells: r.cells, lead: r.lead || null })),
+      })),
+    });
+    for (let i = 0; i < layout.length; i += 30000)
+      mt.addRow([i === 0 ? 'layout' : 'layout+', layout.slice(i, i + 30000)]);
+    mt.addRow([]);
+    mt.addRow(['fieldId', '欄位名', '儲存格', '每行上限', '多行']);
+    metaRows.forEach(r => mt.addRow(r));
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return { blob, fields: metaRows.length, sections: secs.length,
+             filename: '蝦大MS工單_' + new Date().toISOString().slice(0, 10) + '.xlsx' };
+  };
+
+  /* =========================================================
+     匯入：解析填好的工單 → 重建整頁版面
+     定位以 _META 的位址為主（工單已鎖 insertRows），
+     A 欄鍵欄做交叉核對，不符列入 warnings。
+     ========================================================= */
+  const cellText = v => {
+    if (v == null) return '';
+    if (typeof v === 'object') {
+      if (v.richText) return v.richText.map(t => t.text).join('');
+      if (v.text) return String(v.text);
+      if (v.result != null) return String(v.result);
+      return '';
+    }
+    return String(v);
+  };
+
+  wo.parseXlsx = async function (arrayBuffer, presets, sectionDefs) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(arrayBuffer);
+    const mt = wb.getWorksheet('_META');
+    const ws = wb.getWorksheet('填寫表');
+    if (!mt || !ws) throw new Error('這不是蝦大工單（找不到 _META／填寫表）');
+    if (cellText(mt.getRow(1).getCell(1).value) !== wo.MAGIC)
+      throw new Error('工單版本不符（magic 不是 ' + wo.MAGIC + '）');
+
+    /* layout JSON（分塊組回） + 欄位對照 */
+    let layoutStr = '';
+    const fields = [];
+    mt.eachRow(row => {
+      const k = cellText(row.getCell(1).value);
+      if (k === 'layout' || k === 'layout+') layoutStr += cellText(row.getCell(2).value);
+      else if (/^s\d+_/.test(k))
+        fields.push({ id: k, nm: cellText(row.getCell(2).value),
+                      addr: cellText(row.getCell(3).value),
+                      multi: cellText(row.getCell(5).value) === '1' });
+    });
+    if (!layoutStr) throw new Error('_META 缺 layout');
+    const page = JSON.parse(layoutStr);
+
+    /* 取值 + 鍵欄核對 */
+    const valueMap = {}, warnings = [], missing = [];
+    fields.forEach(fd => {
+      const cell = ws.getCell(fd.addr);
+      const v = cellText(cell.value).replace(/\r\n?/g, '\n').trim();
+      valueMap[fd.id] = v;
+      if (!v) missing.push(fd);
+      const keys = cellText(ws.getCell('A' + cell.row).value).split(',');
+      if (keys.indexOf(fd.id) < 0)
+        warnings.push('鍵欄不符：' + fd.addr + ' 應為 ' + fd.id + '（工單可能被動過列）');
+    });
+
+    /* 寫回版面（走訪順序與產出時一致） */
+    let applied = 0;
+    const secs = page.sections.filter(s => !(sectionDefs[s.type] || {}).kv);
+    secs.forEach((sec, si) => {
+      const sid = 's' + (si + 1) + '_' + sec.type;
+      const blocks = [];
+      sec.rows.forEach((r, i) => {
+        if (r.gid && i > 0 && sec.rows[i - 1].gid === r.gid) blocks[blocks.length - 1].rows.push(i);
+        else blocks.push({ rows: [i], mode: (presets[r.preset] || {}).mode || 'grid' });
+      });
+      const nCol = (sectionDefs[sec.type].cols || ['1fr']).length;
+      const placedAll = XD.flow.place(sec.rows, nCol);
+      blocks.forEach((blk, bi) => {
+        const pid = sid + '.b' + (bi + 1);
+        if (blk.mode === 'plain' || blk.mode === 'card') {
+          blk.rows.forEach(ri => sec.rows[ri].cells.forEach((cell, ci) => {
+            applied += XD.applyFields(cell, pid + '.c' + ci, valueMap);
+          }));
+        } else {
+          blk.rows.forEach(ri => placedAll[ri].items.forEach(it => {
+            applied += XD.applyFields(it.cell, pid + '.r' + ri + 'c' + it.col, valueMap);
+          }));
+        }
+      });
+      /* 匯入後的列都重新給 id（避免與編輯器既有 id 撞名） */
+      sec.rows.forEach(r => { r.id = XD.uid(); });
+    });
+
+    return { page, applied, total: fields.length, missing, warnings };
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../core/export-png.js */
+/* =========================================================
+   export-png.js — html-to-image 包裝（PNG 匯出）
+   地雷處理（承 BODA / spike 實測）：
+   - 匯出前等字型 ready
+   - 超長頁要 skipAutoScale（>16384px 會被自動縮小）
+   - 節點若有 transform 縮放，先取消再匯出、匯完還原
+   需要頁面先載入 html2canvas 1.4.1 或 html-to-image 1.11.13（CDN，版本鎖定）。
+   兩者都在時優先用 html2canvas——file:// 下只有它能保住 web font（見 captureNodeH2C）。
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD;
+
+  /* html2canvas 不支援 object-fit。根因（01_蝦導播 v14 已查證並寫在 layout-runtime.js:180）：
+     1.4.1 的 renderReplacedElement 就是
+       drawImage(img, 0,0, 原圖寬,原圖高, box.left,box.top, box.寬,box.高)
+     ——把整張原圖硬塞進 <img> 的 content box，object-fit 完全不看，
+     所以只要「容器比例 ≠ 原圖比例」，預覽正常、匯出就被拉伸。
+     （順帶查證：它也不會畫 <img> 自己的 background-image，所以「改用 background-size:cover」
+      這招無效，實測過 12 條色帶還是全被壓進去。）
+
+     這裡的做法：擷取前把圖改成「絕對定位 ＋ 明確算好的 cover/contain 尺寸」，
+     讓父層的 overflow:hidden 負責裁切，object-fit 變成 no-op；畫完還原。
+     只處理「圖剛好填滿父層內容框」這個標準用法（KV 圖、頭像、人物照片都是），
+     其他情形改成絕對定位會跑位，寧可跳過不動。
+     ⚠ 尺寸一律用 layout px（getComputedStyle 的用值／clientWidth），不能用
+     getBoundingClientRect——MS 的 #paper 帶著 transform:scale 預覽縮放，rect 量到的是
+     縮放後的值（實測 660x303 而 layout 是 1200x550），拿去算會整個錯掉。
+     已經自己算好尺寸的圖（BN 的人物照片、LOGO、徽章）算出來就是現在的框，
+     會被「本來就剛好」那個判斷略過，不會被動到。 */
+  function pinObjectFit(root) {
+    const undo = [];
+    Array.prototype.forEach.call(root.querySelectorAll('img'), im => {
+      const cs = getComputedStyle(im), fit = cs.objectFit;
+      if (fit !== 'cover' && fit !== 'contain') return;
+      const nw = im.naturalWidth, nh = im.naturalHeight;
+      const cw = parseFloat(cs.width), ch = parseFloat(cs.height);
+      if (!nw || !nh || !(cw > 0) || !(ch > 0)) return;
+      if (parseFloat(cs.borderLeftWidth) || parseFloat(cs.borderTopWidth) ||
+          parseFloat(cs.paddingLeft) || parseFloat(cs.paddingTop)) return;
+      const sc = fit === 'cover' ? Math.max(cw / nw, ch / nh) : Math.min(cw / nw, ch / nh);
+      const dw = nw * sc, dh = nh * sc;
+      if (Math.abs(dw - cw) < 0.5 && Math.abs(dh - ch) < 0.5) return;   /* 本來就剛好 */
+      const par = im.parentElement;
+      if (!par) return;
+      const pcs = getComputedStyle(par);
+      const padL = parseFloat(pcs.paddingLeft), padR = parseFloat(pcs.paddingRight);
+      const padT = parseFloat(pcs.paddingTop), padB = parseFloat(pcs.paddingBottom);
+      /* 「圖＝父層內容框」而且沒有其他在流內的元素兄弟（絕對定位的提示層不算） */
+      if (Math.abs(cw - (par.clientWidth - padL - padR)) > 0.5 ||
+          Math.abs(ch - (par.clientHeight - padT - padB)) > 0.5) return;
+      let inflowSiblings = 0;
+      Array.prototype.forEach.call(par.children, ch2 => {
+        if (ch2 === im) return;
+        const p2 = getComputedStyle(ch2).position;
+        if (p2 !== 'absolute' && p2 !== 'fixed') inflowSiblings++;
+      });
+      if (inflowSiblings) return;
+      undo.push([im, im.getAttribute('style'), par, par.getAttribute('style')]);
+      if (pcs.position === 'static') par.style.position = 'relative';
+      if (pcs.overflow === 'visible') par.style.overflow = 'hidden';
+      im.style.position = 'absolute';
+      im.style.left = (padL + (cw - dw) / 2) + 'px';
+      im.style.top = (padT + (ch - dh) / 2) + 'px';
+      im.style.width = dw + 'px';
+      im.style.height = dh + 'px';
+      im.style.objectFit = 'fill';
+    });
+    /* 反向還原：同一個父層被兩張圖動過時，先還原後面那筆才不會留下中間狀態 */
+    return function () {
+      for (let i = undo.length - 1; i >= 0; i--) {
+        const e = undo[i];
+        if (e[1] == null) e[0].removeAttribute('style'); else e[0].setAttribute('style', e[1]);
+        if (e[3] == null) e[2].removeAttribute('style'); else e[2].setAttribute('style', e[3]);
+      }
+    };
+  }
+
+  /* html2canvas 是從「活的 render tree」畫的，所以節點自己與祖先的 CSS transform
+     都會被一起畫進去——MS 的 #paper 帶著 transform:scale(預覽縮放)，不處理的話
+     擷取 1200x550 的區段會變成「內容只畫在左上角 660x303、其餘留白」（實測過）。
+     html-to-image 不會有這個問題（它把節點重新掛到 SVG 裡，祖先的 transform 進不去），
+     所以這裡要自己補：擷取前把「節點本身＋所有祖先」的 transform 暫時關掉，畫完還原。
+     只動節點與祖先，不動子孫——子孫的 transform 往往是作品的一部分
+     （例如 BN 的人物照片縮放/旋轉），關掉就錯了。 */
+  function pinTransforms(node) {
+    const undo = [];
+    for (let n = node; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+      const tf = getComputedStyle(n).transform;
+      if (tf && tf !== 'none') {
+        undo.push([n, n.style.transform]);
+        n.style.transform = 'none';
+      }
+    }
+    return function () {
+      for (let i = undo.length - 1; i >= 0; i--) undo[i][0].style.transform = undo[i][1];
+    };
+  }
+
+  /* 擷取單一節點 → dataURL（type: 'png' | 'jpeg'） */
+  XD.captureNode = async function (node, opts) {
+    /* 頁面有載 html2canvas 就一律優先走它（理由見下面 captureNodeH2C）；
+       沒載才退回 html-to-image，讓還沒換過的頁面照舊能用。 */
+    if (typeof html2canvas !== 'undefined') return XD.captureNodeH2C(node, opts);
+    if (typeof htmlToImage === 'undefined') throw new Error('html-to-image 尚未載入（需要連網）');
+    const o = opts || {};
+    const oldTf = node.style.transform;
+    node.style.transform = 'none';
+    try {
+      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+      const args = {
+        width: o.width || node.offsetWidth,
+        height: o.height || node.offsetHeight,
+        pixelRatio: o.pixelRatio || 1,
+        skipAutoScale: true,
+        backgroundColor: o.background || null,
+      };
+      const dataUrl = o.type === 'jpeg'
+        ? await htmlToImage.toJpeg(node, Object.assign(args, { quality: o.quality || 0.92 }))
+        : await htmlToImage.toPng(node, args);
+      return { dataUrl, width: args.width, height: args.height };
+    } finally {
+      node.style.transform = oldTf;
+    }
+  };
+
+  /* html2canvas 版擷取（承 01_蝦導播 v14 的做法）。
+     為什麼要另外一套：html-to-image 是把 DOM 包成 SVG foreignObject 再當圖片畫，
+     而「SVG 當圖片」是受限模式、不能載入任何外部資源，所以字型必須先被內嵌進 SVG；
+     它內嵌的方式是讀 document.styleSheets[].cssRules 找 @font-face 再 fetch 字型檔，
+     但 file:// 底下每個檔案都是獨立來源 —— tokens.css 的 cssRules 直接丟 SecurityError、
+     備援的 fetch('../core/tokens.css') 也被擋，結果匯出的 SVG 一個 @font-face 都沒有，
+     圖只能用系統裝的字型畫（實測會退回 Noto Sans TC，字形與寬度都跟預覽不一樣）。
+     就算把 @font-face 改指到 GitHub Pages（CORS 是通的）也救不了：SVG-as-image 不能連網，
+     字型仍得整包內嵌，而這三支 CJK 字型各 18MB，內嵌進 16 張圖不可行。
+     html2canvas 不走 SVG，是在主文件的 canvas 上直接 fillText，
+     **文件裡已載入的 web font 直接就是對的**，不需要內嵌任何位元組。
+     代價（v14 也踩過，呼叫端要自己處理）：
+       ① 不支援 object-fit → 圖片要自己算好尺寸寫在 width/height 上；
+       ② 不支援 box-shadow → 需要的邊框要用 border 畫。
+     用法與 XD.captureNode 相同，回傳格式也相同。 */
+  XD.captureNodeH2C = async function (node, opts) {
+    if (typeof html2canvas === 'undefined') throw new Error('html2canvas 尚未載入（需要連網）');
+    const o = opts || {};
+    const w = o.width || node.offsetWidth, h = o.height || node.offsetHeight;
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    /* 先關 transform 再量 object-fit：兩者順序不能顛倒，
+       getComputedStyle 的 width 雖然不受 transform 影響，但 html2canvas 是照關掉後的
+       render tree 畫的，先關掉才能保證兩邊看到的是同一份幾何。 */
+    const unTf = pinTransforms(node);
+    const unFit = pinObjectFit(node);
+    let canvas;
+    try {
+      canvas = await html2canvas(node, {
+        width: o.width || node.offsetWidth, height: o.height || node.offsetHeight,
+        scale: o.pixelRatio || 1,
+        backgroundColor: o.background || null,
+        logging: false, useCORS: true,
+      });
+    } finally { unFit(); unTf(); }
+    const dataUrl = o.type === 'jpeg'
+      ? canvas.toDataURL('image/jpeg', o.quality || 0.92)
+      : canvas.toDataURL('image/png');
+    return { dataUrl, width: canvas.width, height: canvas.height };
+  };
+
+  XD.exportPng = async function (node, filename, opts) {
+    const r = await XD.captureNode(node, opts);
+    const blob = await (await fetch(r.dataUrl)).blob();
+    XD.download(blob, filename);
+    return { bytes: blob.size, width: r.width, height: r.height };
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../core/export-package.js */
+/* =========================================================
+   core/export-package.js — 整包下載共用工具
+   承 02_吸底/v1/src/export/exportBatch.js 的做法：JSZip 打包全部
+   PNG/JPG＋一份專案 JSON，一次觸發下載。這裡把「打包＋下載」與
+   「離屏渲染容器」抽成共用函式，讓 bn-editor / ms-editor / ms-studio
+   三個工具都能用同一套，不必各自重寫一份 JSZip 邏輯。
+   需要頁面已載入 JSZip（CDN）與 core/export-png.js（XD.captureNode）。
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD;
+
+  /* 建一個畫面外的容器（fixed + 位移到視窗外），呼叫 fn(container) 渲染／擷取，
+     結束後（無論成功失敗）都會移除容器——不會動到使用者正在看的畫面。 */
+  XD.withOffscreen = async function (fn) {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-99999px;top:0;pointer-events:none;';
+    document.body.appendChild(container);
+    try { return await fn(container); }
+    finally { document.body.removeChild(container); }
+  };
+
+  /* 把一張 dataURL 縮放成指定像素尺寸（給「設計稿尺寸≠實際交付尺寸」的版位用，
+     例如 BN 608×608 那張是在 800×800 設計稿上做的，交付要縮成 608×608）。 */
+  XD.resizeDataUrl = function (dataUrl, w, h) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const cnv = document.createElement('canvas');
+        cnv.width = w; cnv.height = h;
+        cnv.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(cnv.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  };
+
+  /* items: [{name, dataUrl}]；projectJson 給 null 就不附加。 */
+  XD.zipAndDownload = async function (items, projectJson, projectFilename, zipFilename) {
+    if (typeof JSZip === 'undefined') throw new Error('JSZip 尚未載入（需要連網）');
+    const zip = new JSZip();
+    items.forEach(it => zip.file(it.name, it.dataUrl.split(',')[1], { base64: true }));
+    if (projectJson != null) zip.file(projectFilename || 'project.json', JSON.stringify(projectJson, null, 2));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    XD.download(blob, zipFilename);
+    return blob;
+  };
+})();
+
+</script>
+<script>
+/* inlined: ../packs/ms/presets.js */
+/* =========================================================
+   packs/ms/presets.js — MS 活動頁資料包
+   （區段骨架 + 列型積木 + 假字預設整頁）
+
+   這是「設計師發佈的成果」：資料為主，只允許宣告式 factory。
+   採 .js 而非 .json：file:// 雙擊開檔時 fetch 會被擋，
+   classic <script> 不會。
+   所有預設內容一律假字（蝦大端不預填任何實際案型文案）。
+   ========================================================= */
+(function () {
+  'use strict';
+  const XD = window.XD, A = XD.A, BUL = XD.BUL;
+
+  /* ---------- 區段骨架：欄軌固定，蝦大不能改 ----------
+     nm    = 左欄面板的顯示名。2026-09-08 改成「形狀優先」——盤點後發現 11 個區段
+             其實只有 5 種骨架（欄軌），照用途命名看不出是幾欄的表；後綴保留用途，
+             所以第一次用的人也找得到。詳見 MS討論記錄 §11.9。
+     title = 用途名。工單的區段分組橫條用它，新增區段時膠囊標題也帶這個字。
+     face  = 左欄縮圖畫成哪一種面。實際的面是列型決定的，這裡只是這個區段的代表值。
+     demo  = 這一段「原本的樣態」（＝2026-09-08 以前的 dft，一列都沒動）。
+             下面的迴圈會拿它變出兩份：`full`（不含膠囊）給「新增區段」與「整張表」用，
+             `demo`（首列插膠囊）給「範例整頁」用。
+             ⭐ 曾經拆成「膠囊＋一列」的最小版，使用者試用後改回整塊：
+             一列一列疊太慢，多的刪掉比較快。
+     hot   = 七檔活動裡的高命中區段，線上編輯器預設只列這些（其餘收在「全部」）。 */
+  const sections = {
+    kv:         { nm:'KV 主視覺', kv:true, kvH:550, hot:1, face:'kv', pin:'top',
+                  ds:'滿版完稿圖，設計提供，這裡只佔位', demo:[] },
+
+    highlight:  { nm:'單欄無框 · 活動亮點', title:'活動亮點', cols:['1fr'], hot:1, face:'plain',
+                  ds:'標語＋說明直接落在藍底上，不畫表格線',
+                  cards:['h_slogan','h_body','h_icons3','h_equation','h_pain3','h_tagline'],
+                  demo:['h_slogan','h_body'] },
+
+    ticket:     { nm:'標籤＋兩欄對照 · 票種說明', title:'票種說明', cols:['226px','1fr','1fr'],
+                  face:'grid', ds:'標籤欄 226 ＋ 兩個票種並排比較',
+                  cards:['t_intro','t_head','t_desc','t_list','t_price'],
+                  demo:['t_intro','t_head','t_desc','t_list','t_price'] },
+
+    flow:       { nm:'時間＋內容＋講者 · 活動流程', title:'活動流程', hot:1, face:'grid',
+                  cols:['270px','1fr','250px'], ds:'三欄 270／1fr／250，可跨列、可分隔',
+                  cards:['f_note','f_head','f_group','f_part','f_div','f_row','f_wide','f_dual'],
+                  demo:['f_head','f_group','f_div','f_dual'] },
+
+    consultant: { nm:'照片大卡 · 賣家顧問', title:'賣家顧問', cols:['370px','1fr'], hot:1, face:'card',
+                  ds:'每列一張圓角卡：照片欄 370 ＋ 內容',
+                  cards:['c_badge','c_card','c_lect','c_grid','c_subhead','c_more'],
+                  demo:['c_badge','c_card','c_card'] },
+
+    info:       { nm:'標籤＋內容 · 活動資訊', title:'活動資訊', cols:['200px','1fr'], hot:1, face:'grid',
+                  ds:'標籤欄 200 ＋ 內容，一列一件事',
+                  cards:['i_row','i_fee','i_hot','i_dual','i_reward'],
+                  demo:['i_row','i_row','i_row','i_fee','i_hot'] },
+
+    notice:     { nm:'單欄無框 · 注意事項', title:'注意事項', cols:['1fr'], hot:1, face:'plain',
+                  ds:'白字條列＋聯絡方式，不畫表格線',
+                  cards:['n_bullets','n_contact'], demo:['n_bullets','n_contact'] },
+
+    /* ---- 2026-09-04 新增區段（七檔命中：適合對象 3、花絮／品牌／主題各 2） ---- */
+    schedule:   { nm:'標籤＋內容 · 課程時程', title:'課程時程', cols:['240px','1fr'], face:'grid',
+                  ds:'標籤欄 240 ＋ 內容，左欄放日期時間',
+                  cards:['w_week'], demo:['w_week','w_week'] },
+
+    audience:   { nm:'單欄表格 · 適合對象', title:'適合對象', cols:['1fr'], hot:1, face:'grid',
+                  ds:'單欄表格格，可放條列、icon 對卡、勾叉對照',
+                  cards:['a_body','a_icons','a_check'], demo:['a_body'] },
+
+    topics:     { nm:'單欄橫條 · 討論主題', title:'討論主題', cols:['1fr'], face:'grid',
+                  ds:'單欄橫條，一題一條',
+                  cards:['p_topic','p_note','p_wait'], demo:['p_topic','p_topic','p_note'] },
+
+    gallery:    { nm:'照片格 · 活動花絮', title:'活動花絮', cols:['1fr'], face:'photo',
+                  ds:'2×2 照片格，檔名可留白走素材包配對',
+                  cards:['g_grid'], demo:['g_grid'] },
+
+    brand:      { nm:'照片大卡 · 合作品牌', title:'合作品牌', cols:['370px','1fr'], face:'card',
+                  ds:'欄軌與賣家顧問相同：LOGO 370 ＋ 介紹',
+                  cards:['b_card','b_points','b_pics'], demo:['b_card','b_points'] },
+  };
+
+  /* ---------- 列型積木（內容一律假字） ---------- */
+  const presets = {
+    /* ---------- 通用：膠囊標題（每個區段都有） ----------
+       2026-09-08 起黃底膠囊是一塊列型積木，不再由 flow-engine 對每個區段無條件
+       吐一顆。所以做得到：不要標題／一顆標題管兩張表／一個區段放兩顆。
+       ctx.title＝新增時帶進來的區段用途名，之後就是一般欄位，改它不影響工單分組。 */
+    x_pill: { nm:'膠囊標題', ds:'黃底圓角大標。可以刪掉、可以搬、可以再加一顆',
+              mode:'plain', rowCls:'pillrow', shape:[1],
+              cells:(n, ctx) => [{ atoms:[{ t:'pill', v:(ctx && ctx.title) || XD.ATOMS.pill.ph }] }] },
+
+    /* 活動亮點 */
+    h_slogan: { nm:'標語列', ds:'黃色大字標語（可多行）', mode:'plain', shape:[1],
+                cells:() => [{ atoms:[A('slogan','活動標語大字\n第二行標語')] }] },
+    h_body:   { nm:'內文列', ds:'白色說明文字（可多行）', mode:'plain', shape:[1],
+                cells:() => [{ atoms:[A('hbody','活動說明文字第一行\n活動說明文字第二行\n可以自由增減行數')] }] },
+    h_icons3: { nm:'icon 三卡列', ds:'三張並排：圖示＋兩行短語', mode:'plain', shape:[1,1,1],
+                cells:() => [{ pad0:1, subCols:'1fr 1fr 1fr', subNames:['卡一','卡二','卡三'],
+                  sub:[{ atoms:[A('icon'), A('hbody','標語一\n短句補述')] },
+                       { atoms:[A('icon'), A('hbody','標語二\n短句補述')] },
+                       { atoms:[A('icon'), A('hbody','標語三\n短句補述')] }] }] },
+    h_equation:{ nm:'icon 等式列', ds:'項目＋項目＝成果（運算符是裝飾字，不進工單）',
+                mode:'plain', shape:[3,1,3,1,3],
+                cells:() => [{ pad0:1, subCols:'1fr 64px 1fr 64px 1fr',
+                  subNames:['項目甲','符號','項目乙','符號','成果'],
+                  sub:[{ atoms:[A('icon'), A('hbody','項目甲\n一句能力描述')] },
+                       { atoms:[A('eqop','＋')] },
+                       { atoms:[A('icon'), A('hbody','項目乙\n一句能力描述')] },
+                       { atoms:[A('eqop','＝')] },
+                       { atoms:[A('slogan','成果項')] }] }] },
+    h_pain3:  { nm:'痛點三卡', ds:'三張並排痛點短句', mode:'plain', shape:[1,1,1],
+                cells:() => [{ pad0:1, subCols:'1fr 1fr 1fr', subNames:['痛點一','痛點二','痛點三'],
+                  sub:[{ atoms:[A('hbody','痛點描述一\n兩行內')] },
+                       { atoms:[A('hbody','痛點描述二\n兩行內')] },
+                       { atoms:[A('hbody','痛點描述三\n兩行內')] }] }] },
+    h_tagline:{ nm:'標籤＋說明列', ds:'窄標籤欄＋寬說明欄', mode:'plain', shape:[1,3],
+                cells:() => [{ pad0:1, subCols:'190px 1fr', subNames:['標籤','說明'],
+                  sub:[{ atoms:[A('tag')] },
+                       { atoms:[A('hbody','一句主張\n補充說明文字，可多行')] }] }] },
+
+    /* 票種說明 */
+    t_intro: { nm:'表前註記', ds:'表格上方的黃色提醒字', mode:'plain', shape:[1],
+               cells:() => [{ atoms:[A('slogan','表格上方的提醒文字\n可以換行')] }] },
+    t_head:  { nm:'表頭列', ds:'票種名稱那一排', shape:[1,1,1],
+               cells:() => [{ lab:1, ctr:1, atoms:[A('label','票種')] },
+                            { ctr:1, atoms:[A('head','票種名稱 A')] },
+                            { ctr:1, atoms:[A('head','票種名稱 B')] }] },
+    t_desc:  { nm:'說明列', ds:'標籤＋兩段說明（含藍色重點）', shape:[1,1,1],
+               cells:() => [{ lab:1, ctr:1, atoms:[A('label','形式')] },
+                            { ctr:1, atoms:[A('text'), A('star'), A('note')] },
+                            { ctr:1, atoms:[A('text'), A('star'), A('note')] }] },
+    t_list:  { nm:'條列列', ds:'標籤＋兩組條列（一行一條）', shape:[1,1,1],
+               cells:() => [{ lab:1, ctr:1, atoms:[A('label','適合對象')] },
+                            { atoms:[BUL('bullets', 2)] },
+                            { atoms:[BUL('bullets', 3)] }] },
+    t_price: { nm:'價格列', ds:'標籤＋兩組大字價格', shape:[1,1,1],
+               cells:() => [{ lab:1, ctr:1, atoms:[A('label','票價')] },
+                            { ctr:1, atoms:[A('price'), A('note')] },
+                            { ctr:1, atoms:[A('price'), A('note')] }] },
+
+    /* 活動流程 */
+    f_note:  { nm:'表內說明列', ds:'橫跨整排的開場說明', shape:[3],
+               cells:() => [{ cs:3, ctr:1, atoms:[A('text','表格開場說明文字\n可以換行')] }] },
+    f_head:  { nm:'表頭列', ds:'時間／流程／講者', shape:[1,1,1],
+               cells:() => [{ ctr:1, lab:1, atoms:[A('label','時間')] },
+                            { ctr:1, lab:1, atoms:[A('label','流程')] },
+                            { ctr:1, lab:1, atoms:[A('label','講者')] }] },
+    f_row:   { nm:'一般列', ds:'時間＋流程＋講者', shape:[1,1,1],
+               cells:() => [{ ctr:1, atoms:[A('time')] },
+                            { atoms:[A('text')] },
+                            { ctr:1, atoms:[A('text','講者名稱')] }] },
+    f_wide:  { nm:'滿版列', ds:'時間＋一格橫跨後兩欄', shape:[1,2],
+               cells:() => [{ ctr:1, atoms:[A('time')] },
+                            { cs:2, ctr:1, atoms:[A('text')] }] },
+    f_div:   { nm:'分隔列', ds:'一格橫跨整排（如：中場休息）', shape:[3],
+               cells:() => [{ cs:3, ctr:1, lab:1, atoms:[A('topic','分隔標題')] }] },
+    f_part:  { nm:'章節分隔列', ds:'跨整排的章節大標（Part 1／Part 2）', shape:[3],
+               cells:() => [{ cs:3, ctr:1, lab:1, atoms:[A('part')] }] },
+    f_dual:  { nm:'雙軌列', ds:'時間＋左右兩軌各自條列', shape:[1,1,1],
+               cells:() => [{ ctr:1, atoms:[A('time')] },
+                            { cs:2, pad0:1, sub:[
+                              { atoms:[A('label','左軌標題'), BUL('bullets', 2)] },
+                              { atoms:[A('label','右軌標題'), BUL('bullets', 3)] }] }] },
+    f_group: { nm:'主題組', ds:'時間格跨列＋多個主題（跨列已包好）', shape:[1,1,1], group:3,
+               sub:() => [{ atoms:[A('topic'), BUL('bullets', 2), A('practice')] },
+                          { ctr:1, atoms:[{ t:'speaker', brand:'品牌', name:'姓名' }] }],
+               lead:() => ({ ctr:1, atoms:[A('time'), A('topic','主題組標題')] }) },
+
+    /* 賣家顧問 */
+    c_badge: { nm:'顧問卡（賣家共創）', ds:'圓形照片＋名稱＋介紹，含共創貼片', mode:'card', badge:1, shape:[1,2],
+               cells:() => [{ atoms:[{ t:'photo', v:'' }] },
+                            { atoms:[A('cname'), BUL('cbullets', 3)] }] },
+    c_card:  { nm:'顧問卡', ds:'圓形照片＋名稱＋介紹', mode:'card', shape:[1,2],
+               cells:() => [{ atoms:[{ t:'photo', v:'' }] },
+                            { atoms:[A('cname'), BUL('cbullets', 3)] }] },
+    c_lect:  { nm:'講師經歷大卡', ds:'照片＋頭銜姓名＋經歷／評價兩組條列', mode:'card', shape:[1,1,1],
+               cells:() => [{ ava:1, atoms:[{ t:'photo', v:'' }, A('cname','講師名'), A('note','頭銜描述一行')] },
+                            { ava:0, atoms:[A('label','講師經歷'), BUL('cbullets', 3)] },
+                            { ava:0, atoms:[A('label','特點評價'), BUL('cbullets', 2)] }] },
+    c_grid:  { nm:'並排小卡列', ds:'三張並排小卡：LOGO＋名稱＋重點條列（含佔位卡）',
+               mode:'card', shape:[1,1,1],
+               cells:() => [{ ava:0, atoms:[A('icon'), A('cname','賣家名稱一'), BUL('sqbul', 2)] },
+                            { ava:0, atoms:[A('icon'), A('cname','賣家名稱二'), BUL('sqbul', 2)] },
+                            { ava:0, atoms:[A('icon'), A('cname','（佔位卡）名單即將公布')] }] },
+    c_subhead:{ nm:'子分類標題列', ds:'跨整排的小標（如：直播／短影音）', mode:'plain', shape:[1],
+               cells:() => [{ atoms:[A('slogan','子分類標題')] }] },
+    c_more:  { nm:'尾註列', ds:'跨整排一行白字尾註', mode:'plain', shape:[1],
+               cells:() => [{ atoms:[A('wnote','更多名單陸續公布中......')] }] },
+
+    /* 活動資訊 */
+    i_row: { nm:'資訊列', ds:'標籤＋內容（日期、時間、地點…）', shape:[1,2],
+             cells:() => [{ lab:1, ctr:1, atoms:[A('label','標籤')] },
+                          { ctr:1, atoms:[A('text','內容文字')] }] },
+    i_fee: { nm:'費用列', ds:'標籤＋注意說明＋票價（可多行）', shape:[1,2],
+             cells:() => [{ lab:1, ctr:1, atoms:[A('label','費用')] },
+                          { ctr:1, atoms:[A('star','注意提醒文字'),
+                                          A('text','票種一：$0,000 / 人\n票種二：$000 / 人')] }] },
+    i_hot: { nm:'強調列', ds:'橫跨整排的橘色大字', shape:[3],
+             cells:() => [{ cs:3, ctr:1, atoms:[A('price','強調大字內容')] }] },
+    i_dual: { nm:'雙週資訊列', ds:'標籤欄＋兩週各自內容', shape:[1,1,1],
+              cells:() => [{ lab:1, ctr:1, atoms:[A('label','標籤')] },
+                           { pad0:1, subCols:'1fr 1fr', subNames:['第一週','第二週'],
+                             sub:[{ ctr:1, atoms:[A('text','第一週內容')] },
+                                  { ctr:1, atoms:[A('text','第二週內容')] }] }] },
+    i_reward: { nm:'任務獎勵列', ds:'左側圖示＋獎勵說明', shape:[1,2],
+                cells:() => [{ ctr:1, atoms:[A('icon')] },
+                             { ctr:1, atoms:[A('text','完成任務享獎勵示意文字')] }] },
+
+    /* 注意事項 */
+    n_bullets: { nm:'條列組', ds:'白色圓點條列（一行一條）', mode:'plain', shape:[1],
+                 cells:() => [{ atoms:[BUL('wbullets', 3)] }] },
+    n_contact: { nm:'聯絡資訊', ds:'兩行白字（說明＋帳號/信箱）', mode:'plain', shape:[1],
+                 cells:() => [{ atoms:[A('wtext','說明文字\n聯絡帳號或信箱')] }] },
+
+    /* 課程時程（週次課表） */
+    w_week: { nm:'週次組', ds:'左欄日期時間＋右欄週次主題與大綱', shape:[1,2],
+              cells:() => [{ lab:1, ctr:1, atoms:[A('time','日期：0/00(週)\n時間：00:00–00:00')] },
+                           { atoms:[A('topic','WeekN 週次主題'), BUL('sqbul', 3)] }] },
+
+    /* 適合對象 */
+    a_body:  { nm:'條列內文', ds:'條列（建議最多六項）', shape:[1],
+               cells:() => [{ atoms:[BUL('bullets', 3)] }] },
+    a_icons: { nm:'icon 對卡', ds:'兩張並排：圖示＋一句描述', shape:[1,1],
+               cells:() => [{ pad0:1, subCols:'1fr 1fr', subNames:['卡一','卡二'],
+                 sub:[{ ctr:1, atoms:[A('icon'), A('text','對象描述一')] },
+                      { ctr:1, atoms:[A('icon'), A('text','對象描述二')] }] }] },
+    a_check: { nm:'勾叉列', ds:'✓ 適合／✗ 不建議 兩欄對照', shape:[1,1],
+               cells:() => [{ pad0:1, subCols:'1fr 1fr', subNames:['適合','不建議'],
+                 sub:[{ atoms:[BUL('okbul', 2)] },
+                      { atoms:[BUL('ngbul', 2)] }] }] },
+
+    /* 討論主題 */
+    p_topic: { nm:'主題橫條', ds:'一題一條的主題列', shape:[1],
+               cells:() => [{ ctr:1, atoms:[A('topic','討論主題示意？')] }] },
+    p_note:  { nm:'免責小字', ds:'跨整排白色小字說明', mode:'plain', shape:[1],
+               cells:() => [{ atoms:[A('wnote','此為初步規劃，實際內容以後續公告為主')] }] },
+    p_wait:  { nm:'佔位列', ds:'整區佔位：敬請期待', mode:'plain', shape:[1],
+               cells:() => [{ atoms:[A('slogan','主題整理中，敬請期待')] }] },
+
+    /* 活動花絮 */
+    g_grid: { nm:'照片四格', ds:'2×2 照片格（檔名可留白，走素材包配對）', shape:[1,1],
+              cells:() => [{ pad0:1, subCols:'1fr 1fr',
+                subNames:['照片一','照片二','照片三','照片四'],
+                sub:[{ atoms:[A('pic')] }, { atoms:[A('pic')] },
+                     { atoms:[A('pic')] }, { atoms:[A('pic')] }] }] },
+
+    /* 合作品牌 */
+    b_card:   { nm:'品牌卡', ds:'LOGO＋品牌名稱與介紹', shape:[1,2],
+                cells:() => [{ ctr:1, atoms:[A('pic')] },
+                             { atoms:[A('cname','品牌名稱'),
+                                      A('text','品牌介紹段落示意，\n兩到四行說明文字。')] }] },
+    b_points: { nm:'重點條列', ds:'標籤欄＋重點條列', shape:[1,2],
+                cells:() => [{ lab:1, ctr:1, atoms:[A('label','品牌亮點')] },
+                             { atoms:[BUL('sqbul', 3)] }] },
+    b_pics:   { nm:'示意圖兩欄', ds:'跨整排並排兩張示意圖', shape:[1,1],
+                cells:() => [{ cs:2, pad0:1, subCols:'1fr 1fr', subNames:['示意圖一','示意圖二'],
+                  sub:[{ atoms:[A('pic')] }, { atoms:[A('pic')] }] }] },
+
+    /* ---------- 容器積木（ct_*）：線上編輯器用的「空殼列」 ----------
+       上面那 43 個是「常用組合範本」（從七檔真實活動反推的），這幾個是最小單位：
+       先放一個容器，再自己往格子裡塞語意角色。cells 接得到區段欄軌數 n，
+       所以同一個容器在 1 欄／2 欄／3 欄的區段都排得對。
+       刻意不掛進任何區段的 cards：ms-editor 的積木盤不列它們，
+       只有線上編輯器從 XD.packs.ms.containers 讀。 */
+    ct_full:  { nm:'滿版一格', ds:'一格橫跨整排', ct:1, shape:[3],
+                cells:(n) => [{ cs:n || 1, ctr:1, atoms:[A('text')] }] },
+    ct_cols:  { nm:'逐欄一格', ds:'每個欄軌各一格', ct:1, shape:[1,1,1],
+                cells:(n) => Array.from({ length: n || 1 }, () => ({ atoms:[A('text')] })) },
+    ct_label: { nm:'標籤＋內容', ds:'左邊標籤格＋右邊內容格', ct:1, shape:[1,2],
+                cells:(n) => (n || 1) < 2
+                  ? [{ atoms:[A('label'), A('text')] }]
+                  : [{ lab:1, ctr:1, atoms:[A('label')] }, { cs:(n - 1), atoms:[A('text')] }] },
+    ct_split2:{ nm:'一格切二', ds:'整排一格，內部再分兩欄', ct:1, shape:[1,1],
+                cells:(n) => [{ cs:n || 1, pad0:1, subCols:'1fr 1fr', subNames:['左','右'],
+                  sub:[{ atoms:[A('text')] }, { atoms:[A('text')] }] }] },
+    ct_split3:{ nm:'一格切三', ds:'整排一格，內部再分三欄', ct:1, shape:[1,1,1],
+                cells:(n) => [{ cs:n || 1, pad0:1, subCols:'1fr 1fr 1fr', subNames:['左','中','右'],
+                  sub:[{ atoms:[A('text')] }, { atoms:[A('text')] }, { atoms:[A('text')] }] }] },
+    ct_plain: { nm:'無框文字', ds:'不畫表格線，直接落在藍底上', ct:1, mode:'plain', shape:[1],
+                cells:() => [{ atoms:[A('hbody')] }] },
+    ct_card:  { nm:'卡片列', ds:'獨立圓角卡：照片欄＋內容欄', ct:1, mode:'card', shape:[1,2],
+                cells:() => [{ ava:1, atoms:[{ t:'photo', v:'' }] },
+                             { atoms:[A('cname'), BUL('cbullets', 2)] }] },
+  };
+
+  /* 膠囊標題不屬於任何區段：不進 cards、不進 full。
+     要加標題就從「加一段」的「通用」拿一塊，加在哪、加幾顆、要不要加都自己決定。
+     full＝新增區段與「整張表」用的同一份清單（兩邊必須一致）。 */
+  Object.keys(sections).forEach(k => {
+    const sd = sections[k];
+    sd.full = (sd.demo || []).slice();
+    if (!sd.kv) sd.demo = ['x_pill'].concat(sd.demo);
+  });
+
+  /* 通用積木：不屬於任何區段，哪個區段裡都能加 */
+  const commons = ['x_pill'];
+
+  /* 線上編輯器的容器清單（順序＝積木盤顯示順序） */
+  const containers = ['ct_full','ct_cols','ct_label','ct_split2','ct_split3','ct_plain','ct_card'];
+
+  /* ---------- 假字預設整頁：七區段、各自帶 demo 列型 ---------- */
+  function templateDefault() {
+    const mkRows = type => {
+      const sd = sections[type];
+      const nCol = (sd.cols || ['1fr']).length;
+      const ctx = { title: sd.title || sd.nm };
+      return (sd.demo || []).map(pid => {
+        const p = presets[pid];
+        if (p.group) {
+          const gid = XD.uid('g');
+          return Array.from({ length: p.group }, (_, i) =>
+            ({ id: XD.uid(), preset: pid, gid, lead: i === 0 ? p.lead() : null, cells: p.sub() }));
+        }
+        return [{ id: XD.uid(), preset: pid, cells: p.cells(nCol, ctx) }];
+      }).flat();
+    };
+    return ['kv', 'highlight', 'ticket', 'flow', 'consultant', 'info', 'notice'].map(type =>
+      ({ iid: XD.uid('s'), type, title: sections[type].title || sections[type].nm, rows: mkRows(type) }));
+  }
+
+  XD.packs.ms = { sections, presets, commons, containers, templateDefault };
+})();
+
+</script>
+<style>
+/* ===== 本頁專屬（共用外殼在 core/ui.css） =====
+   三欄：左＝區段積木、中＝畫布、右＝列型積木（點了區段就在眼前，不用捲） */
+main{grid-template-columns:232px 1fr 304px}
+#palette{background:var(--ui-panel);border-right:1px solid var(--ui-line);overflow-y:auto;padding:14px}
+#palette h2{font-size:12px;color:var(--ui-dim);margin:14px 0 10px;font-weight:700;letter-spacing:.04em}
+#palette h2:first-child{margin-top:0}
+#stage{overflow:auto;padding:28px 28px 80px;cursor:default}
+#zoomwrap{margin:0 auto}
+
+/* ---- 右欄：列型積木 ---- */
+#rowpanel{min-width:0}
+#rowhead{flex:none;padding:13px 14px 12px;border-bottom:1px solid var(--ui-line)}
+#rowhead h2{font-size:12px;color:var(--ui-dim);margin:0 0 9px;font-weight:700;letter-spacing:.04em}
+.rp-now{font-size:12.5px;color:var(--ui-text);margin-bottom:10px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-now b{color:#fff}
+.modebar{display:flex;border:1px solid var(--ui-line2);border-radius:var(--ui-r);overflow:hidden}
+.modebar button{flex:1;height:30px;padding:0 4px;border:none;border-radius:0;
+                background:transparent;justify-content:center;font-size:12px}
+.modebar button + button{border-left:1px solid var(--ui-line2)}
+.modebar button.on,.modebar button.on:hover{background:var(--ui-accent);color:#fff;font-weight:700}
+.rp-sel{font-size:11px;color:var(--ui-dim);line-height:1.5;margin-top:9px}
+.rp-sel b{color:var(--ui-text)}
+.rp-sel.warn{color:var(--ui-warn)}
+#rowcards{padding:12px 14px 0}
+#rowcards h3{font-size:11px;color:var(--ui-dim2);font-weight:700;letter-spacing:.05em;margin:2px 0 8px}
+
+/* 選取中的列（換積木的目標） */
+.rowsel{outline:3px solid var(--ui-accent);outline-offset:-3px;z-index:3}
+.prow.rowsel,.ccard.rowsel{outline-offset:6px;border-radius:14px}
+.card{border:1px solid var(--ui-line2);border-radius:10px;padding:10px;margin-bottom:9px;
+      background:var(--ui-surface);cursor:grab;transition:.12s;user-select:none;color:var(--ui-text)}
+.card:hover{border-color:var(--ui-accent);box-shadow:0 2px 10px rgba(238,77,45,.18);transform:translateY(-1px)}
+.card:active{cursor:grabbing}
+.card .nm{font-weight:700;font-size:13px;margin-bottom:2px}
+.card .ds{font-size:11px;color:var(--ui-dim);line-height:1.4}
+.card svg{display:block;margin:7px 0 5px;width:100%;height:30px}
+.card.dragging{opacity:.4}
+.card.seccard .nm:before{content:"▦ ";color:var(--ui-accent)}
+.card.seccard svg{height:40px}
+.card.iscur{border-color:var(--ui-accent)}
+.tagcur{font-size:10px;font-weight:600;color:var(--ui-accent);border:1px solid var(--ui-accent);
+        border-radius:99px;padding:0 6px;vertical-align:1px}
+#rowcards .hint{font-size:12px;color:var(--ui-dim);line-height:1.6;padding:6px 2px}
+
+/* 疊在產出物上的浮動小按鈕：維持淺色，否則在藍底/白格上看不清 */
+.rowbar button,.cellbar button,.leadbar button,.schrome button,.plusbar button{
+  height:auto;min-height:0;background:#fff;border-color:#CBD3E2;color:#1F2430;font-weight:600}
+.rowbar button:hover,.cellbar button:hover,.leadbar button:hover,
+.schrome button:hover,.plusbar button:hover{background:#EEF2F9;color:#000}
+.rowbar button[data-del],.schrome button[data-s="del"]{background:#FDE8E8;color:#C0392B}
+.rowbar button[data-del]:hover,.schrome button[data-s="del"]:hover{background:#C0392B;color:#fff}
+
+/* ===== 產出物上的編輯裝飾（本體樣式在 core/paper.css） ===== */
+.paper{box-shadow:0 8px 40px rgba(0,0,0,.22)}
+.paper.emptypage{padding:60px}
+.sec.sel{outline:4px dashed rgba(255,255,255,.6);outline-offset:-8px;border-radius:20px}
+.schrome{position:absolute;top:12px;right:14px;display:flex;gap:5px;opacity:0;transition:.15s;z-index:7}
+.sec:hover .schrome{opacity:1}
+.schrome button{font-size:14px;padding:4px 11px;border-radius:8px;background:rgba(255,255,255,.95)}
+#emptyPage{border:3px dashed rgba(255,255,255,.5);border-radius:18px;padding:120px 60px;text-align:center;color:#fff}
+#emptyPage b{display:block;font-size:34px;margin-bottom:10px}
+#emptyPage span{font-size:19px;opacity:.85}
+
+/* 列把手／欄位操作（沿 spike 驗證過的互動） */
+.rowbar{position:absolute;left:6px;top:6px;display:flex;gap:3px;opacity:0;transition:.12s;z-index:5;
+        background:rgba(255,255,255,.95);border-radius:8px;padding:2px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+.band:hover .rowbar,.prow:hover .rowbar,.ccard:hover .rowbar{opacity:1}
+.rowbar button{padding:2px 8px;font-size:13px;line-height:1.5;border-radius:6px;min-width:28px}
+.band{position:relative}
+.aw{position:relative}
+.aw .adel{position:absolute;top:-10px;right:-12px;width:27px;height:27px;padding:0;border-radius:50%;
+  font-size:13px;font-weight:700;line-height:1;background:var(--ui-danger);border:2px solid #fff;color:#fff;
+  opacity:0;transition:.12s;z-index:4;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.cell:hover .adel,.prow:hover .adel,.ccard:hover .adel{opacity:.45}
+.aw:hover .adel{opacity:1;transform:scale(1.12)}
+.rowbar button[data-del],.schrome button[data-s="del"]{background:#FDE8E8;color:var(--ui-danger);font-weight:700}
+.rowbar button[data-del]:hover,.schrome button[data-s="del"]:hover{background:var(--ui-danger);color:#fff}
+.cellbar{position:absolute;right:8px;bottom:6px;display:flex;gap:4px;opacity:.45;transition:.12s;z-index:4}
+.cellbar:hover{opacity:1}
+.cellbar button{font-size:12px;padding:2px 9px;border-radius:99px}
+.leadbar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;display:flex;gap:4px;opacity:.3;z-index:4}
+.leadbar:hover{opacity:1}
+.leadbar button{font-size:12px;padding:2px 8px;border-radius:99px}
+#dropline{height:5px;background:var(--c-pill-bg);border-radius:99px;display:none;
+          box-shadow:0 0 0 3px rgba(255,235,0,.35);position:relative;z-index:8}
+</style>
+
+<header>
+  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
+  <h1>MS 工單生成器<small>單檔版｜排出活動頁 → 產出工單</small></h1>
+  <select id="zoom">
+    <option value=".45">45%</option><option value=".55" selected>55%</option>
+    <option value=".75">75%</option><option value="1">100%</option>
+  </select>
+  <span class="spacer"></span>
+  <button id="btnDemo">重置為預設整頁</button>
+  <button id="btnClear">清空頁面</button>
+  <button id="btnDownload">⬇ 下載整包</button>
+  <button class="primary" id="btnXlsx">⬇ 產出整頁工單</button>
+</header>
+
+<main>
+  <aside id="palette">
+    <h2>① 區段積木（整頁的大塊）</h2>
+    <div id="seccards"></div>
+  </aside>
+  <section id="stage"><div id="zoomwrap"><div id="paper" class="paper"></div></div></section>
+  <aside id="rowpanel" class="right-panel">
+    <div id="rowhead">
+      <h2>② 列型積木</h2>
+      <div class="rp-now" id="rpNow">先在畫面上點一個區段</div>
+      <div class="modebar" id="modebar">
+        <button data-mode="add" class="on" title="加一列到選取列的下面">＋ 新增一列</button>
+        <button data-mode="swap" title="把選取的那一列換成別的列型">⇄ 換掉這列</button>
+      </div>
+      <div class="rp-sel" id="rpSel">尚未選取列</div>
+    </div>
+    <div class="pane-scroll"><div id="rowcards"></div></div>
+  </aside>
+</main>
+
+<footer>
+  <span>拖<b>區段積木</b>到頁面上組整頁；點一下區段，右欄就是它能用的<b>列型</b></span>
+  <span>右欄兩顆鈕切換：<kbd>＋ 新增一列</kbd>加在選取列下面、<kbd>⇄ 換掉這列</kbd>就地換列型</span>
+  <span>區段右上 <kbd>↑</kbd><kbd>↓</kbd><kbd>✕</kbd>；列左上同款把手</span>
+  <span>點黃色標題可改字；欄位 <kbd>✕</kbd> 移除、格子右下 <kbd>＋條列</kbd><kbd>↺</kbd></span>
+</footer>
+<div id="msg"></div>
+
+<script>
+(function () {
+  'use strict';
+  const XD = window.XD, $ = XD.$, esc = XD.esc;
+  const PACK = XD.packs.ms, SDEFS = PACK.sections, PRESETS = PACK.presets;
+  const STORE_KEY = 'ms_page_v1', MODE_KEY = 'ms_place_mode_v1';
+
+  let PAGE = { sections: [] };
+  let SEL = null;                       /* 選中的區段 iid */
+  let SELROW = null;                    /* 選中的列 id（換積木的目標） */
+  let MODE = XD.store.get(MODE_KEY, 'add') === 'swap' ? 'swap' : 'add';
+
+  const secOf  = iid => PAGE.sections.find(s => s.iid === iid);
+  /* 由列 id 反查 {sec,row}；找不到代表那列已被刪掉 */
+  const rowOf  = id => {
+    for (const s of PAGE.sections) {
+      const r = (s.rows || []).find(x => x.id === id);
+      if (r) return { sec: s, row: r };
+    }
+    return null;
+  };
+  /* 同一個主題組算一塊（跨列的 f_group 是一整塊，不能只換其中一列） */
+  const blockOf = (sec, row) => row.gid ? sec.rows.filter(x => x.gid === row.gid) : [row];
+  const blockNo = (sec, row) => {
+    let n = 0;
+    for (let i = 0; i < sec.rows.length; i++) {
+      const r = sec.rows[i];
+      if (!(r.gid && i > 0 && sec.rows[i - 1].gid === r.gid)) n++;
+      if (r === row) return n;
+    }
+    return n;
+  };
+  const msNoOf = sec => {
+    const list = PAGE.sections.filter(s => !SDEFS[s.type].kv);
+    const i = list.indexOf(sec);
+    return i < 0 ? 'KV' : 'MS_' + String(i + 1).padStart(2, '0');
+  };
+
+  /* ============ 渲染 ============ */
+  function render() {
+    const paper = $('#paper');
+    if (SELROW && !rowOf(SELROW)) SELROW = null;     /* 被刪掉的列不再算選取 */
+    if (!PAGE.sections.length) {
+      paper.className = 'paper emptypage';
+      paper.innerHTML = '<div id="emptyPage"><b>從左邊拖一個區段進來</b>' +
+        '<span>或按右上角「載入 0920 範例」看完整的一頁長什麼樣子</span></div>';
+      save(); paintRowPalette(); return;
+    }
+    paper.className = 'paper';
+    paper.innerHTML = PAGE.sections.map(sec => {
+      const sdef = SDEFS[sec.type];
+      return '<div class="sec' + (sec.iid === SEL ? ' sel' : '') + (sdef.kv ? ' kv' : '') + '" data-iid="' + sec.iid + '">' +
+        '<div class="msno">' + msNoOf(sec) + '</div>' +
+        '<div class="schrome">' +
+          '<button data-s="up" title="上移">↑</button>' +
+          '<button data-s="dn" title="下移">↓</button>' +
+          '<button data-s="del" title="刪除區段">✕</button></div>' +
+        XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: true }) +
+      '</div>';
+    }).join('');
+    PAGE.sections.forEach(sec => paintHandles(sec));
+    paintRowSel();
+    save();
+    paintRowPalette();
+  }
+
+  /* 選取中的列打橘框（主題組整組一起亮） */
+  function paintRowSel() {
+    const hit = SELROW && rowOf(SELROW);
+    if (!hit) return;
+    blockOf(hit.sec, hit.row).forEach(r =>
+      XD.$$('#paper [data-row="' + r.id + '"]').forEach(n => n.classList.add('rowsel')));
+  }
+
+  /* ---- 列把手／內容鈕（照 spike 的互動，範圍縮到單一區段） ---- */
+  function paintHandles(sec) {
+    const secEl = XD.$('.sec[data-iid="' + sec.iid + '"]'); if (!secEl) return;
+    const sdef = SDEFS[sec.type]; if (sdef.kv) return;
+    const batches = XD.flow.batches(sec.rows, PRESETS);
+    const batchEls = XD.$$('[data-batch]', secEl);
+    batches.forEach((batch, bi) => {
+      const el = batchEls[bi]; if (!el) return;
+      if (batch.mode === 'grid') {
+        const placed = XD.flow.place(batch.rows, sdef.cols.length);
+        let n = 0;
+        placed.forEach(p => {
+          const row = p.row;
+          const first = el.children[n]; n += p.items.length;
+          if (!first) return;
+          const prev = batch.rows[placed.indexOf(p) - 1];
+          if (!(row.gid && prev && prev.gid === row.gid)) attachRowbar(first, sec, row);
+          p.items.forEach((it, k) => attachCellButtons(el.children[n - p.items.length + k], sec, it));
+        });
+      } else {
+        Array.from(el.children).forEach((rowEl, k) => {
+          const row = batch.rows[k]; if (!row) return;
+          attachRowbar(rowEl, sec, row);
+          row.cells.forEach((cell, ci) => attachCellButtons(rowEl, sec, { cell, row }));
+        });
+      }
+    });
+  }
+  function attachRowbar(el, sec, row) {
+    el.classList.add('band');
+    const bar = document.createElement('div');
+    bar.className = 'rowbar';
+    bar.innerHTML = '<button data-mv="-1" title="上移">↑</button>' +
+                    '<button data-mv="1" title="下移">↓</button>' +
+                    '<button data-del="1" title="刪除這列">✕</button>';
+    bar.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.del) delRow(sec, row.id); else moveRow(sec, row.id, +b.dataset.mv);
+    };
+    el.appendChild(bar);
+  }
+  function attachCellButtons(el, sec, it) {
+    if (!el) return;
+    const cell = it.cell;
+    const lists = [];
+    const collect = atoms => (atoms || []).forEach(a => { if (a.items) lists.push(a); });
+    if (cell.sub) cell.sub.forEach(sx => collect(sx.atoms)); else collect(cell.atoms);
+    const defs = cell.sub ? cell.sub.map(x => x._def) : [cell._def];
+    const curs = cell.sub ? cell.sub.map(x => x.atoms) : [cell.atoms];
+    const dirty = JSON.stringify(curs) !== JSON.stringify(defs);
+    if (lists.length || dirty) {
+      const bar = document.createElement('div');
+      bar.className = 'cellbar';
+      bar.innerHTML = (lists.length ? '<button data-k="b+">＋條列</button><button data-k="b-">−</button>' : '') +
+                      (dirty ? '<button data-k="rs" title="還原成原本的欄位">↺</button>' : '');
+      bar.onclick = e => {
+        const b = e.target.closest('button'); if (!b) return;
+        e.stopPropagation();
+        if (b.dataset.k === 'b+') lists.forEach(a => a.items.push(XD.ATOMS[a.t].ph));
+        if (b.dataset.k === 'b-') lists.forEach(a => { if (a.items.length > 1) a.items.pop(); });
+        if (b.dataset.k === 'rs') {
+          if (cell.sub) cell.sub.forEach(x => x.atoms = XD.clone(x._def));
+          else cell.atoms = XD.clone(cell._def);
+          XD.toast('已還原此格');
+        }
+        render();
+      };
+      el.appendChild(bar);
+    }
+    if (it.isLead) {
+      const bar = document.createElement('div');
+      bar.className = 'leadbar';
+      bar.innerHTML = '<button>＋主題</button><button>−</button>';
+      bar.children[0].onclick = e => {
+        e.stopPropagation();
+        const blk = sec.rows.filter(x => x.gid === it.row.gid);
+        const at = sec.rows.indexOf(blk[blk.length - 1]) + 1;
+        sec.rows.splice(at, 0, { id: XD.uid(), preset: it.row.preset, gid: it.row.gid,
+                                 lead: null, cells: PRESETS[it.row.preset].sub() });
+        render();
+      };
+      bar.children[1].onclick = e => {
+        e.stopPropagation();
+        const blk = sec.rows.filter(x => x.gid === it.row.gid);
+        if (blk.length <= 1) return XD.toast('主題組至少要留一個主題');
+        sec.rows = sec.rows.filter(x => x !== blk[blk.length - 1]);
+        render();
+      };
+      el.appendChild(bar);
+    }
+  }
+
+  /* ============ 區段操作 ============ */
+  function defaultRows(type) {
+    const sdef = SDEFS[type];
+    if (sdef.kv) return [];
+    /* full＝這一段原本的整塊（不含膠囊，膠囊在「通用」那一組自己拿） */
+    const ctx = { title: sdef.title || sdef.nm };
+    const nCol = (sdef.cols || ['1fr']).length;
+    return (sdef.full || sdef.cards || []).map(pid => makeRow(pid, nCol, ctx)).flat();
+  }
+  function makeRow(pid, nCol, ctx) {
+    const p = PRESETS[pid];
+    if (p.group) {
+      const gid = XD.uid('g');
+      return Array.from({ length: p.group }, (_, i) =>
+        ({ id: XD.uid(), preset: pid, gid, lead: i === 0 ? p.lead() : null, cells: p.sub() }));
+    }
+    return [{ id: XD.uid(), preset: pid, cells: p.cells(nCol, ctx) }];
+  }
+  function addSection(type, at) {
+    if (SDEFS[type].kv && PAGE.sections.some(s => SDEFS[s.type].kv))
+      return XD.toast('KV 佔位只需要一個');
+    const sec = { iid: XD.uid('s'), type, title: SDEFS[type].title || SDEFS[type].nm, rows: defaultRows(type) };
+    let idx = at === undefined ? PAGE.sections.length : at;
+    if (SDEFS[type].kv) idx = 0;
+    else if (idx === 0 && PAGE.sections[0] && SDEFS[PAGE.sections[0].type].kv) idx = 1;
+    PAGE.sections.splice(idx, 0, sec);
+    SEL = sec.iid;
+    render();
+    XD.toast('已加入區段「' + SDEFS[type].nm + '」');
+  }
+  function moveSection(iid, dir) {
+    const i = PAGE.sections.findIndex(s => s.iid === iid); if (i < 0) return;
+    const j = i + dir;
+    if (j < 0 || j >= PAGE.sections.length) return;
+    if (SDEFS[PAGE.sections[i].type].kv || SDEFS[PAGE.sections[j].type].kv)
+      return XD.toast('KV 固定在最上面');
+    PAGE.sections.splice(j, 0, PAGE.sections.splice(i, 1)[0]);
+    render();
+  }
+  function delSection(iid) {
+    PAGE.sections = PAGE.sections.filter(s => s.iid !== iid);
+    if (SEL === iid) SEL = null;
+    render();
+  }
+
+  /* ============ 列操作 ============ */
+  function addRow(sec, pid, at) {
+    const rows = makeRow(pid);
+    const idx = at === undefined ? sec.rows.length : at;
+    sec.rows.splice(idx, 0, ...rows);
+    SELROW = rows[0].id;                /* 選取跟著新列走，才能連按調整 */
+    render();
+  }
+  /* 就地換列型：把選取的那一塊（主題組算一整塊）換成別的 preset */
+  function replaceRow(sec, id, pid) {
+    const r = sec.rows.find(x => x.id === id); if (!r) return null;
+    const blk = blockOf(sec, r);
+    const at = sec.rows.indexOf(blk[0]);
+    const rows = makeRow(pid);
+    sec.rows.splice(at, blk.length, ...rows);
+    SELROW = rows[0].id;                /* 停在原位，可以連按換不同列型比較 */
+    render();
+    return r.preset;
+  }
+  /* 「新增」的落點：選取列的下一列；沒選就加到最後 */
+  function afterSelIndex(sec) {
+    const r = SELROW && sec.rows.find(x => x.id === SELROW);
+    if (!r) return undefined;
+    const blk = blockOf(sec, r);
+    return sec.rows.indexOf(blk[blk.length - 1]) + 1;
+  }
+  function delRow(sec, id) {
+    const r = sec.rows.find(x => x.id === id); if (!r) return;
+    sec.rows = r.gid ? sec.rows.filter(x => x.gid !== r.gid) : sec.rows.filter(x => x.id !== id);
+    render();
+  }
+  function moveRow(sec, id, dir) {
+    const i = sec.rows.findIndex(x => x.id === id); if (i < 0) return;
+    const r = sec.rows[i];
+    if (r.gid) {
+      const blk = sec.rows.filter(x => x.gid === r.gid);
+      const s = sec.rows.indexOf(blk[0]), rest = sec.rows.filter(x => x.gid !== r.gid);
+      const t = Math.max(0, Math.min(rest.length, s + (dir > 0 ? 1 : -1)));
+      rest.splice(t, 0, ...blk); sec.rows = rest;
+    } else {
+      const j = i + dir; if (j < 0 || j >= sec.rows.length) return;
+      sec.rows.splice(j, 0, sec.rows.splice(i, 1)[0]);
+    }
+    render();
+  }
+
+  /* ============ 積木盤 ============ */
+  function thumb(p) {
+    const seg = p.shape || [1, 1, 1], total = seg.reduce((a, b) => a + b, 0);
+    let x = 2, out = '';
+    const W = 236, H = 28, gap = 3;
+    seg.forEach(s => {
+      const w = (W - 4) * s / total - gap;
+      out += '<rect x="' + x + '" y="2" width="' + Math.max(w, 6) + '" height="' + (H - 4) +
+             '" rx="3" fill="#EAEFFC" stroke="#2C49CE" stroke-width="1.4"/>';
+      x += w + gap;
+    });
+    if (p.group)
+      out += '<rect x="2" y="2" width="' + ((W - 4) * seg[0] / total - gap) + '" height="' + (H - 4) +
+             '" rx="3" fill="#FFE24D" stroke="#2C49CE" stroke-width="1.4"/>' +
+             '<text x="' + ((W - 4) * seg[0] / total / 2) + '" y="19" font-size="10" text-anchor="middle" fill="#16277F">跨列</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '">' + out + '</svg>';
+  }
+  function paintSecPalette() {
+    $('#seccards').innerHTML = Object.entries(SDEFS).map(([k, v]) =>
+      '<div class="card seccard" draggable="true" data-sec="' + k + '">' +
+      '<div class="nm">' + esc(v.nm) + '</div>' + XD.flow.secThumb(v) +
+      '<div class="ds">' + esc(v.ds || '') + '</div></div>').join('');
+  }
+  function setMode(m) {
+    MODE = m === 'swap' ? 'swap' : 'add';
+    XD.store.set(MODE_KEY, MODE);
+    XD.$$('#modebar button').forEach(b => b.classList.toggle('on', b.dataset.mode === MODE));
+    paintRowPalette();
+  }
+  $('#modebar').onclick = e => {
+    const b = e.target.closest('button[data-mode]');
+    if (b) setMode(b.dataset.mode);
+  };
+
+  function paintRowPalette() {
+    const box = $('#rowcards'), now = $('#rpNow'), selEl = $('#rpSel');
+    const sec = secOf(SEL);
+    const hit = SELROW && rowOf(SELROW);
+
+    now.innerHTML = sec ? ('目前編輯：<b>' + esc(msNoOf(sec) + '　' + sec.title) + '</b>')
+                        : '先在畫面上點一個區段';
+
+    if (hit && hit.sec === sec) {
+      selEl.className = 'rp-sel';
+      selEl.innerHTML = '選取第 ' + blockNo(sec, hit.row) + ' 塊：<b>' +
+        esc((PRESETS[hit.row.preset] || {}).nm || hit.row.preset) + '</b>' +
+        (MODE === 'swap' ? '　→ 點下面的列型就換掉它' : '　→ 新的列會加在它下面');
+    } else if (MODE === 'swap') {
+      selEl.className = 'rp-sel warn';
+      selEl.textContent = '要換積木，先在畫面上點一下要換掉的那一列。';
+    } else {
+      selEl.className = 'rp-sel';
+      selEl.textContent = '沒選列＝加到這個區段的最後面。';
+    }
+
+    if (!sec || SDEFS[sec.type].kv) {
+      box.innerHTML = '<div class="hint">' + (sec ? 'KV 是佔位區段，沒有列型可調。' :
+        '點畫面上任一個區段，這裡就會列出它能用的列型。') + '</div>';
+      return;
+    }
+    const card = k => {
+      const p = PRESETS[k];
+      const cur = hit && hit.sec === sec && hit.row.preset === k;
+      return '<div class="card' + (cur ? ' iscur' : '') + '" draggable="true" data-p="' + k + '">' +
+             '<div class="nm">' + esc(p.nm) + (cur ? '　<span class="tagcur">目前</span>' : '') + '</div>' +
+             thumb(p) + '<div class="ds">' + esc(p.ds) + '</div></div>';
+    };
+    /* 通用積木（目前只有膠囊標題）不屬於任何區段，所以單獨一組排在上面 */
+    box.innerHTML =
+      ((PACK.commons || []).length
+        ? '<h3>通用 — 不屬於任何區段</h3>' + PACK.commons.map(card).join('') +
+          '<h3>' + esc(SDEFS[sec.type].title || SDEFS[sec.type].nm) + ' 的常用組合</h3>'
+        : '') +
+      SDEFS[sec.type].cards.map(card).join('');
+  }
+
+  /* ============ 拖放 ============ */
+  let DRAG = null;   /* {kind:'sec'|'row', id} */
+  document.addEventListener('dragstart', e => {
+    const c = e.target.closest('.card'); if (!c) return;
+    DRAG = c.dataset.sec ? { kind: 'sec', id: c.dataset.sec } : { kind: 'row', id: c.dataset.p };
+    c.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'copy';
+    try { e.dataTransfer.setData('text/plain', DRAG.id); } catch (err) {}
+  });
+  document.addEventListener('dragend', () => {
+    XD.$$('.card').forEach(c => c.classList.remove('dragging'));
+    DRAG = null;
+  });
+  $('#stage').addEventListener('dragover', e => {
+    if (DRAG) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; return; }
+    if (e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') >= 0) e.preventDefault();
+  });
+  $('#stage').addEventListener('drop', e => {
+    if (!DRAG) {
+      const f = Array.from((e.dataTransfer || {}).files || []).find(x => (x.type || '').indexOf('image/') === 0);
+      if (f && e.target.closest('[data-kv]')) { e.preventDefault(); setKvFile(f); }
+      return;
+    }
+    e.preventDefault();
+    if (DRAG.kind === 'sec') {
+      addSection(DRAG.id, secDropIndex(e.clientY));
+    } else {
+      const overSec = e.target.closest('.sec');
+      const sec = overSec ? secOf(overSec.dataset.iid) : secOf(SEL);
+      if (!sec) return XD.toast('先點選一個區段再放列型');
+      if (SDEFS[sec.type].kv) return XD.toast('KV 佔位不能放列型');
+      if (SDEFS[sec.type].cards.indexOf(DRAG.id) < 0)
+        return XD.toast('這個列型屬於別的區段（先點對應的區段）');
+      SEL = sec.iid;
+      addRow(sec, DRAG.id, rowDropIndex(sec, e.clientY));
+      XD.toast('已加入「' + PRESETS[DRAG.id].nm + '」');
+    }
+    DRAG = null;
+  });
+  function secDropIndex(y) {
+    let best = PAGE.sections.length;
+    for (let i = 0; i < PAGE.sections.length; i++) {
+      const el = XD.$('.sec[data-iid="' + PAGE.sections[i].iid + '"]'); if (!el) continue;
+      const b = el.getBoundingClientRect();
+      if (y < b.top + b.height / 2) { best = i; break; }
+    }
+    return best;
+  }
+  function rowDropIndex(sec, y) {
+    const secEl = XD.$('.sec[data-iid="' + sec.iid + '"]'); if (!secEl) return sec.rows.length;
+    const batches = XD.flow.batches(sec.rows, PRESETS);
+    const batchEls = XD.$$('[data-batch]', secEl);
+    for (let bi = 0; bi < batches.length; bi++) {
+      const el = batchEls[bi]; if (!el) continue;
+      const batch = batches[bi];
+      if (batch.mode === 'grid') {
+        const placed = XD.flow.place(batch.rows, SDEFS[sec.type].cols.length);
+        let n = 0;
+        for (const p of placed) {
+          const child = el.children[n]; n += p.items.length;
+          if (!child) continue;
+          const b = child.getBoundingClientRect();
+          if (y < b.top + b.height / 2) return anchor(batch.idx[placed.indexOf(p)]);
+        }
+      } else {
+        for (let k = 0; k < el.children.length; k++) {
+          const b = el.children[k].getBoundingClientRect();
+          if (y < b.top + b.height / 2) return anchor(batch.idx[k]);
+        }
+      }
+    }
+    return sec.rows.length;
+    function anchor(i) {
+      const row = sec.rows[i];
+      if (row && row.gid) {
+        const blk = sec.rows.filter(x => x.gid === row.gid);
+        return sec.rows.indexOf(blk[0]);
+      }
+      return i;
+    }
+  }
+
+  /* ============ 點擊事件（委派） ============ */
+  document.addEventListener('click', e => {
+    const c = e.target.closest('.card');
+    if (c && c.dataset.sec) return addSection(c.dataset.sec);
+    if (c && c.dataset.p) {
+      const sec = secOf(SEL);
+      if (!sec) return XD.toast('先點選一個區段');
+      if (SDEFS[sec.type].cards.indexOf(c.dataset.p) < 0) return XD.toast('這個列型屬於別的區段');
+      const nm = PRESETS[c.dataset.p].nm;
+      if (MODE === 'swap') {
+        const hit = SELROW && rowOf(SELROW);
+        if (!hit || hit.sec !== sec) return XD.toast('先點畫面上要換掉的那一列');
+        const was = replaceRow(sec, SELROW, c.dataset.p);
+        return XD.toast('已換成「' + nm + '」（原本是 ' + ((PRESETS[was] || {}).nm || was) + '）');
+      }
+      const at = afterSelIndex(sec);
+      addRow(sec, c.dataset.p, at);
+      return XD.toast(at === undefined ? '已加到區段最後：' + nm : '已加在選取列下面：' + nm);
+    }
+  });
+  $('#paper').addEventListener('click', e => {
+    /* 欄位移除 ✕ */
+    const del = e.target.closest('.adel');
+    if (del) {
+      e.stopPropagation();
+      const [iid, rowId, ci, si, ai] = del.dataset.di.split('|');
+      const sec = secOf(iid); if (!sec) return;
+      const row = sec.rows.find(r => r.id === rowId); if (!row) return;
+      const cell = ci === '-1' ? row.lead : row.cells[+ci]; if (!cell) return;
+      const arr = si === '' ? cell.atoms : (cell.sub[+si] || {}).atoms; if (!arr) return;
+      arr.splice(+ai, 1);
+      XD.toast('已移除欄位（想拿回來 → 該格右下角 ↺）');
+      return render();
+    }
+    /* KV 圖片 */
+    if (e.target.closest('.kvdel')) {
+      e.stopPropagation();
+      const sec = secOf(e.target.closest('.sec').dataset.iid);
+      if (sec) { sec.kvImg = null; render(); }
+      return;
+    }
+    if (e.target.closest('[data-kv]')) { SEL = e.target.closest('.sec').dataset.iid; fKv.click(); return; }
+    /* 區段工具列 */
+    const sBtn = e.target.closest('.schrome button');
+    if (sBtn) {
+      e.stopPropagation();
+      const iid = sBtn.closest('.sec').dataset.iid;
+      if (sBtn.dataset.s === 'del') {
+        XD.confirm('這個區段裡的內容會一起消失。',
+                   { title: '刪除這個區段？', ok: '刪除', danger: 1 })
+          .then(yes => { if (yes) delSection(iid); });
+      } else moveSection(iid, sBtn.dataset.s === 'up' ? -1 : 1);
+      return;
+    }
+    /* 點區段 = 選取該區段；點在某一列上 = 連那一列一起選（換積木的目標）
+       點區段的空白處則清掉列選取，等於「這次只想換區段」 */
+    const secEl = e.target.closest('.sec'); if (!secEl) return;
+    const rowEl = e.target.closest('[data-row]');
+    const iid = secEl.dataset.iid, rid = rowEl ? rowEl.dataset.row : null;
+    if (iid !== SEL || rid !== SELROW) { SEL = iid; SELROW = rid; render(); }
+  });
+
+  /* ============ 頂列 ============ */
+  $('#zoom').onchange = applyZoom;
+  function applyZoom() {
+    const z = +$('#zoom').value;
+    $('#paper').style.transform = 'scale(' + z + ')';
+    $('#zoomwrap').style.width = (1200 * z) + 'px';
+    const h = $('#paper').offsetHeight;
+    $('#zoomwrap').style.height = (h * z) + 'px';
+  }
+  new MutationObserver(() => applyZoom()).observe(document.body, { childList: true, subtree: true });
+
+  $('#btnDemo').onclick = async () => {
+    if (PAGE.sections.length && !await XD.confirm('目前的排法會被蓋掉。',
+        { title: '重置為預設整頁？', ok: '重置', danger: 1 })) return;
+    PAGE.sections = PACK.templateDefault();
+    SEL = null; render();
+    XD.toast('已重置為預設整頁（假字）');
+  };
+  $('#btnClear').onclick = async () => {
+    if (PAGE.sections.length &&
+        !await XD.confirm('所有區段都會被移掉。',
+                          { title: '清空整個頁面？', ok: '清空', danger: 1 })) return;
+    PAGE.sections = []; SEL = null; render();
+  };
+  $('#btnXlsx').onclick = () => {
+    XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS)
+      .then(r => {
+        XD.download(r.blob, r.filename);
+        XD.toast('已產出：' + r.filename + '（' + r.sections + ' 個區段、' + r.fields + ' 個欄位）');
+        window.__lastXlsx = r;
+      })
+      .catch(e => { console.error(e); XD.toast('產出失敗：' + e.message); });
+  };
+
+  /* ============ 下載整包：每個區段各出一張 JPG（KV／EDM1/2…）＋一份暫存 JSON ============
+     跟 ms-studio 的「分段切圖 ZIP」同一套做法（JSZip＋XD.captureNode）。這裡的
+     #paper 是即時編輯用的（editable:true，還帶著序號標籤／上下移動把手），
+     匯出改成離屏重新畫一份 editable:false 的乾淨版本，不會動到使用者正在
+     編輯的畫面（承 02_吸底 exportBatch 的「另開離屏容器」做法）。
+     .kvph/.kvdel 就算 editable:false 也還是會畫出來（跟 ms-studio 一樣），
+     直接砍掉這兩個元素比另外維護一份 export-only CSS 簡單。 */
+  async function downloadPackage() {
+    if (!PAGE.sections.length) { XD.toast('頁面還是空的'); return; }
+    const btn = $('#btnDownload'), oldLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = '匯出中…';
+    try {
+      const pageBg = getComputedStyle(document.documentElement).getPropertyValue('--c-page').trim() || '#2358E6';
+      const items = await XD.withOffscreen(async container => {
+        const out = [];
+        let edm = 0;
+        for (const sec of PAGE.sections) {
+          const sdef = SDEFS[sec.type];
+          const nm = sdef.kv ? 'KV' : 'EDM' + (++edm);
+          const el = document.createElement('div');
+          el.className = 'sec' + (sdef.kv ? ' kv' : '');
+          el.style.width = '1200px';
+          el.innerHTML = XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: false });
+          el.querySelectorAll('.kvdel, .kvph').forEach(n => n.remove());
+          container.appendChild(el);
+          try {
+            const r = await XD.captureNode(el, { type: 'jpeg', quality: .92, background: pageBg });
+            out.push({ name: nm + '.jpg', dataUrl: r.dataUrl });
+          } catch (err) {
+            throw new Error('區段「' + nm + '」擷取失敗：' + (err && err.message ? err.message : err));
+          }
+          container.removeChild(el);
+        }
+        return out;
+      });
+      const projectJson = { sections: PAGE.sections, exportedAt: new Date().toISOString() };
+      const fn = 'MS_' + new Date().toISOString().slice(0, 10) + '.zip';
+      await XD.zipAndDownload(items, projectJson, 'project.json', fn);
+      XD.toast('已下載 ' + items.length + ' 張圖＋暫存 JSON：' + fn);
+    } catch (err) {
+      console.error(err); XD.toast('下載失敗：' + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false; btn.textContent = oldLabel;
+    }
+  }
+  $('#btnDownload').onclick = downloadPackage;
+
+  /* ============ KV 圖片 ============ */
+  const fKv = document.createElement('input');
+  fKv.type = 'file'; fKv.accept = 'image/*'; fKv.style.display = 'none';
+  document.body.appendChild(fKv);
+  function setKvFile(f) {
+    const sec = PAGE.sections.find(sc => SDEFS[sc.type].kv); if (!sec || !f) return;
+    const fr = new FileReader();
+    fr.onload = () => { sec.kvImg = fr.result; render(); XD.toast('KV 圖已放入（僅預覽用，不會進工單）'); };
+    fr.readAsDataURL(f);
+  }
+  fKv.onchange = e => { setKvFile(e.target.files[0]); e.target.value = ''; };
+
+  /* ============ 暫存 ============ */
+  const save = XD.debounce(() => XD.store.set(STORE_KEY,
+    { sections: PAGE.sections.map(sc => Object.assign({}, sc, { kvImg: undefined })) }), 300);
+
+  /* ============ 開機 ============ */
+  const saved = XD.store.get(STORE_KEY);
+  if (saved && saved.sections && saved.sections.length) {
+    PAGE = saved;
+    XD.toast('已還原上次的版面（要重來可按「清空頁面」）');
+  } else {
+    PAGE.sections = PACK.templateDefault();
+  }
+  paintSecPalette();
+  setMode(MODE);            /* 把上次選的放置方式還原到按鈕上（順帶第一次 paintRowPalette） */
+  render();
+
+  window.__api = {
+    get PAGE() { return PAGE; },
+    set PAGE(p) { PAGE = p; render(); },
+    addSection, delSection, moveSection, addRow, delRow, moveRow, replaceRow,
+    secOf, rowOf, render, setMode,
+    get MODE() { return MODE; },
+    get SELROW() { return SELROW; },
+    selectRow: id => { const h = rowOf(id); if (h) { SEL = h.sec.iid; SELROW = id; render(); } return !!h; },
+    makeXlsx: () => XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS),
+    downloadPackage,
+    loadTemplate: () => { PAGE.sections = PACK.templateDefault(); render(); },
+    clearAll: () => { PAGE.sections = []; SEL = null; render(); },
+    select: iid => { SEL = iid; render(); },
+  };
+})();
+</script>
+<!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
+     會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
+     body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
+     結束標籤時它就會挑 svg 的，把一整段 HTML 插進 JS 字串中間 -> SyntaxError
+     -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
+     註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
+</body>

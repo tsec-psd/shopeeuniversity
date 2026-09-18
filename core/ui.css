@@ -1,0 +1,151 @@
+/* =========================================================
+   ui.css — 三支工具共用的介面外殼（深色）
+   版面比例與色票參考 shrimp2choice：頂列 44px ＋ 三欄 220/1fr/288。
+   這裡只放「工具的殼」；產出物本身的樣式留在各工具頁。
+   載入順序：tokens.css → ui.css → 頁面自己的 <style>
+   ========================================================= */
+
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+     color:var(--ui-text);background:var(--ui-bg);height:100vh;
+     display:flex;flex-direction:column;overflow:hidden}
+
+/* ---------- 頂列 ---------- */
+header{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;
+       background:var(--ui-topbar);border-bottom:1px solid var(--ui-line)}
+header h1{font-size:13px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
+header h1 small{font-weight:400;color:var(--ui-dim);font-size:11px;
+       background:var(--ui-surface);border:1px solid var(--ui-line2);
+       padding:1px 6px;border-radius:3px;letter-spacing:.3px}
+.spacer{flex:1}
+
+/* ---------- 控制項 ---------- */
+button,select,label.btn,a.btn{font:inherit;font-size:12px}
+button,label.btn,a.btn{height:28px;padding:0 12px;border-radius:var(--ui-r);
+       border:1px solid var(--ui-line2);background:var(--ui-surface);color:var(--ui-dim);
+       font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+       white-space:nowrap;transition:all .15s;text-decoration:none;box-sizing:border-box}
+button:hover,label.btn:hover,a.btn:hover{color:var(--ui-text);background:var(--ui-surface2)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.1);color:#fff}
+button.ghost{background:transparent}
+label.btn input{display:none}
+select{height:28px;padding:0 8px;border:1px solid var(--ui-line2);border-radius:var(--ui-rf);
+       background:var(--ui-surface);color:var(--ui-text)}
+
+/* ---------- 三欄版面 ---------- */
+main{flex:1;display:grid;grid-template-columns:220px 1fr 288px;min-height:0}
+main.two-col{grid-template-columns:288px 1fr}
+.sidebar,.right-panel{background:var(--ui-panel);display:flex;flex-direction:column;overflow:hidden}
+.sidebar{border-right:1px solid var(--ui-line)}
+.right-panel{border-left:1px solid var(--ui-line)}
+.pane-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0 20px}
+
+/* 分組（右欄的段落） */
+.sg{border-bottom:1px solid var(--ui-line)}
+.sg:last-child{border-bottom:none}
+.sg-label{font-size:13px;font-weight:700;color:#fff;padding:18px 16px 8px;
+          display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sg-body{padding:0 12px 14px}
+
+/* 欄位 */
+.field{margin-bottom:14px}
+.field-label{display:flex;justify-content:space-between;align-items:center;
+             font-size:11px;color:var(--ui-dim);margin-bottom:4px}
+.cc{font-size:10px;color:var(--ui-dim2);font-variant-numeric:tabular-nums}
+.cc.over{color:var(--ui-accent);font-weight:700}
+.fi{width:100%;padding:7px 10px;background:var(--ui-surface);border:1px solid var(--ui-line);
+    border-radius:var(--ui-rf);color:var(--ui-text);font:inherit;font-size:12px;
+    transition:border-color .15s;-webkit-appearance:none}
+.fi::placeholder{color:var(--ui-dim2)}
+.fi:focus{outline:none;border-color:var(--ui-line2);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+.fi.over{border-color:var(--ui-accent);box-shadow:0 0 0 3px var(--ui-accent-dim)}
+
+/* 提示文字 */
+.hint{font-size:12px;color:var(--ui-dim);line-height:1.65}
+kbd{background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:5px;
+    padding:1px 6px;font-size:11px;color:var(--ui-dim)}
+
+/* ---------- 畫布區 ---------- */
+#stage{background:var(--ui-bg);overflow:hidden;position:relative}
+
+/* 縮放列（右下角浮動） */
+.zoombar{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:4px;
+         background:rgba(36,36,36,.94);border:1px solid var(--ui-line2);border-radius:var(--ui-r);
+         padding:4px 6px;z-index:30;backdrop-filter:blur(6px)}
+.zoombar button{height:24px;padding:0 9px;border-radius:9px;font-size:12px;
+                background:transparent;border-color:transparent}
+.zoombar button:hover{background:var(--ui-surface)}
+.zoom-readout{font-size:11px;color:var(--ui-text);min-width:44px;text-align:center;
+              font-variant-numeric:tabular-nums}
+.zoom-hint{font-size:10px;color:var(--ui-dim2);margin-left:6px;padding-right:4px}
+
+/* ---------- 底部列 ---------- */
+footer{flex:none;background:var(--ui-topbar);border-top:1px solid var(--ui-line);
+       padding:7px 16px;font-size:11.5px;color:var(--ui-dim);
+       display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+
+/* ---------- toast ---------- */
+#msg{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);
+     background:#0D0D0D;border:1px solid var(--ui-line2);color:#fff;
+     padding:9px 17px;border-radius:10px;font-size:13px;opacity:0;
+     pointer-events:none;transition:.2s;z-index:99;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#msg.on{opacity:1}
+
+
+/* ---------- 對話框（core/xd-core.js XD.dialog；取代原生 alert/confirm/prompt） ---------- */
+.xd-modal{position:fixed;inset:0;z-index:10050;display:none;padding:24px;
+          align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+.xd-modal.open{display:flex}
+.xd-modal [hidden]{display:none!important}
+.xd-mbox{width:min(92vw,400px);background:var(--ui-panel);color:var(--ui-text);
+         border:1px solid var(--ui-line2);border-radius:12px;padding:20px 20px 15px;
+         box-shadow:0 18px 50px rgba(0,0,0,.55);animation:xd-pop .13s ease-out}
+@keyframes xd-pop{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.xd-mtitle{font-size:14px;font-weight:700;margin-bottom:7px}
+.xd-mtext{font-size:13px;line-height:1.7;color:var(--ui-dim);white-space:pre-wrap}
+.xd-minput{width:100%;height:32px;margin-top:13px;padding:0 10px;font:inherit;font-size:13px;
+           color:var(--ui-text);background:var(--ui-surface);
+           border:1px solid var(--ui-line2);border-radius:var(--ui-rf)}
+.xd-minput:focus{outline:none;border-color:var(--ui-accent)}
+.xd-macts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.xd-macts button{height:30px;padding:0 16px}
+.xd-mok:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.xd-mok.danger{background:#C4362B;border-color:#C4362B;color:#fff}
+.xd-mok.danger:hover{filter:brightness(1.12);color:#fff}
+
+/* ---------- LOGO 編輯器 Modal（core/logo-editor.js，改寫自 02_吸底 imageEditor） ---------- */
+.crop-panel button.mini{height:24px;padding:0 9px;font-size:11px}
+.crop-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;
+            align-items:center;justify-content:center;z-index:10020}
+.crop-modal.open{display:flex}
+.crop-panel{width:min(90vw,860px);background:var(--ui-panel);border:1px solid var(--ui-line2);
+            border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.crop-panel header{height:auto;display:flex;align-items:center;justify-content:space-between;
+                   padding:10px 14px;background:var(--ui-topbar);border-bottom:1px solid var(--ui-line);
+                   font-size:13px;color:var(--ui-text)}
+.crop-body{padding:26px;background:#111}
+.crop-body.checker,.crop-body .cropper-canvas,.crop-body .cropper-view-box{
+  background-color:#2a2a2a;
+  background-image:linear-gradient(45deg,#3c3c3c 25%,transparent 25%,transparent 75%,#3c3c3c 75%),
+                   linear-gradient(45deg,#3c3c3c 25%,transparent 25%,transparent 75%,#3c3c3c 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+.crop-body .cropper-modal{opacity:.5}
+.crop-body img{max-width:100%;max-height:52vh;display:block;margin:0 auto}
+.crop-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 14px;
+            border-top:1px solid var(--ui-line)}
+.crop-group-label{font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--ui-dim2);
+                  width:34px;flex-shrink:0}
+.crop-slider{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ui-dim);margin-left:auto}
+.crop-slider input[type="range"]{width:130px;accent-color:var(--ui-accent);cursor:pointer}
+.crop-slider span{min-width:28px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-text)}
+.crop-actions{display:flex;align-items:center;gap:8px;padding:10px 14px;
+             border-top:1px solid var(--ui-line);background:var(--ui-topbar)}
+.crop-status{flex:1;font-size:11px;color:var(--ui-dim);text-align:right}
+
+/* ---------- 捲軸 ---------- */
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--ui-line2);border-radius:4px}
+*::-webkit-scrollbar-thumb:hover{background:#555}

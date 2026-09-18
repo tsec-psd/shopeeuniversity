@@ -1,0 +1,79 @@
+/* =========================================================
+   蝦大素材工具 — 設計 token（唯一調整處）
+   來源：Seller Talk_MS.psd 量測（2026-08-31，spike/psd-probe）
+   PSD 校準只改這裡，不要動各工具頁的版面 CSS。
+   ========================================================= */
+/* 字型：蝦皮品牌字「蝦皮思源黑（內文）」＝ ShopeeNotoSans (content)。
+   2026-09-11 由 ttf 換成 woff2（54MB → 24MB）——部署到網址之後每個訪客
+   首次造訪都要下載這幾支，ttf 沒有壓縮、woff2 是專為網頁傳輸設計的格式。
+   ⚠ 只列 woff2 不留 ttf 備援是刻意的：現代瀏覽器全部支援 woff2，留 ttf
+   只會讓不支援的老瀏覽器多下載一份 18MB。換字型檔時三支要一起換。 */
+@font-face{font-family:"Shopee Noto Sans content";font-weight:400;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Regular.woff2") format("woff2")}
+@font-face{font-family:"Shopee Noto Sans content";font-weight:500;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Medium.woff2") format("woff2")}
+@font-face{font-family:"Shopee Noto Sans content";font-weight:700;font-style:normal;font-display:swap;
+  src:url("../fonts/ShopeeNotoSans(content)-Bold.woff2") format("woff2")}
+
+:root{
+  /* --- 產出物（活動頁）--- */
+  --c-page:#2358E6;        /* 頁底藍（EDM 實測） */
+  --c-pill-bg:#FFEB00;     /* 區段標題藥丸底 */
+  --c-pill-text:#2358E6;   /* 藥丸字色 */
+  --c-card:#F3FDFF;        /* 表格格底／卡片底 */
+  --c-lab:#FEFBEA;         /* 標籤格底（米黃） */
+  --c-line:#BFD7F5;        /* 表格線（暫估，C 階段校準） */
+  --c-text:#1C3887;        /* 主字色（表頭、標題） rgb(28,56,135) */
+  --c-body:#1A4F90;        /* 內文字色 rgb(26,79,144) */
+  --c-blue:#2357E6;        /* 強調藍字 rgb(35,87,230) */
+  --c-accent:#FB4312;      /* 強調橘 rgb(251,67,18) */
+  --c-slogan:#FFF68F;      /* 亮點標語黃 rgb(255,246,143) */
+  --c-badge:#FEF495;       /* 共創 badge 底 */
+  --c-badge-text:#0A236C;  /* 共創 badge 字 rgb(10,35,108) */
+  --c-white:#FFFFFF;
+
+  --font-ms:"Shopee Noto Sans content","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+
+  /* 字級（PSD 有效字級；含 transform 換算） */
+  --fs-pill:64px;          /* 區段標題（量測 70，含藥丸內縮視覺調整） */
+  --fs-head:50px;          /* 表頭 */
+  --fs-topic:35px;         /* 主題標題 */
+  --fs-body:33px;          /* 表格內文 */
+  --fs-sub:29px;           /* 小註記 */
+  --fs-practice:32px;      /* 實作環節（藍） */
+  --fs-time:35px;          /* 時間欄 */
+  --fs-price:46px;         /* 價格 */
+  --fs-star:33px;          /* 星註／獲得說明（藍） */
+  --fs-cname:40px;         /* 顧問名 */
+  --fs-cbul:28px;          /* 顧問卡條列 */
+  --fs-slogan:72px;        /* 亮點標語 */
+  --fs-hbody:38px;         /* 亮點內文 */
+  --fs-notice:34px;        /* 注意事項聯絡 */
+  --fs-nbul:28px;          /* 注意事項條列 */
+
+  --r-card:24px; --w-line:3px;
+  --pad-cell:26px 30px; --gap-atom:12px;
+  --sec-pad:72px 60px 64px;
+  --kv-h:550px;            /* KV 實際尺寸 1200×550 */
+
+  /* --- 工具介面（深色，跟產出物完全分開）---
+     色票對齊 shrimp2choice：工具是暗的，產出物照樣是自己的顏色。
+     改這裡會同時影響 ms-editor / ms-studio / bn-editor。 */
+  --ui-bg:#1A1A1A;          /* 工作區底（畫布區） */
+  --ui-topbar:#242424;      /* 頂列 */
+  --ui-panel:#303030;       /* 左右面板 */
+  --ui-surface:#383838;     /* 輸入框、卡片、按鈕底 */
+  --ui-surface2:#2E2E2E;    /* hover */
+  --ui-line:#383838;        /* 分隔線 */
+  --ui-line2:#444444;       /* 較亮的框線 */
+  --ui-text:#F0F0F0;
+  --ui-dim:#999999;
+  --ui-dim2:#666666;
+  --ui-accent:#EE4D2D;      /* Shopee 橘 */
+  --ui-accent-dim:rgba(238,77,45,.14);
+  --ui-success:#3D9970;
+  --ui-warn:#E9A23B;
+  --ui-danger:#E5544B;
+  --ui-r:15px;              /* 按鈕圓角 */
+  --ui-rf:8px;              /* 輸入框圓角 */
+}

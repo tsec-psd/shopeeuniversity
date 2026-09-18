@@ -1,0 +1,54 @@
+<meta charset="utf-8">
+<title>蝦大素材工具</title>
+<link rel="stylesheet" href="core/tokens.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.7 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+     background:var(--ui-bg);color:var(--ui-text);min-height:100vh;
+     display:flex;flex-direction:column;align-items:center;padding:70px 24px}
+h1{font-size:26px;margin:0 0 6px}
+p.sub{color:var(--ui-dim);margin:0 0 36px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,280px);gap:18px;justify-content:center}
+a.tool{display:block;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;
+       padding:22px 24px;text-decoration:none;color:inherit;transition:.15s}
+a.tool:hover{border-color:var(--ui-accent);box-shadow:0 4px 20px rgba(238,77,45,.2);transform:translateY(-2px)}
+a.tool b{display:block;font-size:17px;margin-bottom:6px}
+a.tool span{font-size:13px;color:var(--ui-dim)}
+a.tool .tag{display:inline-block;font-size:11px;padding:1px 9px;border-radius:99px;margin-bottom:10px;
+            background:var(--ui-accent-dim);color:var(--ui-accent);font-weight:700}
+a.tool.off{opacity:.4;pointer-events:none}
+a.tool.off .tag{background:var(--ui-surface);color:var(--ui-dim2)}
+footer{margin-top:auto;padding-top:40px;font-size:12px;color:var(--ui-dim2)}
+</style>
+<h1>蝦大素材工具</h1>
+<p class="sub">蝦皮大學課程活動 — 工單與素材產製</p>
+<div class="cards">
+  <a class="tool" href="tools/ms-live.html">
+    <span class="tag">蝦大端</span>
+    <b>MS 線上編輯器</b>
+    <span>直接在版面上打字、換語意角色、上傳圖 → 一次做完 MS，不用填工單</span>
+  </a>
+  <a class="tool" href="tools/ms-editor.html">
+    <span class="tag">蝦大端</span>
+    <b>MS 工單生成器</b>
+    <span>拖區段積木排出活動頁 → 產出可直接填寫的工單試算表</span>
+  </a>
+  <a class="tool" href="tools/ms-studio.html">
+    <span class="tag">設計師</span>
+    <b>MS 生成器（設計師端）</b>
+    <span>匯入填好的工單＋素材包 → 產出完整活動頁 PNG</span>
+  </a>
+  <a class="tool" href="tools/bn-editor.html">
+    <span class="tag">定位版</span>
+    <b>BN 編輯器</b>
+    <span>14 個 BN 版位定位＋文案連動編輯（視覺後續再校）</span>
+  </a>
+</div>
+<footer>core/packs/tools 架構｜token 來源：Seller Talk_MS.psd 實測</footer>
+<!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
+     會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
+     body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
+     結束標籤時它就會挑 svg 的，把一整段 HTML 插進 JS 字串中間 -> SyntaxError
+     -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
+     註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
+</body>

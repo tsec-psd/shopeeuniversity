@@ -1,0 +1,124 @@
+/* =========================================================
+   paper.css — 產出物（1200px 活動長圖）本身的樣式
+   三支 MS 工具共用：ms-editor（蝦大端排版）／ms-studio（設計師端）／
+   ms-live（線上編輯器）。以前這一整份是各自複製一份，加一個新 atom
+   要改兩、三個地方，2026-09-04 抽出來。
+
+   界線：這裡只放「畫出來的東西長什麼樣」，全部由 tokens.css 的 --c-* /
+   --fs-* 驅動；工具的操作介面（把手、選取框、面板）留在各工具頁。
+   載入順序：tokens.css → ui.css → paper.css → 頁面自己的 <style>
+   ========================================================= */
+
+.paper{width:1200px;background:var(--c-page);border-radius:26px;overflow:hidden;
+       transform-origin:top left;font-family:var(--font-ms)}
+.sec{position:relative;padding:var(--sec-pad)}
+.msno{position:absolute;top:14px;left:16px;background:rgba(255,255,255,.92);color:#16277F;
+      font-size:15px;font-weight:700;padding:3px 12px;border-radius:99px;z-index:6;
+      font-family:"Noto Sans TC",sans-serif}
+/* 膠囊標題：2026-09-08 起是一種列型積木（x_pill 的 pill 欄位），
+   不再由區段自動吐出。所以樣式掛在 atom class 上，位置交給它所在的那一列。 */
+.a-pill{display:block;width:max-content;max-width:90%;margin:0 auto;background:var(--c-pill-bg);
+      color:var(--c-pill-text);font-size:var(--fs-pill);line-height:1.25;font-weight:700;
+      padding:6px 74px;border-radius:999px}
+.prow.pillrow{padding:0;margin-bottom:18px}   /* 18 + .plainrun 的 26 = 44，與改版前的 .pill 一致 */
+
+/* 表格面 */
+.grid{display:grid;background:var(--c-line);gap:var(--w-line);
+      border:var(--w-line) solid var(--c-line);border-radius:var(--r-card);overflow:hidden;margin-bottom:26px}
+.cell{background:var(--c-card);padding:var(--pad-cell);display:flex;flex-direction:column;
+      gap:var(--gap-atom);justify-content:center;min-width:0;position:relative}
+.cell.lab{background:var(--c-lab)}
+.cell.ctr{align-items:center;text-align:center}
+.cell.pad0{padding:0}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;background:var(--c-line);gap:var(--w-line);height:100%}
+.subgrid .cell{padding:var(--pad-cell)}
+/* plain 面的子網格不畫表格線（亮點的 icon 三卡／等式列／痛點三卡） */
+.subgrid.plain{background:transparent;gap:34px;height:auto}
+.subgrid.plain>.cell{background:transparent;padding:0}
+
+/* 無框面（亮點、注意事項） */
+.plainrun{display:flex;flex-direction:column;gap:30px;margin-bottom:26px}
+.prow{position:relative;text-align:center;padding:0 46px}
+.pcell{display:flex;flex-direction:column;gap:var(--gap-atom)}
+
+/* 卡片面（顧問牆） */
+.cards{display:flex;flex-direction:column;gap:34px;margin-bottom:26px}
+.ccard{position:relative;display:flex;gap:44px;align-items:center;background:var(--c-card);
+       border-radius:var(--r-card);padding:44px 52px}
+.ccol{display:flex;flex-direction:column;gap:14px;min-width:0;flex:1}
+.ccol.cava{flex:0 0 250px;align-items:center}
+.cbadge{position:absolute;top:34px;right:44px;background:var(--c-badge);color:var(--c-badge-text);
+        font-size:28px;font-weight:700;line-height:1.2;text-align:center;
+        padding:14px 16px;border-radius:14px}
+
+/* KV：滿版圖片欄（無標題） */
+.sec.kv{padding:0}
+.kvwrap{width:100%;height:var(--kv-h);position:relative;cursor:pointer}
+.kvwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.kvwrap .kvph{position:absolute;inset:26px;border:3px dashed rgba(255,255,255,.5);border-radius:18px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#fff}
+.kvph b{font-size:34px}.kvph span{font-size:18px;opacity:.85}.kvph i{font-size:14px;opacity:.6;font-style:normal}
+.kvdel{position:absolute;top:12px;right:14px;background:var(--ui-danger);color:#fff;border:2px solid #fff;
+      border-radius:99px;font-size:13px;font-weight:700;padding:4px 12px;opacity:0;transition:.15s;z-index:6}
+.kvwrap:hover .kvdel{opacity:1}
+
+/* 匯出時關掉只給編輯看的東西（序號標籤、KV 佔位提示） */
+.paper.export .msno,.paper.export .kvdel,.paper.export .kvph{display:none}
+
+/* ---------- 字樣（token 字級，語意角色一一對應） ---------- */
+.a-head{font-size:var(--fs-head);font-weight:700;color:var(--c-text);text-align:center;line-height:1.3}
+.a-label{font-size:var(--fs-head);font-weight:700;color:var(--c-text);line-height:1.3}
+.a-time{font-size:var(--fs-time);font-weight:700;color:var(--c-body);text-align:center;line-height:1.4}
+.a-text{font-size:var(--fs-body);color:var(--c-body);line-height:1.5}
+.a-star{font-size:var(--fs-star);font-weight:700;color:var(--c-blue);line-height:1.45}
+.a-topic{font-size:var(--fs-topic);font-weight:700;color:var(--c-text);line-height:1.4}
+.a-practice{font-size:var(--fs-practice);font-weight:700;color:var(--c-blue)}
+.a-price{font-size:var(--fs-price);font-weight:700;color:var(--c-blue);line-height:1.35}
+.a-note{font-size:var(--fs-sub);color:var(--c-body)}
+.a-slogan{font-size:var(--fs-slogan);font-weight:700;color:var(--c-slogan);line-height:1.4}
+.a-hbody{font-size:var(--fs-hbody);color:var(--c-white);line-height:1.6}
+.a-wtext{font-size:var(--fs-notice);color:var(--c-white);line-height:1.6}
+.a-cname{font-size:var(--fs-cname);font-weight:700;color:var(--c-text)}
+.a-tag{font-size:var(--fs-head);font-weight:700;color:var(--c-slogan);line-height:1.25}
+.a-part{font-size:var(--fs-topic);font-weight:700;color:var(--c-blue);line-height:1.4}
+.a-wnote{font-size:var(--fs-sub);color:var(--c-white);opacity:.78;line-height:1.6}
+.a-eqop{font-size:var(--fs-slogan);font-weight:700;color:var(--c-white);line-height:1}
+
+ul.a-bul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;text-align:left}
+ul.a-bul li{font-size:var(--fs-body);color:var(--c-body);line-height:1.5;padding-left:34px;position:relative}
+ul.a-bul li:before{content:"・";position:absolute;left:0}
+ul.a-bul-w li{font-size:var(--fs-nbul);color:var(--c-white)}
+ul.a-bul-w li:before{content:"●";font-size:.6em;top:.5em}
+ul.a-bul-s li{font-size:var(--fs-cbul);color:var(--c-text)}
+ul.a-bul-sq li:before{content:"■";font-size:.6em;top:.5em}
+ul.a-bul-ok li:before{content:"✓";font-weight:700;color:var(--c-blue)}
+ul.a-bul-ng li{opacity:.72}
+ul.a-bul-ng li:before{content:"✗";font-weight:700;color:var(--c-accent)}
+
+/* 講者：頭像圈是 .avatar 的一個變體（av-speaker），跟照片檔名／圖示／圖片共用
+   同一套上傳／裁切/縮放樣式，見下面 .avatar.av-speaker */
+.spk{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spk .bd{font-size:var(--fs-sub);color:var(--c-body)}
+.spk .nm2{font-size:var(--fs-topic);font-weight:700;color:var(--c-text)}
+
+/* 圖片欄：圓形照片／方形圖示／矩形圖片／講者頭像圈 */
+.avatar{width:250px;height:250px;border-radius:50%;background:#D8E0F7;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:6px;color:#7C8DC4;font-weight:700;font-size:30px;
+        overflow:hidden}
+.avatar em{font-style:normal;font-size:15px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar em.dim{opacity:.65}
+/* .imgwrap 撐滿整個佔位框、扛照片位置／縮放的 transform；<img> 本身永遠是
+   object-fit:cover 填滿 .imgwrap，兩層分工見 atoms.js 的註解 */
+.avatar.has{position:relative}
+.avatar.has .imgwrap{position:absolute;inset:0}
+.avatar.has .imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar.av-icon{width:112px;height:112px;border-radius:24px;font-size:17px;gap:3px}
+.avatar.av-icon em{font-size:11px;max-width:96px}
+.avatar.av-rect{width:100%;height:200px;border-radius:14px;font-size:20px}
+.avatar.av-rect em{font-size:13px;max-width:88%}
+.avatar.av-speaker{width:120px;height:120px;font-size:40px;flex:none}
+
+/* 空區段 */
+.empty{border:3px dashed rgba(255,255,255,.42);border-radius:16px;padding:64px 30px;text-align:center;color:#fff}
+.empty b{display:block;font-size:26px;margin-bottom:8px}
+.empty span{font-size:17px;opacity:.85}

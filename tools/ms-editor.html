@@ -1,0 +1,757 @@
+<meta charset="utf-8">
+<title>MS 工單生成器（蝦大端）</title>
+<!-- 載入順序契約：tokens.css → xd-core → atoms → flow-engine → workorder → packs → 頁面腳本 -->
+<link rel="stylesheet" href="../core/tokens.css">
+<link rel="stylesheet" href="../core/ui.css">
+<link rel="stylesheet" href="../core/paper.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="../core/xd-core.js"></script>
+<script src="../core/atoms.js"></script>
+<script src="../core/flow-engine.js"></script>
+<script src="../core/workorder.js"></script>
+<script src="../core/export-png.js"></script>
+<script src="../core/export-package.js"></script>
+<script src="../packs/ms/presets.js"></script>
+<style>
+/* ===== 本頁專屬（共用外殼在 core/ui.css） =====
+   三欄：左＝區段積木、中＝畫布、右＝列型積木（點了區段就在眼前，不用捲） */
+main{grid-template-columns:232px 1fr 304px}
+#palette{background:var(--ui-panel);border-right:1px solid var(--ui-line);overflow-y:auto;padding:14px}
+#palette h2{font-size:12px;color:var(--ui-dim);margin:14px 0 10px;font-weight:700;letter-spacing:.04em}
+#palette h2:first-child{margin-top:0}
+#stage{overflow:auto;padding:28px 28px 80px;cursor:default}
+#zoomwrap{margin:0 auto}
+
+/* ---- 右欄：列型積木 ---- */
+#rowpanel{min-width:0}
+#rowhead{flex:none;padding:13px 14px 12px;border-bottom:1px solid var(--ui-line)}
+#rowhead h2{font-size:12px;color:var(--ui-dim);margin:0 0 9px;font-weight:700;letter-spacing:.04em}
+.rp-now{font-size:12.5px;color:var(--ui-text);margin-bottom:10px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-now b{color:#fff}
+.modebar{display:flex;border:1px solid var(--ui-line2);border-radius:var(--ui-r);overflow:hidden}
+.modebar button{flex:1;height:30px;padding:0 4px;border:none;border-radius:0;
+                background:transparent;justify-content:center;font-size:12px}
+.modebar button + button{border-left:1px solid var(--ui-line2)}
+.modebar button.on,.modebar button.on:hover{background:var(--ui-accent);color:#fff;font-weight:700}
+.rp-sel{font-size:11px;color:var(--ui-dim);line-height:1.5;margin-top:9px}
+.rp-sel b{color:var(--ui-text)}
+.rp-sel.warn{color:var(--ui-warn)}
+#rowcards{padding:12px 14px 0}
+#rowcards h3{font-size:11px;color:var(--ui-dim2);font-weight:700;letter-spacing:.05em;margin:2px 0 8px}
+
+/* 選取中的列（換積木的目標） */
+.rowsel{outline:3px solid var(--ui-accent);outline-offset:-3px;z-index:3}
+.prow.rowsel,.ccard.rowsel{outline-offset:6px;border-radius:14px}
+.card{border:1px solid var(--ui-line2);border-radius:10px;padding:10px;margin-bottom:9px;
+      background:var(--ui-surface);cursor:grab;transition:.12s;user-select:none;color:var(--ui-text)}
+.card:hover{border-color:var(--ui-accent);box-shadow:0 2px 10px rgba(238,77,45,.18);transform:translateY(-1px)}
+.card:active{cursor:grabbing}
+.card .nm{font-weight:700;font-size:13px;margin-bottom:2px}
+.card .ds{font-size:11px;color:var(--ui-dim);line-height:1.4}
+.card svg{display:block;margin:7px 0 5px;width:100%;height:30px}
+.card.dragging{opacity:.4}
+.card.seccard .nm:before{content:"▦ ";color:var(--ui-accent)}
+.card.seccard svg{height:40px}
+.card.iscur{border-color:var(--ui-accent)}
+.tagcur{font-size:10px;font-weight:600;color:var(--ui-accent);border:1px solid var(--ui-accent);
+        border-radius:99px;padding:0 6px;vertical-align:1px}
+#rowcards .hint{font-size:12px;color:var(--ui-dim);line-height:1.6;padding:6px 2px}
+
+/* 疊在產出物上的浮動小按鈕：維持淺色，否則在藍底/白格上看不清 */
+.rowbar button,.cellbar button,.leadbar button,.schrome button,.plusbar button{
+  height:auto;min-height:0;background:#fff;border-color:#CBD3E2;color:#1F2430;font-weight:600}
+.rowbar button:hover,.cellbar button:hover,.leadbar button:hover,
+.schrome button:hover,.plusbar button:hover{background:#EEF2F9;color:#000}
+.rowbar button[data-del],.schrome button[data-s="del"]{background:#FDE8E8;color:#C0392B}
+.rowbar button[data-del]:hover,.schrome button[data-s="del"]:hover{background:#C0392B;color:#fff}
+
+/* ===== 產出物上的編輯裝飾（本體樣式在 core/paper.css） ===== */
+.paper{box-shadow:0 8px 40px rgba(0,0,0,.22)}
+.paper.emptypage{padding:60px}
+.sec.sel{outline:4px dashed rgba(255,255,255,.6);outline-offset:-8px;border-radius:20px}
+.schrome{position:absolute;top:12px;right:14px;display:flex;gap:5px;opacity:0;transition:.15s;z-index:7}
+.sec:hover .schrome{opacity:1}
+.schrome button{font-size:14px;padding:4px 11px;border-radius:8px;background:rgba(255,255,255,.95)}
+#emptyPage{border:3px dashed rgba(255,255,255,.5);border-radius:18px;padding:120px 60px;text-align:center;color:#fff}
+#emptyPage b{display:block;font-size:34px;margin-bottom:10px}
+#emptyPage span{font-size:19px;opacity:.85}
+
+/* 列把手／欄位操作（沿 spike 驗證過的互動） */
+.rowbar{position:absolute;left:6px;top:6px;display:flex;gap:3px;opacity:0;transition:.12s;z-index:5;
+        background:rgba(255,255,255,.95);border-radius:8px;padding:2px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+.band:hover .rowbar,.prow:hover .rowbar,.ccard:hover .rowbar{opacity:1}
+.rowbar button{padding:2px 8px;font-size:13px;line-height:1.5;border-radius:6px;min-width:28px}
+.band{position:relative}
+.aw{position:relative}
+.aw .adel{position:absolute;top:-10px;right:-12px;width:27px;height:27px;padding:0;border-radius:50%;
+  font-size:13px;font-weight:700;line-height:1;background:var(--ui-danger);border:2px solid #fff;color:#fff;
+  opacity:0;transition:.12s;z-index:4;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.cell:hover .adel,.prow:hover .adel,.ccard:hover .adel{opacity:.45}
+.aw:hover .adel{opacity:1;transform:scale(1.12)}
+.rowbar button[data-del],.schrome button[data-s="del"]{background:#FDE8E8;color:var(--ui-danger);font-weight:700}
+.rowbar button[data-del]:hover,.schrome button[data-s="del"]:hover{background:var(--ui-danger);color:#fff}
+.cellbar{position:absolute;right:8px;bottom:6px;display:flex;gap:4px;opacity:.45;transition:.12s;z-index:4}
+.cellbar:hover{opacity:1}
+.cellbar button{font-size:12px;padding:2px 9px;border-radius:99px}
+.leadbar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;display:flex;gap:4px;opacity:.3;z-index:4}
+.leadbar:hover{opacity:1}
+.leadbar button{font-size:12px;padding:2px 8px;border-radius:99px}
+#dropline{height:5px;background:var(--c-pill-bg);border-radius:99px;display:none;
+          box-shadow:0 0 0 3px rgba(255,235,0,.35);position:relative;z-index:8}
+</style>
+
+<header>
+  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
+  <h1>MS 工單生成器<small>蝦大端｜排出活動頁 → 產出工單</small></h1>
+  <select id="zoom">
+    <option value=".45">45%</option><option value=".55" selected>55%</option>
+    <option value=".75">75%</option><option value="1">100%</option>
+  </select>
+  <span class="spacer"></span>
+  <button id="btnDemo">重置為預設整頁</button>
+  <button id="btnClear">清空頁面</button>
+  <button id="btnDownload">⬇ 下載整包</button>
+  <button class="primary" id="btnXlsx">⬇ 產出整頁工單</button>
+</header>
+
+<main>
+  <aside id="palette">
+    <h2>① 區段積木（整頁的大塊）</h2>
+    <div id="seccards"></div>
+  </aside>
+  <section id="stage"><div id="zoomwrap"><div id="paper" class="paper"></div></div></section>
+  <aside id="rowpanel" class="right-panel">
+    <div id="rowhead">
+      <h2>② 列型積木</h2>
+      <div class="rp-now" id="rpNow">先在畫面上點一個區段</div>
+      <div class="modebar" id="modebar">
+        <button data-mode="add" class="on" title="加一列到選取列的下面">＋ 新增一列</button>
+        <button data-mode="swap" title="把選取的那一列換成別的列型">⇄ 換掉這列</button>
+      </div>
+      <div class="rp-sel" id="rpSel">尚未選取列</div>
+    </div>
+    <div class="pane-scroll"><div id="rowcards"></div></div>
+  </aside>
+</main>
+
+<footer>
+  <span>拖<b>區段積木</b>到頁面上組整頁；點一下區段，右欄就是它能用的<b>列型</b></span>
+  <span>右欄兩顆鈕切換：<kbd>＋ 新增一列</kbd>加在選取列下面、<kbd>⇄ 換掉這列</kbd>就地換列型</span>
+  <span>區段右上 <kbd>↑</kbd><kbd>↓</kbd><kbd>✕</kbd>；列左上同款把手</span>
+  <span>點黃色標題可改字；欄位 <kbd>✕</kbd> 移除、格子右下 <kbd>＋條列</kbd><kbd>↺</kbd></span>
+</footer>
+<div id="msg"></div>
+
+<script>
+(function () {
+  'use strict';
+  const XD = window.XD, $ = XD.$, esc = XD.esc;
+  const PACK = XD.packs.ms, SDEFS = PACK.sections, PRESETS = PACK.presets;
+  const STORE_KEY = 'ms_page_v1', MODE_KEY = 'ms_place_mode_v1';
+
+  let PAGE = { sections: [] };
+  let SEL = null;                       /* 選中的區段 iid */
+  let SELROW = null;                    /* 選中的列 id（換積木的目標） */
+  let MODE = XD.store.get(MODE_KEY, 'add') === 'swap' ? 'swap' : 'add';
+
+  const secOf  = iid => PAGE.sections.find(s => s.iid === iid);
+  /* 由列 id 反查 {sec,row}；找不到代表那列已被刪掉 */
+  const rowOf  = id => {
+    for (const s of PAGE.sections) {
+      const r = (s.rows || []).find(x => x.id === id);
+      if (r) return { sec: s, row: r };
+    }
+    return null;
+  };
+  /* 同一個主題組算一塊（跨列的 f_group 是一整塊，不能只換其中一列） */
+  const blockOf = (sec, row) => row.gid ? sec.rows.filter(x => x.gid === row.gid) : [row];
+  const blockNo = (sec, row) => {
+    let n = 0;
+    for (let i = 0; i < sec.rows.length; i++) {
+      const r = sec.rows[i];
+      if (!(r.gid && i > 0 && sec.rows[i - 1].gid === r.gid)) n++;
+      if (r === row) return n;
+    }
+    return n;
+  };
+  const msNoOf = sec => {
+    const list = PAGE.sections.filter(s => !SDEFS[s.type].kv);
+    const i = list.indexOf(sec);
+    return i < 0 ? 'KV' : 'MS_' + String(i + 1).padStart(2, '0');
+  };
+
+  /* ============ 渲染 ============ */
+  function render() {
+    const paper = $('#paper');
+    if (SELROW && !rowOf(SELROW)) SELROW = null;     /* 被刪掉的列不再算選取 */
+    if (!PAGE.sections.length) {
+      paper.className = 'paper emptypage';
+      paper.innerHTML = '<div id="emptyPage"><b>從左邊拖一個區段進來</b>' +
+        '<span>或按右上角「載入 0920 範例」看完整的一頁長什麼樣子</span></div>';
+      save(); paintRowPalette(); return;
+    }
+    paper.className = 'paper';
+    paper.innerHTML = PAGE.sections.map(sec => {
+      const sdef = SDEFS[sec.type];
+      return '<div class="sec' + (sec.iid === SEL ? ' sel' : '') + (sdef.kv ? ' kv' : '') + '" data-iid="' + sec.iid + '">' +
+        '<div class="msno">' + msNoOf(sec) + '</div>' +
+        '<div class="schrome">' +
+          '<button data-s="up" title="上移">↑</button>' +
+          '<button data-s="dn" title="下移">↓</button>' +
+          '<button data-s="del" title="刪除區段">✕</button></div>' +
+        XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: true }) +
+      '</div>';
+    }).join('');
+    PAGE.sections.forEach(sec => paintHandles(sec));
+    paintRowSel();
+    save();
+    paintRowPalette();
+  }
+
+  /* 選取中的列打橘框（主題組整組一起亮） */
+  function paintRowSel() {
+    const hit = SELROW && rowOf(SELROW);
+    if (!hit) return;
+    blockOf(hit.sec, hit.row).forEach(r =>
+      XD.$$('#paper [data-row="' + r.id + '"]').forEach(n => n.classList.add('rowsel')));
+  }
+
+  /* ---- 列把手／內容鈕（照 spike 的互動，範圍縮到單一區段） ---- */
+  function paintHandles(sec) {
+    const secEl = XD.$('.sec[data-iid="' + sec.iid + '"]'); if (!secEl) return;
+    const sdef = SDEFS[sec.type]; if (sdef.kv) return;
+    const batches = XD.flow.batches(sec.rows, PRESETS);
+    const batchEls = XD.$$('[data-batch]', secEl);
+    batches.forEach((batch, bi) => {
+      const el = batchEls[bi]; if (!el) return;
+      if (batch.mode === 'grid') {
+        const placed = XD.flow.place(batch.rows, sdef.cols.length);
+        let n = 0;
+        placed.forEach(p => {
+          const row = p.row;
+          const first = el.children[n]; n += p.items.length;
+          if (!first) return;
+          const prev = batch.rows[placed.indexOf(p) - 1];
+          if (!(row.gid && prev && prev.gid === row.gid)) attachRowbar(first, sec, row);
+          p.items.forEach((it, k) => attachCellButtons(el.children[n - p.items.length + k], sec, it));
+        });
+      } else {
+        Array.from(el.children).forEach((rowEl, k) => {
+          const row = batch.rows[k]; if (!row) return;
+          attachRowbar(rowEl, sec, row);
+          row.cells.forEach((cell, ci) => attachCellButtons(rowEl, sec, { cell, row }));
+        });
+      }
+    });
+  }
+  function attachRowbar(el, sec, row) {
+    el.classList.add('band');
+    const bar = document.createElement('div');
+    bar.className = 'rowbar';
+    bar.innerHTML = '<button data-mv="-1" title="上移">↑</button>' +
+                    '<button data-mv="1" title="下移">↓</button>' +
+                    '<button data-del="1" title="刪除這列">✕</button>';
+    bar.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.del) delRow(sec, row.id); else moveRow(sec, row.id, +b.dataset.mv);
+    };
+    el.appendChild(bar);
+  }
+  function attachCellButtons(el, sec, it) {
+    if (!el) return;
+    const cell = it.cell;
+    const lists = [];
+    const collect = atoms => (atoms || []).forEach(a => { if (a.items) lists.push(a); });
+    if (cell.sub) cell.sub.forEach(sx => collect(sx.atoms)); else collect(cell.atoms);
+    const defs = cell.sub ? cell.sub.map(x => x._def) : [cell._def];
+    const curs = cell.sub ? cell.sub.map(x => x.atoms) : [cell.atoms];
+    const dirty = JSON.stringify(curs) !== JSON.stringify(defs);
+    if (lists.length || dirty) {
+      const bar = document.createElement('div');
+      bar.className = 'cellbar';
+      bar.innerHTML = (lists.length ? '<button data-k="b+">＋條列</button><button data-k="b-">−</button>' : '') +
+                      (dirty ? '<button data-k="rs" title="還原成原本的欄位">↺</button>' : '');
+      bar.onclick = e => {
+        const b = e.target.closest('button'); if (!b) return;
+        e.stopPropagation();
+        if (b.dataset.k === 'b+') lists.forEach(a => a.items.push(XD.ATOMS[a.t].ph));
+        if (b.dataset.k === 'b-') lists.forEach(a => { if (a.items.length > 1) a.items.pop(); });
+        if (b.dataset.k === 'rs') {
+          if (cell.sub) cell.sub.forEach(x => x.atoms = XD.clone(x._def));
+          else cell.atoms = XD.clone(cell._def);
+          XD.toast('已還原此格');
+        }
+        render();
+      };
+      el.appendChild(bar);
+    }
+    if (it.isLead) {
+      const bar = document.createElement('div');
+      bar.className = 'leadbar';
+      bar.innerHTML = '<button>＋主題</button><button>−</button>';
+      bar.children[0].onclick = e => {
+        e.stopPropagation();
+        const blk = sec.rows.filter(x => x.gid === it.row.gid);
+        const at = sec.rows.indexOf(blk[blk.length - 1]) + 1;
+        sec.rows.splice(at, 0, { id: XD.uid(), preset: it.row.preset, gid: it.row.gid,
+                                 lead: null, cells: PRESETS[it.row.preset].sub() });
+        render();
+      };
+      bar.children[1].onclick = e => {
+        e.stopPropagation();
+        const blk = sec.rows.filter(x => x.gid === it.row.gid);
+        if (blk.length <= 1) return XD.toast('主題組至少要留一個主題');
+        sec.rows = sec.rows.filter(x => x !== blk[blk.length - 1]);
+        render();
+      };
+      el.appendChild(bar);
+    }
+  }
+
+  /* ============ 區段操作 ============ */
+  function defaultRows(type) {
+    const sdef = SDEFS[type];
+    if (sdef.kv) return [];
+    /* full＝這一段原本的整塊（不含膠囊，膠囊在「通用」那一組自己拿） */
+    const ctx = { title: sdef.title || sdef.nm };
+    const nCol = (sdef.cols || ['1fr']).length;
+    return (sdef.full || sdef.cards || []).map(pid => makeRow(pid, nCol, ctx)).flat();
+  }
+  function makeRow(pid, nCol, ctx) {
+    const p = PRESETS[pid];
+    if (p.group) {
+      const gid = XD.uid('g');
+      return Array.from({ length: p.group }, (_, i) =>
+        ({ id: XD.uid(), preset: pid, gid, lead: i === 0 ? p.lead() : null, cells: p.sub() }));
+    }
+    return [{ id: XD.uid(), preset: pid, cells: p.cells(nCol, ctx) }];
+  }
+  function addSection(type, at) {
+    if (SDEFS[type].kv && PAGE.sections.some(s => SDEFS[s.type].kv))
+      return XD.toast('KV 佔位只需要一個');
+    const sec = { iid: XD.uid('s'), type, title: SDEFS[type].title || SDEFS[type].nm, rows: defaultRows(type) };
+    let idx = at === undefined ? PAGE.sections.length : at;
+    if (SDEFS[type].kv) idx = 0;
+    else if (idx === 0 && PAGE.sections[0] && SDEFS[PAGE.sections[0].type].kv) idx = 1;
+    PAGE.sections.splice(idx, 0, sec);
+    SEL = sec.iid;
+    render();
+    XD.toast('已加入區段「' + SDEFS[type].nm + '」');
+  }
+  function moveSection(iid, dir) {
+    const i = PAGE.sections.findIndex(s => s.iid === iid); if (i < 0) return;
+    const j = i + dir;
+    if (j < 0 || j >= PAGE.sections.length) return;
+    if (SDEFS[PAGE.sections[i].type].kv || SDEFS[PAGE.sections[j].type].kv)
+      return XD.toast('KV 固定在最上面');
+    PAGE.sections.splice(j, 0, PAGE.sections.splice(i, 1)[0]);
+    render();
+  }
+  function delSection(iid) {
+    PAGE.sections = PAGE.sections.filter(s => s.iid !== iid);
+    if (SEL === iid) SEL = null;
+    render();
+  }
+
+  /* ============ 列操作 ============ */
+  function addRow(sec, pid, at) {
+    const rows = makeRow(pid);
+    const idx = at === undefined ? sec.rows.length : at;
+    sec.rows.splice(idx, 0, ...rows);
+    SELROW = rows[0].id;                /* 選取跟著新列走，才能連按調整 */
+    render();
+  }
+  /* 就地換列型：把選取的那一塊（主題組算一整塊）換成別的 preset */
+  function replaceRow(sec, id, pid) {
+    const r = sec.rows.find(x => x.id === id); if (!r) return null;
+    const blk = blockOf(sec, r);
+    const at = sec.rows.indexOf(blk[0]);
+    const rows = makeRow(pid);
+    sec.rows.splice(at, blk.length, ...rows);
+    SELROW = rows[0].id;                /* 停在原位，可以連按換不同列型比較 */
+    render();
+    return r.preset;
+  }
+  /* 「新增」的落點：選取列的下一列；沒選就加到最後 */
+  function afterSelIndex(sec) {
+    const r = SELROW && sec.rows.find(x => x.id === SELROW);
+    if (!r) return undefined;
+    const blk = blockOf(sec, r);
+    return sec.rows.indexOf(blk[blk.length - 1]) + 1;
+  }
+  function delRow(sec, id) {
+    const r = sec.rows.find(x => x.id === id); if (!r) return;
+    sec.rows = r.gid ? sec.rows.filter(x => x.gid !== r.gid) : sec.rows.filter(x => x.id !== id);
+    render();
+  }
+  function moveRow(sec, id, dir) {
+    const i = sec.rows.findIndex(x => x.id === id); if (i < 0) return;
+    const r = sec.rows[i];
+    if (r.gid) {
+      const blk = sec.rows.filter(x => x.gid === r.gid);
+      const s = sec.rows.indexOf(blk[0]), rest = sec.rows.filter(x => x.gid !== r.gid);
+      const t = Math.max(0, Math.min(rest.length, s + (dir > 0 ? 1 : -1)));
+      rest.splice(t, 0, ...blk); sec.rows = rest;
+    } else {
+      const j = i + dir; if (j < 0 || j >= sec.rows.length) return;
+      sec.rows.splice(j, 0, sec.rows.splice(i, 1)[0]);
+    }
+    render();
+  }
+
+  /* ============ 積木盤 ============ */
+  function thumb(p) {
+    const seg = p.shape || [1, 1, 1], total = seg.reduce((a, b) => a + b, 0);
+    let x = 2, out = '';
+    const W = 236, H = 28, gap = 3;
+    seg.forEach(s => {
+      const w = (W - 4) * s / total - gap;
+      out += '<rect x="' + x + '" y="2" width="' + Math.max(w, 6) + '" height="' + (H - 4) +
+             '" rx="3" fill="#EAEFFC" stroke="#2C49CE" stroke-width="1.4"/>';
+      x += w + gap;
+    });
+    if (p.group)
+      out += '<rect x="2" y="2" width="' + ((W - 4) * seg[0] / total - gap) + '" height="' + (H - 4) +
+             '" rx="3" fill="#FFE24D" stroke="#2C49CE" stroke-width="1.4"/>' +
+             '<text x="' + ((W - 4) * seg[0] / total / 2) + '" y="19" font-size="10" text-anchor="middle" fill="#16277F">跨列</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '">' + out + '</svg>';
+  }
+  function paintSecPalette() {
+    $('#seccards').innerHTML = Object.entries(SDEFS).map(([k, v]) =>
+      '<div class="card seccard" draggable="true" data-sec="' + k + '">' +
+      '<div class="nm">' + esc(v.nm) + '</div>' + XD.flow.secThumb(v) +
+      '<div class="ds">' + esc(v.ds || '') + '</div></div>').join('');
+  }
+  function setMode(m) {
+    MODE = m === 'swap' ? 'swap' : 'add';
+    XD.store.set(MODE_KEY, MODE);
+    XD.$$('#modebar button').forEach(b => b.classList.toggle('on', b.dataset.mode === MODE));
+    paintRowPalette();
+  }
+  $('#modebar').onclick = e => {
+    const b = e.target.closest('button[data-mode]');
+    if (b) setMode(b.dataset.mode);
+  };
+
+  function paintRowPalette() {
+    const box = $('#rowcards'), now = $('#rpNow'), selEl = $('#rpSel');
+    const sec = secOf(SEL);
+    const hit = SELROW && rowOf(SELROW);
+
+    now.innerHTML = sec ? ('目前編輯：<b>' + esc(msNoOf(sec) + '　' + sec.title) + '</b>')
+                        : '先在畫面上點一個區段';
+
+    if (hit && hit.sec === sec) {
+      selEl.className = 'rp-sel';
+      selEl.innerHTML = '選取第 ' + blockNo(sec, hit.row) + ' 塊：<b>' +
+        esc((PRESETS[hit.row.preset] || {}).nm || hit.row.preset) + '</b>' +
+        (MODE === 'swap' ? '　→ 點下面的列型就換掉它' : '　→ 新的列會加在它下面');
+    } else if (MODE === 'swap') {
+      selEl.className = 'rp-sel warn';
+      selEl.textContent = '要換積木，先在畫面上點一下要換掉的那一列。';
+    } else {
+      selEl.className = 'rp-sel';
+      selEl.textContent = '沒選列＝加到這個區段的最後面。';
+    }
+
+    if (!sec || SDEFS[sec.type].kv) {
+      box.innerHTML = '<div class="hint">' + (sec ? 'KV 是佔位區段，沒有列型可調。' :
+        '點畫面上任一個區段，這裡就會列出它能用的列型。') + '</div>';
+      return;
+    }
+    const card = k => {
+      const p = PRESETS[k];
+      const cur = hit && hit.sec === sec && hit.row.preset === k;
+      return '<div class="card' + (cur ? ' iscur' : '') + '" draggable="true" data-p="' + k + '">' +
+             '<div class="nm">' + esc(p.nm) + (cur ? '　<span class="tagcur">目前</span>' : '') + '</div>' +
+             thumb(p) + '<div class="ds">' + esc(p.ds) + '</div></div>';
+    };
+    /* 通用積木（目前只有膠囊標題）不屬於任何區段，所以單獨一組排在上面 */
+    box.innerHTML =
+      ((PACK.commons || []).length
+        ? '<h3>通用 — 不屬於任何區段</h3>' + PACK.commons.map(card).join('') +
+          '<h3>' + esc(SDEFS[sec.type].title || SDEFS[sec.type].nm) + ' 的常用組合</h3>'
+        : '') +
+      SDEFS[sec.type].cards.map(card).join('');
+  }
+
+  /* ============ 拖放 ============ */
+  let DRAG = null;   /* {kind:'sec'|'row', id} */
+  document.addEventListener('dragstart', e => {
+    const c = e.target.closest('.card'); if (!c) return;
+    DRAG = c.dataset.sec ? { kind: 'sec', id: c.dataset.sec } : { kind: 'row', id: c.dataset.p };
+    c.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'copy';
+    try { e.dataTransfer.setData('text/plain', DRAG.id); } catch (err) {}
+  });
+  document.addEventListener('dragend', () => {
+    XD.$$('.card').forEach(c => c.classList.remove('dragging'));
+    DRAG = null;
+  });
+  $('#stage').addEventListener('dragover', e => {
+    if (DRAG) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; return; }
+    if (e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') >= 0) e.preventDefault();
+  });
+  $('#stage').addEventListener('drop', e => {
+    if (!DRAG) {
+      const f = Array.from((e.dataTransfer || {}).files || []).find(x => (x.type || '').indexOf('image/') === 0);
+      if (f && e.target.closest('[data-kv]')) { e.preventDefault(); setKvFile(f); }
+      return;
+    }
+    e.preventDefault();
+    if (DRAG.kind === 'sec') {
+      addSection(DRAG.id, secDropIndex(e.clientY));
+    } else {
+      const overSec = e.target.closest('.sec');
+      const sec = overSec ? secOf(overSec.dataset.iid) : secOf(SEL);
+      if (!sec) return XD.toast('先點選一個區段再放列型');
+      if (SDEFS[sec.type].kv) return XD.toast('KV 佔位不能放列型');
+      if (SDEFS[sec.type].cards.indexOf(DRAG.id) < 0)
+        return XD.toast('這個列型屬於別的區段（先點對應的區段）');
+      SEL = sec.iid;
+      addRow(sec, DRAG.id, rowDropIndex(sec, e.clientY));
+      XD.toast('已加入「' + PRESETS[DRAG.id].nm + '」');
+    }
+    DRAG = null;
+  });
+  function secDropIndex(y) {
+    let best = PAGE.sections.length;
+    for (let i = 0; i < PAGE.sections.length; i++) {
+      const el = XD.$('.sec[data-iid="' + PAGE.sections[i].iid + '"]'); if (!el) continue;
+      const b = el.getBoundingClientRect();
+      if (y < b.top + b.height / 2) { best = i; break; }
+    }
+    return best;
+  }
+  function rowDropIndex(sec, y) {
+    const secEl = XD.$('.sec[data-iid="' + sec.iid + '"]'); if (!secEl) return sec.rows.length;
+    const batches = XD.flow.batches(sec.rows, PRESETS);
+    const batchEls = XD.$$('[data-batch]', secEl);
+    for (let bi = 0; bi < batches.length; bi++) {
+      const el = batchEls[bi]; if (!el) continue;
+      const batch = batches[bi];
+      if (batch.mode === 'grid') {
+        const placed = XD.flow.place(batch.rows, SDEFS[sec.type].cols.length);
+        let n = 0;
+        for (const p of placed) {
+          const child = el.children[n]; n += p.items.length;
+          if (!child) continue;
+          const b = child.getBoundingClientRect();
+          if (y < b.top + b.height / 2) return anchor(batch.idx[placed.indexOf(p)]);
+        }
+      } else {
+        for (let k = 0; k < el.children.length; k++) {
+          const b = el.children[k].getBoundingClientRect();
+          if (y < b.top + b.height / 2) return anchor(batch.idx[k]);
+        }
+      }
+    }
+    return sec.rows.length;
+    function anchor(i) {
+      const row = sec.rows[i];
+      if (row && row.gid) {
+        const blk = sec.rows.filter(x => x.gid === row.gid);
+        return sec.rows.indexOf(blk[0]);
+      }
+      return i;
+    }
+  }
+
+  /* ============ 點擊事件（委派） ============ */
+  document.addEventListener('click', e => {
+    const c = e.target.closest('.card');
+    if (c && c.dataset.sec) return addSection(c.dataset.sec);
+    if (c && c.dataset.p) {
+      const sec = secOf(SEL);
+      if (!sec) return XD.toast('先點選一個區段');
+      if (SDEFS[sec.type].cards.indexOf(c.dataset.p) < 0) return XD.toast('這個列型屬於別的區段');
+      const nm = PRESETS[c.dataset.p].nm;
+      if (MODE === 'swap') {
+        const hit = SELROW && rowOf(SELROW);
+        if (!hit || hit.sec !== sec) return XD.toast('先點畫面上要換掉的那一列');
+        const was = replaceRow(sec, SELROW, c.dataset.p);
+        return XD.toast('已換成「' + nm + '」（原本是 ' + ((PRESETS[was] || {}).nm || was) + '）');
+      }
+      const at = afterSelIndex(sec);
+      addRow(sec, c.dataset.p, at);
+      return XD.toast(at === undefined ? '已加到區段最後：' + nm : '已加在選取列下面：' + nm);
+    }
+  });
+  $('#paper').addEventListener('click', e => {
+    /* 欄位移除 ✕ */
+    const del = e.target.closest('.adel');
+    if (del) {
+      e.stopPropagation();
+      const [iid, rowId, ci, si, ai] = del.dataset.di.split('|');
+      const sec = secOf(iid); if (!sec) return;
+      const row = sec.rows.find(r => r.id === rowId); if (!row) return;
+      const cell = ci === '-1' ? row.lead : row.cells[+ci]; if (!cell) return;
+      const arr = si === '' ? cell.atoms : (cell.sub[+si] || {}).atoms; if (!arr) return;
+      arr.splice(+ai, 1);
+      XD.toast('已移除欄位（想拿回來 → 該格右下角 ↺）');
+      return render();
+    }
+    /* KV 圖片 */
+    if (e.target.closest('.kvdel')) {
+      e.stopPropagation();
+      const sec = secOf(e.target.closest('.sec').dataset.iid);
+      if (sec) { sec.kvImg = null; render(); }
+      return;
+    }
+    if (e.target.closest('[data-kv]')) { SEL = e.target.closest('.sec').dataset.iid; fKv.click(); return; }
+    /* 區段工具列 */
+    const sBtn = e.target.closest('.schrome button');
+    if (sBtn) {
+      e.stopPropagation();
+      const iid = sBtn.closest('.sec').dataset.iid;
+      if (sBtn.dataset.s === 'del') {
+        XD.confirm('這個區段裡的內容會一起消失。',
+                   { title: '刪除這個區段？', ok: '刪除', danger: 1 })
+          .then(yes => { if (yes) delSection(iid); });
+      } else moveSection(iid, sBtn.dataset.s === 'up' ? -1 : 1);
+      return;
+    }
+    /* 點區段 = 選取該區段；點在某一列上 = 連那一列一起選（換積木的目標）
+       點區段的空白處則清掉列選取，等於「這次只想換區段」 */
+    const secEl = e.target.closest('.sec'); if (!secEl) return;
+    const rowEl = e.target.closest('[data-row]');
+    const iid = secEl.dataset.iid, rid = rowEl ? rowEl.dataset.row : null;
+    if (iid !== SEL || rid !== SELROW) { SEL = iid; SELROW = rid; render(); }
+  });
+
+  /* ============ 頂列 ============ */
+  $('#zoom').onchange = applyZoom;
+  function applyZoom() {
+    const z = +$('#zoom').value;
+    $('#paper').style.transform = 'scale(' + z + ')';
+    $('#zoomwrap').style.width = (1200 * z) + 'px';
+    const h = $('#paper').offsetHeight;
+    $('#zoomwrap').style.height = (h * z) + 'px';
+  }
+  new MutationObserver(() => applyZoom()).observe(document.body, { childList: true, subtree: true });
+
+  $('#btnDemo').onclick = async () => {
+    if (PAGE.sections.length && !await XD.confirm('目前的排法會被蓋掉。',
+        { title: '重置為預設整頁？', ok: '重置', danger: 1 })) return;
+    PAGE.sections = PACK.templateDefault();
+    SEL = null; render();
+    XD.toast('已重置為預設整頁（假字）');
+  };
+  $('#btnClear').onclick = async () => {
+    if (PAGE.sections.length &&
+        !await XD.confirm('所有區段都會被移掉。',
+                          { title: '清空整個頁面？', ok: '清空', danger: 1 })) return;
+    PAGE.sections = []; SEL = null; render();
+  };
+  $('#btnXlsx').onclick = () => {
+    XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS)
+      .then(r => {
+        XD.download(r.blob, r.filename);
+        XD.toast('已產出：' + r.filename + '（' + r.sections + ' 個區段、' + r.fields + ' 個欄位）');
+        window.__lastXlsx = r;
+      })
+      .catch(e => { console.error(e); XD.toast('產出失敗：' + e.message); });
+  };
+
+  /* ============ 下載整包：每個區段各出一張 JPG（KV／EDM1/2…）＋一份暫存 JSON ============
+     跟 ms-studio 的「分段切圖 ZIP」同一套做法（JSZip＋XD.captureNode）。這裡的
+     #paper 是即時編輯用的（editable:true，還帶著序號標籤／上下移動把手），
+     匯出改成離屏重新畫一份 editable:false 的乾淨版本，不會動到使用者正在
+     編輯的畫面（承 02_吸底 exportBatch 的「另開離屏容器」做法）。
+     .kvph/.kvdel 就算 editable:false 也還是會畫出來（跟 ms-studio 一樣），
+     直接砍掉這兩個元素比另外維護一份 export-only CSS 簡單。 */
+  async function downloadPackage() {
+    if (!PAGE.sections.length) { XD.toast('頁面還是空的'); return; }
+    const btn = $('#btnDownload'), oldLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = '匯出中…';
+    try {
+      const pageBg = getComputedStyle(document.documentElement).getPropertyValue('--c-page').trim() || '#2358E6';
+      const items = await XD.withOffscreen(async container => {
+        const out = [];
+        let edm = 0;
+        for (const sec of PAGE.sections) {
+          const sdef = SDEFS[sec.type];
+          const nm = sdef.kv ? 'KV' : 'EDM' + (++edm);
+          const el = document.createElement('div');
+          el.className = 'sec' + (sdef.kv ? ' kv' : '');
+          el.style.width = '1200px';
+          el.innerHTML = XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: false });
+          el.querySelectorAll('.kvdel, .kvph').forEach(n => n.remove());
+          container.appendChild(el);
+          try {
+            const r = await XD.captureNode(el, { type: 'jpeg', quality: .92, background: pageBg });
+            out.push({ name: nm + '.jpg', dataUrl: r.dataUrl });
+          } catch (err) {
+            throw new Error('區段「' + nm + '」擷取失敗：' + (err && err.message ? err.message : err));
+          }
+          container.removeChild(el);
+        }
+        return out;
+      });
+      const projectJson = { sections: PAGE.sections, exportedAt: new Date().toISOString() };
+      const fn = 'MS_' + new Date().toISOString().slice(0, 10) + '.zip';
+      await XD.zipAndDownload(items, projectJson, 'project.json', fn);
+      XD.toast('已下載 ' + items.length + ' 張圖＋暫存 JSON：' + fn);
+    } catch (err) {
+      console.error(err); XD.toast('下載失敗：' + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false; btn.textContent = oldLabel;
+    }
+  }
+  $('#btnDownload').onclick = downloadPackage;
+
+  /* ============ KV 圖片 ============ */
+  const fKv = document.createElement('input');
+  fKv.type = 'file'; fKv.accept = 'image/*'; fKv.style.display = 'none';
+  document.body.appendChild(fKv);
+  function setKvFile(f) {
+    const sec = PAGE.sections.find(sc => SDEFS[sc.type].kv); if (!sec || !f) return;
+    const fr = new FileReader();
+    fr.onload = () => { sec.kvImg = fr.result; render(); XD.toast('KV 圖已放入（僅預覽用，不會進工單）'); };
+    fr.readAsDataURL(f);
+  }
+  fKv.onchange = e => { setKvFile(e.target.files[0]); e.target.value = ''; };
+
+  /* ============ 暫存 ============ */
+  const save = XD.debounce(() => XD.store.set(STORE_KEY,
+    { sections: PAGE.sections.map(sc => Object.assign({}, sc, { kvImg: undefined })) }), 300);
+
+  /* ============ 開機 ============ */
+  const saved = XD.store.get(STORE_KEY);
+  if (saved && saved.sections && saved.sections.length) {
+    PAGE = saved;
+    XD.toast('已還原上次的版面（要重來可按「清空頁面」）');
+  } else {
+    PAGE.sections = PACK.templateDefault();
+  }
+  paintSecPalette();
+  setMode(MODE);            /* 把上次選的放置方式還原到按鈕上（順帶第一次 paintRowPalette） */
+  render();
+
+  window.__api = {
+    get PAGE() { return PAGE; },
+    set PAGE(p) { PAGE = p; render(); },
+    addSection, delSection, moveSection, addRow, delRow, moveRow, replaceRow,
+    secOf, rowOf, render, setMode,
+    get MODE() { return MODE; },
+    get SELROW() { return SELROW; },
+    selectRow: id => { const h = rowOf(id); if (h) { SEL = h.sec.iid; SELROW = id; render(); } return !!h; },
+    makeXlsx: () => XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS),
+    downloadPackage,
+    loadTemplate: () => { PAGE.sections = PACK.templateDefault(); render(); },
+    clearAll: () => { PAGE.sections = []; SEL = null; render(); },
+    select: iid => { SEL = iid; render(); },
+  };
+})();
+</script>
+<!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
+     會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
+     body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
+     結束標籤時它就會挑 svg 的，把一整段 HTML 插進 JS 字串中間 -> SyntaxError
+     -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
+     註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
+</body>

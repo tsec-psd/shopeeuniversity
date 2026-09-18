@@ -1,0 +1,1555 @@
+<meta charset="utf-8">
+<title>MS 線上編輯器（蝦大端）</title>
+<!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → atoms → flow-engine
+     → workorder → export-png → export-package → history → packs → 頁面腳本 -->
+<link rel="stylesheet" href="../core/tokens.css">
+<link rel="stylesheet" href="../core/ui.css">
+<link rel="stylesheet" href="../core/paper.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="../core/xd-core.js"></script>
+<script src="../core/atoms.js"></script>
+<script src="../core/flow-engine.js"></script>
+<script src="../core/workorder.js"></script>
+<script src="../core/export-png.js"></script>
+<script src="../core/export-package.js"></script>
+<script src="../core/history.js"></script>
+<script src="../packs/ms/presets.js"></script>
+<style>
+/* ===== 本頁專屬（外殼在 ui.css、產出物本體在 paper.css） ===== */
+main{grid-template-columns:246px 1fr 310px}
+#stage{overflow:auto;padding:26px 26px 80px}
+#zoomwrap{margin:0 auto}
+.paper{box-shadow:0 8px 40px rgba(0,0,0,.22)}
+.paper.emptypage{padding:60px}
+#emptyPage{border:3px dashed rgba(255,255,255,.5);border-radius:18px;padding:110px 50px;
+           text-align:center;color:#fff}
+#emptyPage b{display:block;font-size:32px;margin-bottom:10px}
+#emptyPage span{font-size:18px;opacity:.85}
+
+/* ---- 左欄分頁（三個抽屜，不用捲來捲去找） ---- */
+.tabs{flex:none;display:flex;border-bottom:1px solid var(--ui-line)}
+.tabs button{flex:1;height:36px;border:none;border-radius:0;background:transparent;
+             justify-content:center;font-size:12px;border-bottom:2px solid transparent}
+.tabs button.on{color:#fff;font-weight:700;border-bottom-color:var(--ui-accent);background:var(--ui-surface2)}
+.pane{padding:12px 13px 0}
+.pane h3{font-size:11px;color:var(--ui-dim2);font-weight:700;letter-spacing:.05em;margin:2px 0 8px}
+.card{border:1px solid var(--ui-line2);border-radius:10px;padding:9px 10px;margin-bottom:8px;
+      background:var(--ui-surface);cursor:pointer;transition:.12s;user-select:none;color:var(--ui-text)}
+.card:hover{border-color:var(--ui-accent);box-shadow:0 2px 10px rgba(238,77,45,.18);transform:translateY(-1px)}
+.card .nm{font-weight:700;font-size:12.5px;margin-bottom:2px}
+.card .ds{font-size:11px;color:var(--ui-dim);line-height:1.4}
+.card svg{display:block;margin:6px 0 4px;width:100%;height:26px}
+.card.seccard .nm:before{content:"▦ ";color:var(--ui-accent)}
+.card.seccard svg{height:40px}
+.card.fullcard{border-style:dashed;border-color:var(--ui-line2)}
+.card.fullcard:hover{border-style:solid}
+#btnAdv.on{border-color:var(--ui-accent);color:var(--ui-accent);background:var(--ui-accent-dim)}
+.segbar{display:flex;border:1px solid var(--ui-line2);border-radius:var(--ui-r);overflow:hidden;margin-bottom:10px}
+.segbar button{flex:1;height:26px;border:none;border-radius:0;background:transparent;
+               justify-content:center;font-size:11.5px}
+.segbar button + button{border-left:1px solid var(--ui-line2)}
+.segbar button.on,.segbar button.on:hover{background:var(--ui-accent);color:#fff;font-weight:700}
+
+/* ---- 右欄檢視器 ---- */
+#insp{min-width:0}
+.sg-label small{font-weight:400;font-size:11px;color:var(--ui-dim)}
+/* 樣式列表：每一列用它自己的樣式畫出樣本字，底色＝它實際會落在的面
+   （白卡 or 藍底），右邊標從 paper.css 量到的實際規格。做法承 Word 樣式庫 */
+.stylelist{border:1px solid var(--ui-line2);border-radius:10px;overflow:hidden;margin-bottom:7px}
+.stylelist.face-card{background:var(--c-card)}
+.stylelist.face-plain{background:var(--c-page)}
+.srow{display:flex;align-items:center;gap:8px;width:100%;height:auto;min-height:32px;
+      padding:5px 10px;border:none;border-radius:0;background:transparent;text-align:left;
+      border-bottom:1px solid rgba(28,56,135,.10)}
+.stylelist.face-plain .srow{border-bottom-color:rgba(255,255,255,.14)}
+.srow:last-child{border-bottom:none}
+.srow:hover{background:rgba(238,77,45,.16)}
+.srow.on,.srow.on:hover{background:var(--ui-accent)}
+.srow.on .sprev,.srow.on .sprev *,.srow.on .sspec{color:#fff!important;opacity:1}
+.sprev{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+       line-height:1.3;text-align:left;font-family:var(--font-ms)}
+.sprev-img{font-size:13px;color:var(--c-body)}
+.stylelist.face-plain .sprev-img{color:#fff}
+.sprev ul.a-bul{gap:0}
+.sprev ul.a-bul li{padding-left:1.3em;line-height:1.3}
+.sspec{flex:none;font-size:10px;color:rgba(28,56,135,.5);font-variant-numeric:tabular-nums}
+.stylelist.face-plain .sspec{color:rgba(255,255,255,.55)}
+.morebtn{width:100%;height:26px;justify-content:center;font-size:11.5px;
+         background:transparent;border-style:dashed;margin-bottom:8px}
+.subpick{margin:8px 0 4px}
+.subpick i{display:block;font-style:normal;font-size:10.5px;color:var(--ui-dim2);
+           font-weight:700;letter-spacing:.05em;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{height:24px;padding:0 9px;font-size:11.5px;border-radius:99px;
+      background:var(--ui-surface);border:1px solid var(--ui-line2);color:var(--ui-dim)}
+.chip:hover{color:#fff}
+.chip.on,.chip.on:hover{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:700}
+.btnrow{display:flex;gap:5px;flex-wrap:wrap}
+.btnrow button{height:26px;padding:0 10px;font-size:11.5px}
+.btnrow button.danger{background:#3A2020;border-color:#5A2C2C;color:#E5544B}
+.btnrow button.danger:hover{background:var(--ui-danger);color:#fff}
+.metaline{font-size:11px;color:var(--ui-dim);margin:2px 0 8px;line-height:1.6}
+.metaline b{color:var(--ui-text)}
+.metaline .over{color:var(--ui-accent);font-weight:700}
+
+/* ---- 畫布上的編輯狀態 ---- */
+.sec{cursor:default}
+.selsec{outline:3px dashed rgba(255,255,255,.45);outline-offset:-10px;border-radius:20px}
+.selrow{outline:2px solid rgba(255,255,255,.75);outline-offset:-2px}
+.selcell{outline:2px solid var(--ui-accent);outline-offset:-2px;z-index:2}
+.aw{position:relative}
+.selatom>[data-ed],.selatom>.spk:not(.has-photo){outline:3px solid var(--ui-accent);
+  outline-offset:4px;border-radius:6px}
+/* 圖片框的選取樣式跟文字分開寫——上面那條 border-radius:6px 是給方框文字用的，
+   套到圓形頭像上會把 overflow:hidden 的裁切形狀一起壓扁成圓角方框（一直沒被看到，
+   因為以前點圖片一律直接跳出檔案選取視窗，選取態根本沒機會畫出來）。
+   還沒放照片的空框才用這條通用外框；已經有照片的改由 #imgOv 操作框＋下面的
+   裁切虛線接手，兩個一起出現才不會又疊一圈方形外框（使用者回饋「好多框」）。
+   講者的頭像圈也是同一顆 .avatar，就算外面多包了 .spk（品牌／姓名），一樣要在
+   有照片時讓外面那圈 .spk 外框讓開——.spk 用 has-photo 這個旗標（見 atoms.js）。 */
+.selatom>.avatar:not(.has){outline:3px solid var(--ui-accent);outline-offset:4px}
+[data-ed]{cursor:text;min-width:2em;min-height:1em}
+[data-ed]:hover{background:rgba(255,255,255,.16);border-radius:4px}
+[data-ed]:focus{outline:2px solid var(--ui-accent);outline-offset:3px;border-radius:4px;
+                background:rgba(255,255,255,.2)}
+.cell [data-ed]:hover,.cell [data-ed]:focus{background:rgba(35,88,230,.10)}
+[data-img]{cursor:pointer}
+[data-img]:hover{filter:brightness(1.06)}
+/* 已有照片的圖片框：改成拖曳調整位置，不再是點一下就跳選檔視窗。
+   裁切框線用 ::after 疊一圈虛線，border-radius:inherit 讓圓形／方形／矩形三種
+   佔位框都自動吃到自己的形狀，不用各寫一份。 */
+.avatar.has{cursor:grab}
+.avatar.has:active{cursor:grabbing}
+.avatar.has::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  border:2px dashed #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);opacity:0;transition:opacity .15s}
+.avatar.has:hover::after{opacity:.55}
+.selatom>.avatar.has::after{opacity:1}
+/* 照片操作框（PS 式）：選到有照片的欄位才出現，貼著「照片實際被縮放後的範圍」
+   （不是頻框本身，框會隨縮放變大變小）。position:fixed 且不放在 #paper 裡面——
+   跟 #rowbar 同一個理由，#paper 帶 transform:scale，放進去會被縮放拉走。
+   四個角把手固定等比例縮放（拖曳時看跟中心的距離變化，x/y 一起縮，不會變形），
+   拖曳照片本體移動則還是原本那組 .avatar.has 的 mousedown（見下面 JS）。 */
+#imgOv{position:fixed;display:none;z-index:42;pointer-events:none}
+#imgOv.on{display:block}
+#imgOv .io-box{position:absolute;inset:0;border:1.5px solid var(--ui-accent);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+#imgOv .io-h{position:absolute;width:11px;height:11px;background:#fff;border:2px solid var(--ui-accent);
+  border-radius:2px;pointer-events:auto;transform:translate(-50%,-50%)}
+#imgOv .io-h.tl{left:0;top:0;cursor:nwse-resize}
+#imgOv .io-h.tr{left:100%;top:0;cursor:nesw-resize}
+#imgOv .io-h.bl{left:0;top:100%;cursor:nesw-resize}
+#imgOv .io-h.br{left:100%;top:100%;cursor:nwse-resize}
+/* 匯出的離屏節點不要帶任何編輯裝飾 */
+.paper.export [data-ed]{outline:none!important;background:none!important}
+
+/* ---------- 浮動列工具條 ----------
+   選到一列就貼在它右邊（紙的外面）。position:fixed 不在 #paper 裡面——
+   #paper 有 transform:scale，放進去圖示會跟著缩。 */
+#rowbar{position:fixed;display:none;flex-direction:column;gap:6px;z-index:40}
+#rowbar.on{display:flex}
+#rowbar button{width:38px;height:38px;padding:0;border-radius:9px;
+  background:var(--ui-panel);border:1px solid var(--ui-line2);color:var(--ui-dim);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 12px rgba(0,0,0,.4);transition:.12s}
+#rowbar button:hover{color:#fff;border-color:var(--ui-accent);background:var(--ui-surface2)}
+#rowbar button.danger:hover{color:#fff;border-color:#C4362B;background:#C4362B}
+#rowbar button:disabled{opacity:.3}
+#rowbar svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.75;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 頁面總覽（畫布右上，即時縮圖） ----------
+   position:fixed，位置用 JS 量 #stage 的 rect 貼出來（跟 rowbar 同一招，
+   不寫死 px），畫布捲動、視窗縮放都會自己校正。內容重用「乾淨匯出」那套
+   render（沒有 contenteditable、沒有 ✕、沒有 KV 刪除鈕）——這裡本來就
+   不該讓人打字進去，用匯出模式最乾脆，也保證縮圖跟真的畫布長一模一樣。 */
+#minimap{position:fixed;width:176px;z-index:33;overflow:hidden;
+  background:rgba(36,36,36,.94);border:1px solid var(--ui-line2);border-radius:var(--ui-r);
+  backdrop-filter:blur(6px);box-shadow:0 6px 20px rgba(0,0,0,.4)}
+#minimap.empty{display:none}
+#miniHead{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  padding:7px 8px 7px 10px;font-size:10.5px;font-weight:700;color:var(--ui-dim);
+  letter-spacing:.05em;user-select:none;cursor:pointer}
+#miniHead:hover{color:#fff}
+#miniHead button{width:20px;height:20px;padding:0;border:none;background:transparent;color:inherit}
+#miniHead svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+#miniBody{border-top:1px solid var(--ui-line2);background:var(--ui-bg);
+  position:relative;cursor:crosshair;overflow:hidden}
+#minimap.collapsed #miniBody{display:none}
+#miniStage{position:relative;transform-origin:top left;width:1200px}
+#miniInner{width:1200px}
+#miniInner *{pointer-events:none!important}
+#miniView{position:absolute;left:0;top:0;border:2px solid var(--ui-accent);
+  background:rgba(238,77,45,.12);box-sizing:border-box;display:none}
+
+/* ---------- 右欄麵包屑 ----------
+   貼在最上面、不隨內容捲動，把「選到多深」直接講成一條路徑：
+   MS_01 活動資訊 › 第2列 › 內容格 › 內文。比底下疊幾塊卡片更一眼看出
+   這是同一個東西層層往內鑽，也能直接點回去上一層。 */
+#crumb{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:1px;
+  padding:11px 14px;border-bottom:1px solid var(--ui-line);background:var(--ui-topbar)}
+#crumb[hidden]{display:none}
+.crumb{height:auto;padding:3px 5px;border:none;background:transparent;
+  color:var(--ui-dim);font-size:11.5px;border-radius:5px}
+.crumb:hover{color:#fff;background:var(--ui-surface)}
+.crumb.cur{color:#fff;font-weight:700;cursor:default}
+.crumb.cur:hover{background:transparent}
+.csep{color:var(--ui-dim2);font-size:11px;padding:0 1px}
+
+/* ---------- 右欄分組：整塊卡片＋各自的顏色，一眼看出這裡疊了四層 ----------
+   2026-09-08 第三十一輪先試過「細色條＋灰階」，使用者回饋還是不夠明顯、
+   要更多顏色與分區感——這輪改成每一層都是獨立的卡片（自己的邊框＋標籤底色），
+   四層固定四色（欄位橘／格藍／列綠／區段紫），不是誰選到才有顏色。
+   最上面那組（剛點的東西）用滿色邊框＋陰影再加強一次。 */
+/* #inspBody 前綴不是選擇性的：ui.css 舊版留著 .sg:last-child{border-bottom:none}
+   （給以前「疊在一起用分隔線」的版面設計用），特異度比單純的 .sg 高一階，
+   會把最後一張卡的下邊框吃掉一半顏色。加 #inspBody 讓這裡的規則穩贏，不用跟舊規則搶。 */
+#inspBody .sg{margin:0 10px 10px;border-radius:14px;overflow:hidden;
+  border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03)}
+#inspBody .sg:first-of-type{margin-top:10px}
+#inspBody .sg-label{gap:9px;padding:11px 14px;font-size:13px}
+.sg-label svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;
+  stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.sg-label span{flex:1}
+#inspBody .sg-body{padding:11px 14px 16px}
+
+#inspBody .sg-atom{border-color:rgba(238,77,45,.45)}
+.sg-atom .sg-label{background:rgba(238,77,45,.20)}
+.sg-atom .sg-label svg{color:#FF8A63}
+#inspBody .sg-cell{border-color:rgba(76,141,255,.45)}
+.sg-cell .sg-label{background:rgba(76,141,255,.20)}
+.sg-cell .sg-label svg{color:#7FB0FF}
+#inspBody .sg-row{border-color:rgba(61,189,141,.45)}
+.sg-row .sg-label{background:rgba(61,189,141,.20)}
+.sg-row .sg-label svg{color:#63D9AC}
+#inspBody .sg-sec{border-color:rgba(192,138,240,.45)}
+.sg-sec .sg-label{background:rgba(192,138,240,.20)}
+.sg-sec .sg-label svg{color:#D3AAF7}
+
+#inspBody .sg-primary{border-width:2px}
+#inspBody .sg-primary.sg-atom{border-color:#EE4D2D;box-shadow:0 2px 16px rgba(238,77,45,.28)}
+#inspBody .sg-primary.sg-cell{border-color:#4C8DFF;box-shadow:0 2px 16px rgba(76,141,255,.28)}
+#inspBody .sg-primary.sg-row{border-color:#3DBD8D;box-shadow:0 2px 16px rgba(61,189,141,.28)}
+#inspBody .sg-primary.sg-sec{border-color:#C08AF0;box-shadow:0 2px 16px rgba(192,138,240,.28)}
+
+/* 按鈕整體放大＋圖示跟 #rowbar 共用同一套語言（「刪除」到哪裡都是同一顆垃圾桶） */
+.btnrow{gap:8px}
+.btnrow button{height:36px;padding:0 14px;font-size:13px;border-radius:10px}
+.btnrow button svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btnrow button.addchip{border-style:dashed}
+.btnrow button.addchip:hover{border-color:var(--ui-accent);color:var(--ui-accent);
+  background:var(--ui-accent-dim)}
+.chip{height:30px;padding:0 13px;font-size:12.5px}
+</style>
+
+<header>
+  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
+  <h1>MS 線上編輯器<small>蝦大端｜直接在版面上完成，不用填工單</small></h1>
+  <select id="zoom">
+    <option value=".5">50%</option><option value=".75" selected>75%</option>
+    <option value="1">100%</option>
+  </select>
+  <button id="btnUndo" title="復原 Ctrl+Z">↶</button>
+  <button id="btnRedo" title="重做 Ctrl+Shift+Z">↷</button>
+  <button id="btnAdv" title="打開才會出現空白容器、換容器、格的切分——那些是設計師在用的">⚙ 進階</button>
+  <span class="spacer"></span>
+  <button id="btnDemo">範例整頁</button>
+  <button id="btnClear">清空頁面</button>
+  <label class="btn" title="開啟先前存的 .json 專案">📂 開專案<input type="file" id="fProj" accept=".json"></label>
+  <button id="btnSaveProj">💾 存專案</button>
+  <button id="btnXlsx" title="產出一份給人審閱／留底的試算表（不用再匯回）">📄 工單</button>
+  <button id="btnPng">⬇ 整張 PNG</button>
+  <button class="primary" id="btnZip">⬇ 分段切圖 ZIP</button>
+</header>
+
+<main>
+  <aside id="left" class="sidebar">
+    <div class="tabs" id="tabs">
+      <button data-t="sec" class="on">加一段</button>
+      <button data-t="row">加一列</button>
+    </div>
+    <div class="pane-scroll"><div class="pane" id="pane"></div></div>
+  </aside>
+  <section id="stage"><div id="zoomwrap"><div id="paper" class="paper"></div></div></section>
+  <div id="rowbar"></div>
+  <div id="imgOv"><div class="io-box">
+    <i class="io-h tl"></i><i class="io-h tr"></i><i class="io-h bl"></i><i class="io-h br"></i>
+  </div></div>
+  <div id="minimap" class="empty">
+    <div id="miniHead"><span>頁面總覽</span><button id="miniToggle" title="收起／展開頁面總覽"></button></div>
+    <div id="miniBody" title="點一下跳到那裡">
+      <div id="miniStage"><div id="miniInner" class="paper export"></div><div id="miniView"></div></div>
+    </div>
+  </div>
+  <aside id="insp" class="right-panel">
+    <div id="crumb" hidden></div>
+    <div class="pane-scroll" id="inspBody"></div>
+  </aside>
+</main>
+
+<footer>
+  <span>直接點版面上的字就能改；<kbd>Enter</kbd> 在條列裡＝加一條</span>
+  <span>右欄可換<b>語意角色</b>（主標／內文／條列…）——字級字重由設計端定，選的是「這句是什麼」</span>
+  <span>點圖片框上傳圖；<kbd>Ctrl+Z</kbd> 復原</span>
+  <span>內容自動暫存在這台電腦</span>
+</footer>
+<div id="msg"></div>
+
+<script>
+(function () {
+  'use strict';
+  const XD = window.XD, $ = XD.$, $$ = XD.$$, esc = XD.esc;
+  const PACK = XD.packs.ms, SDEFS = PACK.sections, PRESETS = PACK.presets;
+  const COMMONS = PACK.commons || [];
+  const CONTAINERS = PACK.containers || [];
+  const KEY = 'ms_live_v1', KEY_IMG = 'ms_live_img_v1';
+  const PHOTO_MAX = 1400, ICON_MAX = 420;
+
+  let PAGE = { sections: [] };
+  let H = null;
+  let TAB = 'sec', SECALL = false, showMore = false;
+  /* 進階＝結構編輯（空白容器、換容器、格的切分）。
+     蝗大的工作只有四件：加一段、加一列、打字、換語意角色；
+     剩下的是設計師遇到 preset 沒涵蓋的排法才進來補。 */
+  let ADV = XD.store.get('ms_live_adv', false);
+  let imgWarned = false;
+  /* 選取狀態：四層，都是位址字串（atom 的位址不含講者的第 6 段，那段另外存） */
+  let SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+
+  /* ============ 位址解析 ============
+     欄位位址 iid|rowId|ci|si|ai（si 空字串＝不在子網格內），格位址是前四段。 */
+  const parts = s => String(s == null ? '' : s).split('|');
+  function locCell(addr) {
+    const p = parts(addr);
+    const sec = PAGE.sections.find(s => s.iid === p[0]); if (!sec) return null;
+    const row = (sec.rows || []).find(r => r.id === p[1]); if (!row) return null;
+    const cell = p[2] === '-1' ? row.lead : (row.cells || [])[+p[2]];
+    if (!cell) return null;
+    const arr = p[3] === '' || p[3] == null ? cell.atoms : ((cell.sub || [])[+p[3]] || {}).atoms;
+    return { sec, row, cell, arr: arr || null, si: (p[3] === '' || p[3] == null) ? null : +p[3] };
+  }
+  function locAtom(addr) {
+    const p = parts(addr), base = locCell(addr);
+    if (!base || !base.arr) return null;
+    const atom = base.arr[+p[4]];
+    if (!atom) return null;
+    return { sec: base.sec, row: base.row, cell: base.cell, arr: base.arr,
+             si: base.si, atom, ai: +p[4], spk: p[5] || null };
+  }
+  const cellAddrOf = addr => parts(addr).slice(0, 4).join('|');
+  const secOf = iid => PAGE.sections.find(s => s.iid === iid);
+  const msNo = sec => {
+    const list = PAGE.sections.filter(s => !SDEFS[s.type].kv);
+    const i = list.indexOf(sec);
+    return i < 0 ? 'KV' : 'MS_' + String(i + 1).padStart(2, '0');
+  };
+  const txtOf = n => String((n && n.innerText) || '').replace(/\u00a0/g, ' ').trim();
+  const nColOf = sec => ((SDEFS[sec.type] || {}).cols || ['1fr']).length;
+  const blockOf = (sec, row) => row.gid ? sec.rows.filter(x => x.gid === row.gid) : [row];
+
+  /* ============ 歷史 ============
+     快照式（core/history.js）。圖片不在快照裡——只存 imgId，dataURL 在 XD.IMAGES，
+     否則每打一個字都要複製好幾 MB 的 base64。 */
+  function commit(key) { H.set(PAGE, key ? { key: key } : {}); paintUndo(); save(); }
+  function restore() { PAGE = XD.clone(H.getState()); render(); }
+  function paintUndo() {
+    $('#btnUndo').disabled = !H.canUndo();
+    $('#btnRedo').disabled = !H.canRedo();
+  }
+
+  /* ============ 渲染 ============ */
+  function render() {
+    const paper = $('#paper');
+    if (!PAGE.sections.length) {
+      paper.className = 'paper emptypage';
+      paper.innerHTML = '<div id="emptyPage"><b>從左邊「區段」加一塊進來</b>' +
+        '<span>或按上面「範例整頁」看完整的一頁長什麼樣子</span></div>';
+    } else {
+      paper.className = 'paper';
+      paper.innerHTML = PAGE.sections.map(sec => {
+        const sdef = SDEFS[sec.type];
+        return '<div class="sec' + (sdef.kv ? ' kv' : '') + '" data-iid="' + sec.iid + '">' +
+          '<div class="msno">' + msNo(sec) + '</div>' +
+          XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: true, live: true }) + '</div>';
+      }).join('');
+    }
+    pruneSel(); markSel(); paintPane(); paintInsp(); paintMini(); applyZoom();
+  }
+  /* 結構變動後，指到不存在東西的選取要清掉 */
+  function pruneSel() {
+    if (SEL.atom && !locAtom(SEL.atom)) SEL.atom = SEL.spk = null;
+    if (SEL.cell && !locCell(SEL.cell)) SEL.cell = null;
+    if (SEL.sec && !secOf(SEL.sec)) SEL = { sec:null, row:null, cell:null, atom:null, spk:null };
+    if (SEL.row) {
+      const s = secOf(SEL.sec);
+      if (!s || !(s.rows || []).some(r => r.id === SEL.row)) SEL.row = null;
+    }
+  }
+  /* 只換 class，不重建 DOM——重建會把正在打字的 contenteditable 抽掉、游標就沒了 */
+  function markSel() {
+    $$('#paper .selsec,#paper .selrow,#paper .selcell,#paper .selatom')
+      .forEach(n => n.classList.remove('selsec', 'selrow', 'selcell', 'selatom'));
+    /* 選到「一個欄位」時，只留欄位自己的選取樣式（文字：外框；照片：操作框＋裁切虛線）——
+       段／列／格三層外框跟它疊在一起會變成「好多框」，這種情況下不畫。
+       SEL.sec／SEL.row／SEL.cell 本身還是照設定（右欄的「這一列」「這一格」資訊不受影響，
+       麵包屑也還在），只是不畫外框而已；沒選到欄位（只選了格／列/段）才用外框當唯一提示。 */
+    if (!SEL.atom) {
+      if (SEL.sec) { const n = $('#paper .sec[data-iid="' + SEL.sec + '"]'); if (n) n.classList.add('selsec'); }
+      if (SEL.row) $$('#paper [data-row="' + SEL.row + '"]').forEach(n => n.classList.add('selrow'));
+      if (SEL.cell) { const n = $('#paper [data-cell="' + SEL.cell + '"]'); if (n) n.classList.add('selcell'); }
+    }
+    if (SEL.atom) { const n = $('#paper [data-aw="' + SEL.atom + '"]'); if (n) n.classList.add('selatom'); }
+    paintRowbar();
+    placeImgOv();
+  }
+  /* ---------- 浮動列工具條 ----------
+     列的四個動作（上移、下移、複製、删除）以前在右欄，手要跑很遠。
+     搬到畫布上選到的那一列旁邊：右欄只管資訊與設定，畫布管直接操作。
+     position:fixed 且不在 #paper 裡面——#paper 有 transform:scale，圖示會跟著缩。
+     icon 一律線性 SVG（專案規範：fill:none、stroke:currentColor），不用 emoji。 */
+  const ICON = {
+    up:   '<svg viewBox="0 0 24 24"><path d="M12 19V6M6 12l6-6 6 6"/></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="M12 5v13M6 12l6 6 6-6"/></svg>',
+    dup:  '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>' +
+          '<path d="M15 5H6a1 1 0 0 0-1 1v9"/></svg>',
+    del:  '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 7V4.8A.8.8 0 0 1 10.8 4h2.4a.8.8 0 0 1 .8.8V7"/>' +
+          '<path d="M6.5 7l.9 12.1a1 1 0 0 0 1 .9h7.2a1 1 0 0 0 1-.9L17.5 7"/>' +
+          '<path d="M10.5 11v5M13.5 11v5"/></svg>',
+    /* 右欄按鈕圖示（跟上面四顆共用同一套語言：刪除永遠是垃圾桶、上下永遠是箭頭） */
+    chevU: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+    chevD: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+    pic:   '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/>' +
+           '<circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>',
+    picOff:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 20L20 4"/></svg>',
+  };
+  /* 右欄分組圖示：從「一整排字」到「一格」到「一列」到「一段」，形狀愈畫愈大，
+     不用讀字也看得出這是同一條路徑愈鑽愈深（配合 paintCrumb 的麵包屑）。 */
+  const ZICON = {
+    atom: '<svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
+    cell: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+    row:  '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M12 8v8"/></svg>',
+    sec:  '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/>' +
+          '<rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>',
+  };
+  function paintRowbar() {
+    const bar = $('#rowbar');
+    const sec = secOf(SEL.sec);
+    const row = SEL.row && sec && sec.rows.find(r => r.id === SEL.row);
+    if (!row) { bar.classList.remove('on'); return; }
+    if (!bar.dataset.built) {
+      bar.innerHTML =
+        '<button data-act="rup"  title="上移這一列">' + ICON.up + '</button>' +
+        '<button data-act="rdn"  title="下移這一列">' + ICON.down + '</button>' +
+        '<button data-act="rdup" title="複製這一列">' + ICON.dup + '</button>' +
+        '<button data-act="rdel" class="danger" title="删掉這一列">' + ICON.del + '</button>';
+      bar.dataset.built = '1';
+    }
+    bar.classList.add('on');
+    placeRowbar();
+  }
+  function placeRowbar() {
+    const bar = $('#rowbar');
+    if (!bar.classList.contains('on')) return;
+    /* 一列在 grid 面上是好幾個格，取整列的聯集矩形 */
+    const parts = $$('#paper [data-row="' + SEL.row + '"]');
+    if (!parts.length) { bar.classList.remove('on'); return; }
+    let top = Infinity, bottom = -Infinity, right = -Infinity;
+    parts.forEach(n => { const r = n.getBoundingClientRect();
+      top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom);
+      right = Math.max(right, r.right); });
+    const stage = $('#stage').getBoundingClientRect();
+    const h = bar.offsetHeight || 176;
+    bar.style.left = Math.round(Math.min(right + 14, stage.right - 52)) + 'px';
+    bar.style.top  = Math.round(Math.max(stage.top + 8,
+      Math.min((top + bottom) / 2 - h / 2, stage.bottom - h - 8))) + 'px';
+  }
+  $('#rowbar').onclick = e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    rowAct(b.dataset.act);
+  };
+  $('#stage').addEventListener('scroll', () => { placeRowbar(); placeImgOv(); });
+  window.addEventListener('resize', () => { placeRowbar(); placeMinimap(); placeMiniView(); placeImgOv(); });
+
+  function applyZoom() {
+    const z = +$('#zoom').value;
+    $('#paper').style.transform = 'scale(' + z + ')';
+    $('#zoomwrap').style.width = (1200 * z) + 'px';
+    $('#zoomwrap').style.height = ($('#paper').offsetHeight * z) + 'px';
+    placeRowbar();
+    placeMiniView();
+    placeImgOv();
+  }
+  $('#zoom').onchange = applyZoom;
+
+  /* ---------- 頁面總覽（畫布右上的縮圖） ----------
+     內容用「乾淨匯出」的渲染方式（editable:false）：跟 PNG／ZIP 匯出走
+     同一種畫法，天生沒有 contenteditable、沒有 ✕、沒有 KV 刪除鈕——
+     這裡不該讓人打字進去，用匯出模式最省事，也保證縮圖跟真畫布長一樣。
+     結構變動走 render()（見上面 paintMini() 呼叫）；純打字不重畫 #paper
+     （怕游標跑掉），但 #miniInner 是另一棵、沒人在裡面打字的 DOM，
+     所以打字時另外呼叫一次 paintMini() 沒有風險，縮圖照樣即時跟著動。 */
+  const MINI_W = 176, MINI_MAXH = 360;
+  let MINI_ON = XD.store.get('ms_live_minimap', true);
+  function paintMini() {
+    const box = $('#minimap'); if (!box) return;
+    const empty = !PAGE.sections.length;
+    box.classList.toggle('empty', empty);
+    if (!empty) {
+      $('#miniInner').innerHTML = PAGE.sections.map(sec => {
+        const sdef = SDEFS[sec.type];
+        return '<div class="sec' + (sdef.kv ? ' kv' : '') + '">' +
+          XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: false }) + '</div>';
+      }).join('');
+    }
+    sizeMini();
+  }
+  function sizeMini() {
+    const stage = $('#miniStage');
+    if (!stage || $('#minimap').classList.contains('empty')) return;
+    const H = Math.max(1, $('#paper').offsetHeight);
+    let k = MINI_W / 1200;
+    if (H * k > MINI_MAXH) k = MINI_MAXH / H;
+    const offX = Math.max(0, (MINI_W - 1200 * k) / 2);
+    stage.style.transform = 'translateX(' + offX.toFixed(2) + 'px) scale(' + k + ')';
+    stage.style.height = H + 'px';
+    $('#miniBody').style.height = Math.round(H * k) + 'px';
+    $('#miniBody').dataset.k = k;
+    $('#miniBody').dataset.offx = offX;
+    placeMiniView();
+  }
+  /* 貼在 #stage 右上角——量 #stage 的 rect，不寫死 px，視窗縮放會自己校正
+     （跟 placeRowbar 同一招）。只有開機／resize 需要重算：#stage 這個
+     格子本身的大小跟位置不會因為捲動或加內容而變。 */
+  function placeMinimap() {
+    const box = $('#minimap'); if (!box) return;
+    const r = $('#stage').getBoundingClientRect();
+    box.style.top = Math.round(r.top + 14) + 'px';
+    box.style.right = Math.round(window.innerWidth - r.right + 14) + 'px';
+  }
+  /* 縮圖裡那個橘框＝目前畫布捲動窗口實際看到的範圍。整頁都在螢幕上時
+     （不用捲）就不畫，免得多一個永遠貼滿全框的框線在那裡佔位置。 */
+  function placeMiniView() {
+    const box = $('#minimap'), view = $('#miniView'), body = $('#miniBody'), stage = $('#stage');
+    if (!box || box.classList.contains('empty') || box.classList.contains('collapsed')) return;
+    const k = +body.dataset.k || 0; if (!k) return;
+    const offX = +body.dataset.offx || 0;
+    const z = +$('#zoom').value || 1;
+    const H = Math.max(1, $('#paper').offsetHeight);
+    const totalH = H * k, totalW = 1200 * k;
+    let top = (stage.scrollTop / z) * k;
+    let left = offX + (stage.scrollLeft / z) * k;
+    let h = Math.min((stage.clientHeight / z) * k, totalH);
+    let w = Math.min((stage.clientWidth / z) * k, totalW);
+    top = Math.max(0, Math.min(top, totalH - h));
+    left = Math.max(offX, Math.min(left, offX + totalW - w));
+    const fits = h >= totalH - 1 && w >= totalW - 1;
+    view.style.display = fits ? 'none' : 'block';
+    if (!fits) {
+      view.style.top = Math.round(top) + 'px';
+      view.style.left = Math.round(left) + 'px';
+      view.style.width = Math.round(w) + 'px';
+      view.style.height = Math.round(h) + 'px';
+    }
+  }
+  function miniNavigate(clientX, clientY) {
+    const body = $('#miniBody'), stage = $('#stage');
+    const k = +body.dataset.k || 0; if (!k) return;
+    const offX = +body.dataset.offx || 0;
+    const z = +$('#zoom').value || 1;
+    const r = body.getBoundingClientRect();
+    const px = (clientX - r.left - offX) / k;
+    const py = (clientY - r.top) / k;
+    stage.scrollLeft = Math.max(0, px * z - stage.clientWidth / 2);
+    stage.scrollTop  = Math.max(0, py * z - stage.clientHeight / 2);
+    placeMiniView();
+  }
+  let miniDrag = false;
+  $('#miniBody').addEventListener('mousedown', e => {
+    if ($('#minimap').classList.contains('empty')) return;
+    miniDrag = true; miniNavigate(e.clientX, e.clientY); e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => { if (miniDrag) miniNavigate(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', () => { miniDrag = false; });
+  $('#stage').addEventListener('scroll', placeMiniView);
+  function paintMiniToggle() {
+    $('#minimap').classList.toggle('collapsed', !MINI_ON);
+    $('#miniToggle').innerHTML = MINI_ON ? ICON.chevU : ICON.chevD;
+    if (MINI_ON) placeMiniView();
+  }
+  $('#miniHead').onclick = () => {
+    MINI_ON = !MINI_ON; XD.store.set('ms_live_minimap', MINI_ON);
+    paintMiniToggle();
+  };
+  paintMiniToggle();
+  placeMinimap();
+
+  /* ============ 左欄：區段／積木／範本 ============ */
+  function thumb(p) {
+    const seg = p.shape || [1, 1, 1], total = seg.reduce((a, b) => a + b, 0);
+    let x = 2, out = '';
+    const W = 218, Hh = 24, gap = 3;
+    seg.forEach(s => {
+      const w = (W - 4) * s / total - gap;
+      out += '<rect x="' + x + '" y="2" width="' + Math.max(w, 6) + '" height="' + (Hh - 4) +
+             '" rx="3" fill="#EAEFFC" stroke="#2C49CE" stroke-width="1.4"/>';
+      x += w + gap;
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '">' + out + '</svg>';
+  }
+  const cardHTML = (k, p, cls) =>
+    '<div class="card' + (cls ? ' ' + cls : '') + '" data-add="' + k + '">' +
+    '<div class="nm">' + esc(p.nm) + '</div>' + (p.shape ? thumb(p) : '') +
+    '<div class="ds">' + esc(p.ds || '') + '</div></div>';
+
+  /* 左欄只做一件事：加。兩個分頁＝兩個層級（加一段到頁上、加一列到段裡）。
+     2026-09-08 之前是三個分頁（區段／積木／範本），使用者回「一下區段一下積木」——
+     問題不是名詞多，是三個分頁裝的是兩個層級的東西卻長得一模一樣。 */
+  function paintPane() {
+    const box = $('#pane');
+    $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+
+    if (TAB === 'sec') {
+      const keys = Object.keys(SDEFS).filter(k => SECALL || SDEFS[k].hot);
+      box.innerHTML =
+        '<h3>不屬於任何一段</h3>' +
+        COMMONS.map(k => cardHTML(k, PRESETS[k])).join('') +
+        '<h3>加一段到頁面最後</h3>' +
+        '<div class="segbar" id="secseg"><button data-all="0"' + (SECALL ? '' : ' class="on"') +
+        '>常用</button><button data-all="1"' + (SECALL ? ' class="on"' : '') + '>全部</button></div>' +
+        keys.map(k => '<div class="card seccard" data-sec="' + k + '"><div class="nm">' +
+          esc(SDEFS[k].nm) + '</div>' + XD.flow.secThumb(SDEFS[k]) +
+          '<div class="ds">' + esc(SDEFS[k].ds || '') + '</div></div>').join('');
+      return;
+    }
+
+    const sec = secOf(SEL.sec);
+    if (!sec || SDEFS[sec.type].kv) {
+      box.innerHTML = '<div class="hint">' + (sec ? 'KV 是整張圖，沒有列可以加。'
+        : '先點畫面上一段，這裡才知道要加到哪裡。') + '</div>';
+      return;
+    }
+    const sdef = SDEFS[sec.type];
+    /* 「整張表」＝這一段原本的完整樣態（demo 扣掉膠囊）。
+       最小化積木可以自由疊，但「我就是要整張」不應該要點五次。 */
+    const full = sdef.full || [];
+    box.innerHTML =
+      '<h3>在「' + esc(sec.title) + '」裡加一列</h3>' +
+      (full.length > 1
+        ? '<div class="card fullcard" data-full="1"><div class="nm">⌗ 整張表（' +
+          full.length + ' 列）</div><div class="ds">這一段原本的完整樣態，一次銖好</div></div>'
+        : '') +
+      (sdef.cards || []).map(k => cardHTML(k, PRESETS[k])).join('') +
+      (ADV
+        ? '<h3>進階：空白容器 — 加進來再自己塞欄位</h3>' +
+          CONTAINERS.map(k => cardHTML(k, PRESETS[k])).join('')
+        : '');
+  }
+  $('#tabs').onclick = e => {
+    const b = e.target.closest('button[data-t]'); if (!b) return;
+    TAB = b.dataset.t; paintPane();
+  };
+  $('#pane').onclick = e => {
+    const seg = e.target.closest('#secseg button');
+    if (seg) { SECALL = seg.dataset.all === '1'; paintPane(); return; }
+    const sc = e.target.closest('[data-sec]');
+    if (sc) return addSection(sc.dataset.sec);
+    if (e.target.closest('[data-full]')) return addFullTable();
+    const ac = e.target.closest('[data-add]');
+    if (ac) return addRow(ac.dataset.add);
+  };
+
+  /* ============ 右欄檢視器 ============ */
+  /* lv＝這組是哪一層（atom/cell/row/sec），決定圖示＋左側色條。
+     最上面那組會在 paintInsp 最後補上 sg-primary——那才是使用者剛點的東西，
+     其餘幾組只是「這東西所在的脈絡」，故意退到背景。 */
+  const group = (lv, label, body, extra) =>
+    '<div class="sg sg-' + lv + '"><div class="sg-label">' + ZICON[lv] + '<span>' + label + '</span>' +
+    (extra ? '<small>' + extra + '</small>' : '') + '</div><div class="sg-body">' + body + '</div></div>';
+
+  /* 這一列是白底表格格還是藍底無框列——角色清單照這個過濾 */
+  const faceOfRow = row => ((PRESETS[(row || {}).preset] || {}).mode === 'plain') ? 'plain' : 'card';
+
+  /* ---- 規格是「量」出來的，不是寫死的 ----
+     字級字重直接對 core/paper.css 的實際樣式量測，PSD 一校準這裡就跟著動，
+     不會有第二份會漂掉的數字。順帶：使用者原本想要的「大中小／Bold-Medium-Regular」
+     在這裡是唯讀資訊，看得到但不能挑——挑的是角色。 */
+  const SPEC = {};
+  (function measureSpecs() {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden;width:600px';
+    probe.className = 'paper';
+    document.body.appendChild(probe);
+    Object.keys(XD.ATOMS).forEach(t => {
+      const d = XD.ATOMS[t];
+      let el, target;
+      if (d.list) {
+        el = document.createElement('ul');
+        el.className = 'a-bul' + (d.white ? ' a-bul-w' : '') + (d.small ? ' a-bul-s' : '') +
+                       (d.mod ? ' ' + d.mod : '');
+        el.innerHTML = '<li>x</li>';
+        target = el.firstChild;
+      } else if (d.cls) {
+        el = document.createElement('div'); el.className = d.cls; el.textContent = 'x';
+        target = el;
+      } else return;
+      probe.appendChild(el);
+      const cs = getComputedStyle(target);
+      SPEC[t] = { px: Math.round(parseFloat(cs.fontSize) || 0), w: parseInt(cs.fontWeight, 10) || 400 };
+    });
+    document.body.removeChild(probe);
+  })();
+  const wName = w => w >= 700 ? 'Bold' : w >= 500 ? 'Medium' : 'Regular';
+  /* 預覽字級：把 28~72px 壓進 11~21px。刻意不等比例縮——等比例的話
+     小的那幾個會縮到看不清楚；壓縮後大小順序仍然看得出來（Word 樣式庫的做法）。 */
+  const prevPx = px => Math.max(10, Math.min(22, Math.round(11 + (px - 28) * 0.22)));
+
+  /* 一列樣式選項：左邊用它自己的樣式畫出樣本字，右邊標實際規格 */
+  function styleRow(role, curType, atomType) {
+    const t = atomType || role.set;
+    const sp = SPEC[t] || {};
+    const on = curType && (role.set === curType ||
+      (role.also || []).indexOf(curType) >= 0 || (role.styles || []).some(s => s[0] === curType));
+    const size = sp.px ? prevPx(sp.px) : 13;
+    const d = XD.ATOMS[t] || {};
+    let prev;
+    if (role.img) prev = '<span class="sprev sprev-img">▢　' + esc(role.sample) + '</span>';
+    else if (d.list) {
+      const cls = 'a-bul' + (d.white ? ' a-bul-w' : '') + (d.small ? ' a-bul-s' : '') +
+                  (d.mod ? ' ' + d.mod : '');
+      prev = '<span class="sprev"><ul class="' + cls + '"><li style="font-size:' + size + 'px">' +
+             esc(role.sample) + '</li></ul></span>';
+    } else {
+      prev = '<span class="sprev ' + (d.cls || '') + '" style="font-size:' + size + 'px">' +
+             esc(role.sample) + '</span>';
+    }
+    const spec = role.img ? '圖片' : (sp.px ? sp.px + ' · ' + wName(sp.w) : '');
+    return '<button class="srow' + (on ? ' on' : '') + '" data-role="' + role.id + '">' +
+           prev + '<span class="sspec">' + spec + '</span></button>';
+  }
+
+  function styleList(face, curType) {
+    const all = XD.rolesFor(face);
+    const cur = curType ? XD.roleOf(curType, face) : null;
+    let show = all.filter(r => r.hot || (cur && r.id === cur.id));
+    const rest = all.filter(r => show.indexOf(r) < 0);
+    if (showMore) show = all;
+    /* 模板專屬角色（實作環節／講者／運算符）不在名單裡，但正在用就得看得到 */
+    if (cur && show.indexOf(cur) < 0) show = [cur].concat(show);
+    let html = '<div class="stylelist face-' + face + '">' +
+      show.map(r => styleRow(r, curType, r.id === (cur || {}).id ? curType : null)).join('') + '</div>';
+    if (rest.length && !showMore)
+      html += '<button class="morebtn" data-act="more">⌄ 更多樣式（' + rest.length + '）</button>';
+    else if (showMore && rest.length)
+      html += '<button class="morebtn" data-act="less">⌃ 收起來</button>';
+    return html;
+  }
+
+  /* 這一列在區段裡是第幾列（膠囊不算，主題組整塊算一列）——給麵包屑用的人話編號 */
+  function rowOrdinal(sec, row) {
+    const blk = blockOf(sec, row);
+    const seen = {}; let n = 0, at = -1;
+    sec.rows.forEach(r => {
+      if (r.preset === 'x_pill') return;
+      const key = blockOf(sec, r)[0].id;
+      if (seen[key]) return;
+      seen[key] = 1; n++;
+      if (key === blk[0].id) at = n;
+    });
+    return at;
+  }
+
+  function paintInsp() {
+    const box = $('#inspBody');
+    const hitA = SEL.atom && locAtom(SEL.atom);
+    const hitC = SEL.cell && locCell(SEL.cell);
+    const sec = secOf(SEL.sec);
+    const row = (SEL.row && sec) ? sec.rows.find(r => r.id === SEL.row) : null;
+    /* 疊的順序刻意是「最specific先出現」：剛點的欄位／格排最上面，不用捲過
+       整段資訊才碰到自己要改的東西；區段資訊墊在最下面當脈絡。 */
+    const groups = [];
+
+    if (hitA) {
+      const def = XD.ATOMS[hitA.atom.t] || {};
+      const face = faceOfRow(hitA.row);
+      const role = XD.roleOf(hitA.atom.t, face);
+      const val = def.list ? (hitA.atom.items || []).join('\n')
+                : def.spk ? [hitA.atom.brand, hitA.atom.name].join(' ')
+                : String(hitA.atom.v == null ? '' : hitA.atom.v);
+      const longest = def.list ? Math.max.apply(null, [0].concat((hitA.atom.items || []).map(XD.countUnits)))
+                               : Math.max.apply(null, [0].concat(val.split('\n').map(XD.countUnits)));
+      const over = def.max && longest > def.max;
+
+      let body = styleList(face, hitA.atom.t);
+      /* 符號／框型是角色底下的樣式，不是另外的角色——只有選到該角色時才出現 */
+      if (role && role.styles && role.styles.length > 1) {
+        body += '<div class="subpick"><i>' + (role.img ? '框型' : '符號') + '</i><div class="chips">' +
+          role.styles.map(s => '<button class="chip' + (s[0] === hitA.atom.t ? ' on' : '') +
+            '" data-style="' + s[0] + '">' + esc(s[1]) + '</button>').join('') + '</div></div>';
+      }
+      body += '<div class="metaline">' +
+        (def.max ? '最長一行 <span class="' + (over ? 'over' : '') + '">' +
+          (Number.isInteger(longest) ? longest : longest.toFixed(1)) + ' / ' + def.max + ' 字</span>' : '') +
+        '</div>';
+      body += '<div class="btnrow">' +
+        (def.list ? '<button data-act="bul+">＋ 一條</button><button data-act="bul-">− 一條</button>' : '') +
+        (def.photo ? '<button data-act="img">' + ICON.pic + '選圖</button>' +
+                     (hitA.atom.imgId || hitA.atom.img
+                       ? '<button data-act="imgx">' + ICON.picOff + '清除圖</button>' : '') : '') +
+        '<button class="danger" data-act="delatom" title="也可以把它清空後按 Backspace／Delete">' +
+        ICON.del + '刪掉這個欄位</button></div>';
+      if (def.photo && XD.photoResolved(hitA.atom)) {
+        const tf = Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
+        body += '<div class="metaline" style="margin-top:8px">拖曳照片可移動位置・拖角落的把手可縮放・目前縮放 ' +
+          Math.round(tf.z * 100) + '%</div>' +
+          '<div class="btnrow"><button data-act="pzreset" title="回到剛上傳時的位置">⟲ 重設位置</button></div>';
+      } else if (def.photo && (hitA.atom.imgId || hitA.atom.img)) {
+        body += '<div class="metaline over" style="margin-top:8px">圖片暫存遺失了（通常是重新整理瀏覽器時圖片太多存不下）' +
+          '，點畫布上的框可以直接重新選檔。</div>';
+      }
+      groups.push(group('atom', '選取的欄位', body, def.deco ? '裝飾字，不進工單' : ''));
+    }
+
+    if (hitC) {
+      /* 加欄位不需要整份角色清單——先加一段，再用上面的樣式列表細調 */
+      const face = faceOfRow(hitC.row);
+      let body = '<div class="btnrow">' + (XD.QUICK_ADD[face] || []).map(q =>
+        '<button class="addchip" data-addrole="' + q[0] + '">' + esc(q[1]) + '</button>').join('') + '</div>';
+      /* 合併／拆開：直接改 cell.cs（跨欄）。引擎的 flow.place 本來就在算跨欄，
+         所以這是加操作不是改架構。比「整列換容器」好的地方是打好的字不會重來。
+         不收進進階——把標籤＋內容兩格併成一格放大字，是蝗大真的會遇到的事。 */
+      const cmg = [];
+      if (!hitC.cell.sub && !hitC.row.lead && !hitC.row.gid) {
+        const ci = hitC.row.cells.indexOf(hitC.cell);
+        const nxt = ci >= 0 ? hitC.row.cells[ci + 1] : null;
+        if (nxt && !nxt.sub) cmg.push('<button data-act="cmerge">⇥ 併掉右邊那格</button>');
+        if (ci >= 0 && (hitC.cell.cs || 1) > 1) cmg.push('<button data-act="csplit">⇤ 拆出一格</button>');
+      }
+      if (cmg.length) body += '<div class="btnrow" style="margin-top:6px">' + cmg.join('') + '</div>';
+
+      /* 置中／標籤底色／子網格加減欄＝改格子的切分，是設計師的活，收進進階 */
+      if (ADV) {
+        const flags = [];
+        if (!hitC.cell.sub) {
+          flags.push('<button data-act="ctr">' + (hitC.cell.ctr ? '✓ ' : '') + '置中</button>');
+          flags.push('<button data-act="lab">' + (hitC.cell.lab ? '✓ ' : '') + '標籤底色</button>');
+        } else {
+          flags.push('<button data-act="sub+">＋ 一欄</button><button data-act="sub-">− 一欄</button>');
+        }
+        body += '<div class="btnrow" style="margin-top:6px">' + flags.join('') + '</div>';
+      }
+      groups.push(group('cell', '這一格', body));
+    }
+
+    if (row) {
+      const p = PRESETS[row.preset] || {};
+      let body = '<div class="metaline">目前是：<b>' + esc(p.nm || row.preset) + '</b>' +
+        (row.gid ? '（主題組，整組算一塊）' : '') + '</div>';
+      /* 賣家共創標籤：每張卡自己開關（row.badge），不用換容器（換了內容會重來）。
+         只有卡片面的列（顧問卡／講師經歷大卡／並排小卡列…）才會出現這顆按鈕。 */
+      if (p.mode === 'card') {
+        const on = row.badge != null ? !!row.badge : !!p.badge;
+        body += '<div class="btnrow" style="margin-top:10px">' +
+          '<button data-act="badge">' + (on ? '✓ ' : '') + '賣家共創標籤</button></div>';
+      }
+      if (ADV) body += '<div class="metaline" style="margin-top:10px">換成別的容器（內容會重來）：</div><div class="chips">' +
+            CONTAINERS.map(k => '<button class="chip' + (k === row.preset ? ' on' : '') +
+              '" data-swap="' + k + '">' + esc(PRESETS[k].nm) + '</button>').join('') + '</div>';
+      groups.push(group('row', '這一列', body));
+    }
+
+    if (sec) {
+      const sdef = SDEFS[sec.type];
+      groups.push(group('sec', '這個區段', '<div class="metaline"><b>' + esc(msNo(sec) + '　' + sec.title) + '</b>' +
+        (sdef.kv ? '' : '　欄軌 ' + (sdef.cols || []).join(' ／ ')) + '</div>' +
+        '<div class="btnrow"><button data-act="sup">' + ICON.chevU + '上移</button>' +
+        '<button data-act="sdn">' + ICON.chevD + '下移</button>' +
+        '<button class="danger" data-act="sdel">' + ICON.del + '刪掉整個區段</button></div>'));
+    }
+
+    if (groups.length) groups[0] = groups[0].replace('class="sg sg-', 'class="sg sg-primary sg-');
+    box.innerHTML = groups.join('') || '<div class="pane"><div class="hint">' +
+      '點畫面上任何一段文字，這裡就會出現它的角色與操作。<br><br>' +
+      '沒有東西可點的話，先從左邊「加一段」加一塊。</div></div>';
+    paintCrumb(sec, row, hitC, hitA);
+  }
+
+  /* ---------- 右欄麵包屑 ----------
+     貼在 #inspBody 上面、不隨內容捲動。把「選到多深」直接講成一條路徑，
+     比底下疊那幾塊 .sg 更一眼看出「這是同一個東西，只是層層往內鑽」。
+     點還沒到底的那幾節可以直接跳回那一層（等於「這個區段／這一列」的捷徑）。 */
+  function paintCrumb(sec, row, hitC, hitA) {
+    const el = $('#crumb'); if (!el) return;
+    if (!sec) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    const crumbs = [{ lv: 'sec', t: msNo(sec) + ' ' + sec.title }];
+    if (row) crumbs.push({ lv: 'row', t: row.preset === 'x_pill' ? '膠囊標題' : ('第 ' + rowOrdinal(sec, row) + ' 列') });
+    if (hitC && row) {
+      const t = hitC.si != null ? '子欄 ' + (hitC.si + 1)
+        : (row.lead || row.gid || row.cells.length <= 1) ? '這一格'
+        : '第 ' + (row.cells.indexOf(hitC.cell) + 1) + ' 格';
+      crumbs.push({ lv: 'cell', t: t });
+    }
+    if (hitA) {
+      const role = XD.roleOf(hitA.atom.t, faceOfRow(hitA.row));
+      crumbs.push({ lv: 'atom', t: (role && role.nm) || XD.ATOMS[hitA.atom.t].nm || '欄位' });
+    }
+    el.innerHTML = crumbs.map((c, i) => (i ? '<span class="csep">›</span>' : '') +
+      '<button class="crumb' + (i === crumbs.length - 1 ? ' cur' : '') + '" data-lv="' + c.lv + '">' +
+      esc(c.t) + '</button>').join('');
+  }
+  $('#crumb').onclick = e => {
+    const b = e.target.closest('button[data-lv]'); if (!b || b.classList.contains('cur')) return;
+    const lv = b.dataset.lv;
+    if (lv === 'sec') SEL.row = SEL.cell = SEL.atom = null;
+    else if (lv === 'row') SEL.cell = SEL.atom = null;
+    else if (lv === 'cell') SEL.atom = null;
+    markSel(); paintPane(); paintInsp();
+  };
+
+  /* ============ 畫布互動 ============ */
+  const paperEl = $('#paper');
+
+  paperEl.addEventListener('click', e => {
+    const del = e.target.closest('.adel');
+    if (del) { e.preventDefault(); e.stopPropagation(); return delAtom(del.dataset.di); }
+    if (e.target.closest('.kvdel')) {
+      e.stopPropagation();
+      const s = secOf(e.target.closest('.sec').dataset.iid);
+      if (s) { s.kvImgId = null; commit(); render(); }
+      return;
+    }
+    /* 已經有照片的圖片框：點一下只選取（可以拖曳調整位置），不再跳選檔視窗——
+       要換照片改用右欄「選圖」鈕（明確動作，不會跟拖曳調整搶點擊）。
+       還沒放照片的空框維持原行為：點一下直接選檔。
+       ⚠ 判斷「有沒有照片」用 XD.photoResolved，不能只看 imgId 存不存在——重新整理
+       瀏覽器時圖片側表（XD.IMAGES）常存不進 localStorage 被整包丟掉，atom 上的
+       imgId／檔名卻還留著，變成點了沒反應、要先「清除圖」才能重新選檔的孤兒狀態。
+       這裡直接讓孤兒狀態也能點一下重新選檔。 */
+    const im = e.target.closest('[data-img]');
+    if (im) { const hit = locAtom(im.dataset.img);
+      if (!hit || !XD.photoResolved(hit.atom)) pickImage(im.dataset.img); }
+    if (e.target.closest('[data-kv]')) {
+      SEL.sec = e.target.closest('.sec').dataset.iid; pickKv();
+    }
+    const secEl = e.target.closest('.sec'); if (!secEl) return;
+    const awEl = e.target.closest('[data-aw]');
+    const cellEl = e.target.closest('[data-cell]');
+    const rowEl = e.target.closest('[data-row]');
+    SEL.sec = secEl.dataset.iid;
+    SEL.row = rowEl ? rowEl.dataset.row : null;
+    SEL.cell = cellEl ? cellEl.dataset.cell : (awEl ? cellAddrOf(awEl.dataset.aw) : null);
+    SEL.atom = awEl ? awEl.dataset.aw : null;
+    SEL.spk = null;
+    markSel(); paintPane(); paintInsp();
+  });
+
+  /* ============ 圖片拖曳調整位置／PS 式操作框縮放 ============
+     照片＝object-fit:cover，z=1 時已經剛好填滿整個框（見 paper.css .avatar.has img）。
+     放大 z 倍之後，四邊各多出來的可視範圍＝(z-1)/2，所以位移上限用 (z-1)*50（%）鎖死——
+     公式不看照片長寬比，cover 已經先幫兩個維度都對齊了（BN 人物照片第十一輪同一條公式）。
+     拖曳距離用「螢幕像素 ÷ 框的螢幕寬高」換算成 %：兩邊都是螢幕座標，畫布縮放
+     （#paper 的 transform:scale）已經內含在兩者裡面，換算完自動抵消，不用另外知道倍率。
+     跟其他拖曳（BN 人物照片）同一個原則：拖曳中只改 inline transform，放開才進歷史。 */
+  function clampPhotoT(tf) {
+    const lim = Math.max(0, (tf.z - 1) * 50);
+    return { x: Math.max(-lim, Math.min(lim, tf.x)), y: Math.max(-lim, Math.min(lim, tf.y)), z: tf.z };
+  }
+  /* 操作框＝貼著「照片實際被縮放後的範圍」，不是頻框本身。
+     中心＝頻框中心 + 位移（tf.x/y% 相對頻框寬高，跟 .imgwrap 的 transform 同一套換算）；
+     尺寸＝頻框尺寸 × tf.z。tfOverride 給拖曳中即時預覽用（atom.tf 還沒寫回去）。 */
+  function placeImgOv(tfOverride) {
+    const ov = $('#imgOv');
+    const hitA = SEL.atom && locAtom(SEL.atom);
+    const def = hitA && (XD.ATOMS[hitA.atom.t] || {});
+    const box = hitA && def.photo && XD.photoResolved(hitA.atom) &&
+                $('#paper [data-aw="' + SEL.atom + '"] .avatar.has');
+    if (!box) { ov.classList.remove('on'); return; }
+    const r = box.getBoundingClientRect();
+    if (!r.width || !r.height) { ov.classList.remove('on'); return; }
+    const tf = tfOverride || Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
+    const w = r.width * tf.z, h = r.height * tf.z;
+    const cx = r.left + r.width / 2 + tf.x / 100 * r.width;
+    const cy = r.top + r.height / 2 + tf.y / 100 * r.height;
+    ov.style.left = Math.round(cx - w / 2) + 'px';
+    ov.style.top = Math.round(cy - h / 2) + 'px';
+    ov.style.width = Math.round(w) + 'px';
+    ov.style.height = Math.round(h) + 'px';
+    ov.classList.add('on');
+  }
+  let PHDRAG = null, PZDRAG = null;
+  paperEl.addEventListener('mousedown', e => {
+    const box = e.target.closest('.avatar.has'); if (!box) return;
+    const awEl = box.closest('[data-aw]'); if (!awEl) return;
+    const hit = locAtom(awEl.dataset.aw); if (!hit) return;
+    const wrap = box.querySelector('.imgwrap'); if (!wrap) return;
+    const r = box.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    e.preventDefault();
+    PHDRAG = { atom: hit.atom, wrap, w: r.width, h: r.height,
+               sx: e.clientX, sy: e.clientY,
+               tf0: Object.assign({ x: 0, y: 0, z: 1 }, hit.atom.tf), moved: false, tf: null };
+  });
+  /* 操作框四個角把手：固定中心等比例縮放（PS 操作框的簡化版，不用旋轉、不用單邊自由拉）。
+     用「滑鼠到中心的距離」變化去換算縮放倍率——半徑比＝縮放比，x/y 永遠同步，
+     不會因為只往某一邊拖就變形；中心點（含既有的位移 tf.x/y）本身不會被拖曳影響。 */
+  $('#imgOv').querySelectorAll('.io-h').forEach(h => {
+    h.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      const hitA = SEL.atom && locAtom(SEL.atom); if (!hitA) return;
+      const box = $('#paper [data-aw="' + SEL.atom + '"] .avatar.has'); if (!box) return;
+      const wrap = box.querySelector('.imgwrap'); if (!wrap) return;
+      const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
+      const tf0 = Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
+      const cx = r.left + r.width / 2 + tf0.x / 100 * r.width;
+      const cy = r.top + r.height / 2 + tf0.y / 100 * r.height;
+      const d0 = Math.max(1, Math.hypot(e.clientX - cx, e.clientY - cy));
+      PZDRAG = { atom: hitA.atom, wrap, cx, cy, d0, tf0, tf: null };
+    });
+  });
+  window.addEventListener('mousemove', e => {
+    if (PZDRAG) {
+      const d1 = Math.hypot(e.clientX - PZDRAG.cx, e.clientY - PZDRAG.cy);
+      const z = Math.max(1, Math.min(3, PZDRAG.tf0.z * (d1 / PZDRAG.d0)));
+      const tf = clampPhotoT({ x: PZDRAG.tf0.x, y: PZDRAG.tf0.y, z });
+      PZDRAG.tf = tf;
+      PZDRAG.wrap.style.transform = 'translate(' + tf.x + '%,' + tf.y + '%) scale(' + tf.z + ')';
+      placeImgOv(tf);
+      return;
+    }
+    if (!PHDRAG) return;
+    const dx = e.clientX - PHDRAG.sx, dy = e.clientY - PHDRAG.sy;
+    if (!PHDRAG.moved && Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    PHDRAG.moved = true;
+    const tf = clampPhotoT({
+      x: PHDRAG.tf0.x + dx / PHDRAG.w * 100,
+      y: PHDRAG.tf0.y + dy / PHDRAG.h * 100,
+      z: PHDRAG.tf0.z,
+    });
+    PHDRAG.tf = tf;
+    PHDRAG.wrap.style.transform = 'translate(' + tf.x + '%,' + tf.y + '%) scale(' + tf.z + ')';
+    placeImgOv(tf);
+  });
+  window.addEventListener('mouseup', () => {
+    if (PZDRAG) {
+      if (PZDRAG.tf) { PZDRAG.atom.tf = PZDRAG.tf; commit('phzoom:' + SEL.atom); render(); }
+      PZDRAG = null;
+      return;
+    }
+    if (!PHDRAG) return;
+    if (PHDRAG.moved && PHDRAG.tf) {
+      PHDRAG.atom.tf = PHDRAG.tf;
+      commit('phtf:' + SEL.atom); render();
+    }
+    PHDRAG = null;
+  });
+
+  /* 打字：只更新資料模型與歷史，不重畫（重畫會把游標弄丟） */
+  paperEl.addEventListener('input', e => {
+    const el = e.target.closest('[data-ed]'); if (!el) return;
+    const hit = locAtom(el.dataset.ed); if (!hit) return;
+    readEd(el, hit.atom, parts(el.dataset.ed)[5] || null);
+    commit('ed:' + el.dataset.ed);
+    paintInsp();
+    paintMini();
+  });
+  function readEd(el, atom, spk) {
+    const def = XD.ATOMS[atom.t] || {};
+    const txt = n => String(n.innerText || '').replace(/\u00a0/g, ' ');
+    if (spk) { atom[spk] = txt(el).trim(); return; }
+    if (def.list) {
+      const lis = Array.prototype.slice.call(el.querySelectorAll('li'));
+      const items = (lis.length ? lis.map(txt) : txt(el).split('\n'))
+        .map(s => s.trim()).filter(s => s !== '');
+      atom.items = items.length ? items : [''];
+    } else {
+      atom.v = txt(el).replace(/\n+$/, '');
+    }
+  }
+  /* 貼上一律當純文字，不然會把來源的 HTML 樣式帶進版面 */
+  paperEl.addEventListener('paste', e => {
+    if (!e.target.closest('[data-ed]')) return;
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, t.replace(/\r\n?/g, '\n'));
+  });
+  /* 單行角色不讓它換行（標題、標籤這種本來就該一行） */
+  paperEl.addEventListener('keydown', e => {
+    /* Backspace／Delete：欄位已經空了就當「刪掉這個欄位」。
+       裡面還有字就一律當一般刪字——不然打到一半整個欄位會消失。
+       （取代舊的右上角 ✕ 小鈕：疊在每個欄位角上很吵，而且常壓到內容） */
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const t = e.target.closest('[data-ed]'); if (!t) return;
+      if (txtOf(t) !== '') return;
+      e.preventDefault();
+      return delAtom(t.dataset.ed);
+    }
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const el = e.target.closest('[data-ed]'); if (!el) return;
+    const hit = locAtom(el.dataset.ed); if (!hit) return;
+    const def = XD.ATOMS[hit.atom.t] || {};
+    if (!def.list && !def.multi) e.preventDefault();
+  });
+
+  /* 圖片欄位不是輸入框，按鍵進不了 #paper 的 keydown。
+     只對圖片開這條路：文字欄位一律要先清空，避免焦點不在畫布時誤刪。 */
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    const t = e.target;
+    if (t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    if (!SEL.atom) return;
+    const hit = locAtom(SEL.atom); if (!hit) return;
+    if (!(XD.ATOMS[hit.atom.t] || {}).photo) return;
+    e.preventDefault();
+    delAtom(SEL.atom);
+  });
+
+  /* ============ 結構操作 ============ */
+  function addSection(type) {
+    if (SDEFS[type].kv && PAGE.sections.some(s => SDEFS[s.type].kv)) return XD.toast('KV 只需要一個');
+    const sdef = SDEFS[type];
+    const sec = { iid: XD.uid('s'), type, title: sdef.title || sdef.nm, rows: [] };
+    /* full＝這一段原本的整塊（不含膠囊）。跟「整張表」讀同一份清單。 */
+    if (!sdef.kv) (sdef.full || []).forEach(pid =>
+      sec.rows.push.apply(sec.rows, makeRow(pid, (sdef.cols || ['1fr']).length, { title: sec.title })));
+    let idx = PAGE.sections.length;
+    if (sdef.kv) idx = 0;
+    PAGE.sections.splice(idx, 0, sec);
+    SEL = { sec: sec.iid, row: null, cell: null, atom: null, spk: null };
+    commit(); render();
+    XD.toast('已加入「' + sdef.nm + '」');
+  }
+  function makeRow(pid, nCol, ctx) {
+    const p = PRESETS[pid];
+    if (p.group) {
+      const gid = XD.uid('g');
+      return Array.from({ length: p.group }, (_, i) =>
+        ({ id: XD.uid(), preset: pid, gid, lead: i === 0 ? p.lead() : null, cells: p.sub() }));
+    }
+    return [{ id: XD.uid(), preset: pid, cells: p.cells(nCol, ctx) }];
+  }
+  function addRow(pid) {
+    const sec = secOf(SEL.sec); if (!sec) return XD.toast('先點一個區段');
+    if (SDEFS[sec.type].kv) return XD.toast('KV 不能加列');
+    const rows = makeRow(pid, nColOf(sec));
+    let at = sec.rows.length;
+    if (SEL.row) {
+      const r = sec.rows.find(x => x.id === SEL.row);
+      if (r) { const blk = blockOf(sec, r); at = sec.rows.indexOf(blk[blk.length - 1]) + 1; }
+    } else if (pid === 'x_pill') at = 0;   /* 標題放在一段的最後永遠不對 */
+    sec.rows.splice(at, 0, ...rows);
+    SEL.row = rows[0].id; SEL.cell = SEL.atom = null;
+    commit(); render();
+    XD.toast('已加入：' + PRESETS[pid].nm);
+  }
+  /* 「整張表」＝把這一段换回它原本的完整樣態。
+     不含膠囊——膠囊是獨立的一塊，要就自己加。
+     是「換成」不是「附加」，否則會跟新增區段自帶的那一列重複。 */
+  async function addFullTable() {
+    const sec = secOf(SEL.sec); if (!sec) return XD.toast('先點一段');
+    const sdef = SDEFS[sec.type];
+    if (sdef.kv) return XD.toast('KV 不能加列');
+    const pids = (sdef.full || []);
+    if (!pids.length) return;
+    const keep = sec.rows.filter(r => r.preset === 'x_pill');
+    const others = sec.rows.length - keep.length;
+    if (others && !await XD.confirm('這一段目前的 ' + others +
+        ' 列會被換掉（膠囊標題不動）。',
+        { title: '換成整張表？', ok: '換成整張', danger: 1 })) return;
+    const rows = pids.map(pid => makeRow(pid, nColOf(sec))).reduce((a, b) => a.concat(b), []);
+    sec.rows = keep.concat(rows);
+    SEL.row = rows[0].id; SEL.cell = SEL.atom = null;
+    commit(); render();
+    XD.toast('已銖好整張表（' + rows.length + ' 列）');
+  }
+
+  /* ---- 合併／拆開格 ----
+     一列有幾格以前只能靠「整列換容器」改，而換容器內容會重來。
+     這兩個直接改 cs，內容留著：併掉右邊那格時把它的欄位接過來，
+     不默默丟掉（同型別的第二個欄位在工單裡自動得到 id 後綴）。 */
+  function cellMerge(hit) {
+    const row = hit.row, cell = hit.cell;
+    if (row.lead || row.gid) return XD.toast('主題組（跨列）的格不能併，先換成一般列');
+    const ci = row.cells.indexOf(cell);
+    if (ci < 0 || cell.sub) return XD.toast('這一格不能併');
+    const nxt = row.cells[ci + 1];
+    if (!nxt) return XD.toast('右邊沒有格了');
+    if (nxt.sub) return XD.toast('右邊那格裡面切過欄，不能直接併');
+    cell.cs = (cell.cs || 1) + (nxt.cs || 1);
+    cell.atoms = (cell.atoms || []).concat(nxt.atoms || []);
+    row.cells.splice(ci + 1, 1);
+    delete cell._def;                       /* 還原點要重新蓋 */
+    SEL.atom = null;
+    commit(); render();
+    XD.toast('已併成一格（跨 ' + cell.cs + ' 欄）');
+  }
+  function cellSplit(hit) {
+    const row = hit.row, cell = hit.cell;
+    if (row.lead || row.gid) return XD.toast('主題組（跨列）的格不能拆');
+    const ci = row.cells.indexOf(cell);
+    if (ci < 0) return XD.toast('這一格不能拆');
+    if ((cell.cs || 1) < 2) return XD.toast('這一格只佔一欄，沒得拆');
+    cell.cs = (cell.cs || 1) - 1;
+    const t = (XD.QUICK_ADD[faceOfRow(row)] || [['text']])[0][0];
+    row.cells.splice(ci + 1, 0, { atoms: [XD.A(t)] });
+    delete cell._def;
+    SEL.atom = null;
+    commit(); render();
+    XD.toast('已拆出一格');
+  }
+
+  function rowAct(act, swapPid) {
+    const sec = secOf(SEL.sec); if (!sec || !SEL.row) return;
+    const r = sec.rows.find(x => x.id === SEL.row); if (!r) return;
+    const blk = blockOf(sec, r), first = sec.rows.indexOf(blk[0]);
+    if (act === 'rdel') { sec.rows = sec.rows.filter(x => blk.indexOf(x) < 0); SEL.row = null; }
+    else if (act === 'rdup') {
+      const copy = XD.clone(blk).map(x => Object.assign({}, x, { id: XD.uid() }));
+      const gid = r.gid ? XD.uid('g') : null;
+      if (gid) copy.forEach(x => { x.gid = gid; });
+      sec.rows.splice(first + blk.length, 0, ...copy);
+      SEL.row = copy[0].id;
+    } else if (act === 'swap' && swapPid) {
+      const rows = makeRow(swapPid, nColOf(sec));
+      sec.rows.splice(first, blk.length, ...rows);
+      SEL.row = rows[0].id;
+    } else if (act === 'badge') {
+      const on = r.badge != null ? !!r.badge : !!(PRESETS[r.preset] || {}).badge;
+      r.badge = !on;
+    } else {
+      const rest = sec.rows.filter(x => blk.indexOf(x) < 0);
+      const t = Math.max(0, Math.min(rest.length, first + (act === 'rdn' ? 1 : -1)));
+      rest.splice(t, 0, ...blk); sec.rows = rest;
+    }
+    SEL.cell = SEL.atom = null;
+    commit(); render();
+  }
+  async function secAct(act) {
+    const i = PAGE.sections.findIndex(s => s.iid === SEL.sec); if (i < 0) return;
+    if (act === 'sdel') {
+      if (!await XD.confirm('裡面的內容會一起消失，不能復原。',
+                            { title: '刪掉整個區段？', ok: '刪掉', danger: 1 })) return;
+      PAGE.sections.splice(i, 1);
+      SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+    } else {
+      const j = i + (act === 'sdn' ? 1 : -1);
+      if (j < 0 || j >= PAGE.sections.length) return;
+      if (SDEFS[PAGE.sections[i].type].kv || SDEFS[PAGE.sections[j].type].kv)
+        return XD.toast('KV 固定在最上面');
+      PAGE.sections.splice(j, 0, PAGE.sections.splice(i, 1)[0]);
+    }
+    commit(); render();
+  }
+  function delAtom(addr) {
+    const hit = locAtom(addr); if (!hit) return;
+    /* 刪到一格空掉是允許的——表格常常就是需要空白格（票種表頭左上角本來就空著）。
+       但「無框列」空掉會變成 0 高的隱形列，那種情況直接當「這一列不要了」。
+       舊版一律擋（「一格至少要留一個欄位」），配上鍵盤刪除會顯得像壞掉。 */
+    if (hit.arr.length <= 1 && (PRESETS[hit.row.preset] || {}).mode === 'plain') {
+      SEL.sec = hit.sec.iid; SEL.row = hit.row.id; SEL.cell = SEL.atom = null;
+      return rowAct('rdel');
+    }
+    hit.arr.splice(hit.ai, 1);
+    SEL.atom = null;
+    commit(); render();
+  }
+  function addAtomTo(cellAddr, role) {
+    const hit = locCell(cellAddr); if (!hit || !hit.arr) return;
+    const def = XD.ATOMS[role] || {};
+    hit.arr.push(def.list ? XD.BUL(role, 2)
+              : def.spk ? { t: 'speaker', brand: '品牌', name: '姓名' }
+              : def.photo ? { t: role, v: '' }
+              : { t: role, v: def.ph });
+    SEL.atom = [cellAddr, hit.arr.length - 1].join('|');
+    commit(); render();
+    XD.toast('已加入欄位：' + def.nm);
+  }
+  function setRole(atomType) {
+    const hit = locAtom(SEL.atom); if (!hit) return;
+    if (hit.atom.t === atomType) return;
+    XD.convertAtom(hit.atom, atomType);
+    commit(); render();
+    const r = XD.roleOf(atomType, faceOfRow(hit.row));
+    XD.toast('已改成：' + ((r && r.nm) || XD.ATOMS[atomType].nm));
+  }
+
+  /* ============ 圖片 ============ */
+  const fImg = document.createElement('input');
+  fImg.type = 'file'; fImg.accept = 'image/*'; fImg.style.display = 'none';
+  document.body.appendChild(fImg);
+  let imgTarget = null, imgIsKv = false;
+
+  /* 分階段各縮一半再到目標（單次 drawImage 倍率一大就糊，BN 第十一輪查過） */
+  function shrink(file, max) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const im = new Image();
+        im.onload = () => {
+          let w = im.naturalWidth, h = im.naturalHeight;
+          const sc = Math.min(1, max / Math.max(w, h));
+          let cw = w, ch = h, src = im;
+          while (Math.max(cw, ch) > max * 2) {
+            const c = document.createElement('canvas');
+            c.width = Math.round(cw / 2); c.height = Math.round(ch / 2);
+            const cx = c.getContext('2d');
+            cx.imageSmoothingQuality = 'high';
+            cx.drawImage(src, 0, 0, c.width, c.height);
+            src = c; cw = c.width; ch = c.height;
+          }
+          const out = document.createElement('canvas');
+          out.width = Math.max(1, Math.round(w * sc)); out.height = Math.max(1, Math.round(h * sc));
+          const ox = out.getContext('2d');
+          ox.imageSmoothingQuality = 'high';
+          ox.drawImage(src, 0, 0, out.width, out.height);
+          resolve(out.toDataURL(/\.png$/i.test(file.name) ? 'image/png' : 'image/jpeg', 0.9));
+        };
+        im.onerror = reject;
+        im.src = fr.result;
+      };
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  }
+  function pickImage(addr) { imgTarget = addr; imgIsKv = false; fImg.click(); }
+  function pickKv() { imgTarget = null; imgIsKv = true; fImg.click(); }
+  fImg.onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      if (imgIsKv) {
+        const sec = secOf(SEL.sec); if (!sec) return;
+        const id = XD.uid('img');
+        XD.IMAGES[id] = await shrink(f, PHOTO_MAX);
+        sec.kvImgId = id; delete sec.kvImg;
+        commit(); render(); XD.toast('KV 圖已放入');
+        return;
+      }
+      const hit = locAtom(imgTarget); if (!hit) return;
+      const def = XD.ATOMS[hit.atom.t] || {};
+      const id = XD.uid('img');
+      XD.IMAGES[id] = await shrink(f, def.av === 'icon' ? ICON_MAX : PHOTO_MAX);
+      hit.atom.imgId = id;
+      hit.atom.v = f.name;
+      delete hit.atom.img;
+      delete hit.atom.tf;   /* 換照片＝重新從剛好填滿的位置開始，舊照片調過的位移對新照片沒意義 */
+      commit(); render(); XD.toast('已放入：' + f.name);
+    } catch (err) { console.error(err); XD.toast('讀圖失敗：' + (err.message || err)); }
+  };
+
+  /* ============ 右欄按鈕 ============ */
+  $('#inspBody').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.role) {                       /* 樣式列表：值是角色 id，不是 atom 型別 */
+      const r = XD.ROLES.find(x => x.id === b.dataset.role);
+      return r && setRole(r.set);
+    }
+    if (b.dataset.style) return setRole(b.dataset.style);   /* 符號／框型：直接指定 atom 型別 */
+    if (b.dataset.addrole) return addAtomTo(SEL.cell, b.dataset.addrole);
+    if (b.dataset.swap) return rowAct('swap', b.dataset.swap);
+    const act = b.dataset.act;
+    if (!act) return;
+    if (act === 'more' || act === 'less') { showMore = (act === 'more'); return paintInsp(); }
+    if (act === 'rup' || act === 'rdn' || act === 'rdel' || act === 'rdup' || act === 'badge') return rowAct(act);
+    if (act === 'sup' || act === 'sdn' || act === 'sdel') return secAct(act);
+    if (act === 'delatom') return delAtom(SEL.atom);
+    const hitA = SEL.atom && locAtom(SEL.atom);
+    const hitC = SEL.cell && locCell(SEL.cell);
+    if (act === 'cmerge' && hitC) return cellMerge(hitC);
+    if (act === 'csplit' && hitC) return cellSplit(hitC);
+    if (act === 'bul+' && hitA) { hitA.atom.items.push(XD.ATOMS[hitA.atom.t].ph); commit(); render(); }
+    if (act === 'bul-' && hitA && hitA.atom.items.length > 1) { hitA.atom.items.pop(); commit(); render(); }
+    if (act === 'img') return pickImage(SEL.atom);
+    if (act === 'imgx' && hitA) { delete hitA.atom.imgId; delete hitA.atom.img; delete hitA.atom.tf; commit(); render(); }
+    if (act === 'pzreset' && hitA) { delete hitA.atom.tf; commit(); render(); }
+    if (act === 'ctr' && hitC) { hitC.cell.ctr = hitC.cell.ctr ? 0 : 1; commit(); render(); }
+    if (act === 'lab' && hitC) { hitC.cell.lab = hitC.cell.lab ? 0 : 1; commit(); render(); }
+    if ((act === 'sub+' || act === 'sub-') && hitC && hitC.cell.sub) {
+      const c = hitC.cell;
+      if (act === 'sub+') { c.sub.push({ atoms: [XD.A('text')] }); c.subNames = null; }
+      else if (c.sub.length > 2) { c.sub.pop(); c.subNames = null; }
+      c.subCols = c.sub.map(() => '1fr').join(' ');
+      commit(); render();
+    }
+  };
+
+  /* ============ 頂列 ============ */
+  function paintAdv() {
+    const b = $('#btnAdv');
+    b.classList.toggle('on', ADV);
+    b.textContent = (ADV ? '✓ ' : '⚙ ') + '進階';
+  }
+  $('#btnAdv').onclick = () => {
+    ADV = !ADV; XD.store.set('ms_live_adv', ADV);
+    paintAdv(); paintPane(); paintInsp();
+    XD.toast(ADV ? '進階：可以自己拼容器、改格的切分'
+                 : '進階已關（蝗大端看到的樣子）');
+  };
+  paintAdv();
+  $('#btnUndo').onclick = () => { if (H.undo()) { restore(); paintUndo(); } };
+  $('#btnRedo').onclick = () => { if (H.redo()) { restore(); paintUndo(); } };
+  $('#btnDemo').onclick = async () => {
+    if (PAGE.sections.length && !await XD.confirm('目前畫布上的內容會被蓋掉。',
+        { title: '換成範例整頁？', ok: '換成範例', danger: 1 })) return;
+    PAGE.sections = PACK.templateDefault();
+    SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+    commit(); render(); XD.toast('已載入範例整頁（假字，直接改就好）');
+  };
+  $('#btnClear').onclick = async () => {
+    if (!PAGE.sections.length) return XD.toast('頁面已經是空的');
+    /* 這裡有 undo，所以問句照問，但把「清掉還救得回來」講出來 */
+    if (!await XD.confirm('所有區段都會被移掉。清掉之後還可以用 ↶ 復原。',
+        { title: '清空整個頁面？', ok: '清空', danger: 1 })) return;
+    PAGE.sections = [];
+    SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+    commit(); render(); XD.toast('已清空（可用 ↶ 復原）');
+  };
+
+  /* 匯出一律離屏重畫一份 editable:false 的乾淨版本，
+     不動使用者正在編輯的畫面（承 ms-editor downloadPackage 的做法）。 */
+  function sectionNode(sec) {
+    const sdef = SDEFS[sec.type];
+    const el = document.createElement('div');
+    el.className = 'sec' + (sdef.kv ? ' kv' : '');
+    el.style.width = '1200px';
+    el.innerHTML = XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: false });
+    el.querySelectorAll('.kvdel, .kvph').forEach(n => n.remove());
+    return el;
+  }
+  const pageBg = () => getComputedStyle(document.documentElement)
+    .getPropertyValue('--c-page').trim() || '#2358E6';
+
+  async function withBtn(btn, fn) {
+    const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '處理中…';
+    try { await fn(); }
+    catch (err) { console.error(err); XD.toast('失敗：' + (err && err.message ? err.message : err)); }
+    finally { btn.disabled = false; btn.textContent = old; }
+  }
+
+  $('#btnPng').onclick = () => withBtn($('#btnPng'), async () => {
+    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
+    await XD.withOffscreen(async c => {
+      const wrap = document.createElement('div');
+      wrap.className = 'paper export';
+      PAGE.sections.forEach(sec => wrap.appendChild(sectionNode(sec)));
+      c.appendChild(wrap);
+      const r = await XD.exportPng(wrap, 'MS活動頁_' + new Date().toISOString().slice(0, 10) + '.png',
+        { width: 1200, height: wrap.offsetHeight, background: pageBg() });
+      XD.toast('已匯出 PNG（1200 × ' + r.height + '）');
+      window.__lastPng = r;
+    });
+  });
+
+  $('#btnZip').onclick = () => withBtn($('#btnZip'), async () => {
+    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
+    const items = await XD.withOffscreen(async c => {
+      const wrap = document.createElement('div');
+      wrap.className = 'paper export';
+      c.appendChild(wrap);
+      const out = []; let edm = 0;
+      for (const sec of PAGE.sections) {
+        const el = sectionNode(sec);
+        wrap.appendChild(el);
+        const nm = SDEFS[sec.type].kv ? 'KV' : 'EDM' + (++edm);
+        const r = await XD.captureNode(el, { type: 'jpeg', quality: .92, background: pageBg() });
+        out.push({ name: nm + '.jpg', dataUrl: r.dataUrl });
+        wrap.removeChild(el);
+      }
+      return out;
+    });
+    await XD.zipAndDownload(items, projectJson(), 'project.json',
+      'MS_' + new Date().toISOString().slice(0, 10) + '.zip');
+    XD.toast('已下載 ' + items.length + ' 張圖＋專案檔');
+    window.__lastZip = items.map(i => i.name);
+  });
+
+  $('#btnXlsx').onclick = () => withBtn($('#btnXlsx'), async () => {
+    const r = await XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS);
+    XD.download(r.blob, r.filename);
+    XD.toast('已產出工單（給人審／留底用，不用再匯回）：' + r.fields + ' 個欄位');
+    window.__lastXlsx = r;
+  });
+
+  /* ============ 專案存讀 ============ */
+  function projectJson() {
+    /* 匯出時把圖片攤回檔案裡，換一台電腦打開才看得到 */
+    return { v: 1, tool: 'ms-live', savedAt: new Date().toISOString(),
+             sections: PAGE.sections, images: XD.IMAGES };
+  }
+  $('#btnSaveProj').onclick = () => {
+    const blob = new Blob([JSON.stringify(projectJson(), null, 2)], { type: 'application/json' });
+    XD.download(blob, 'MS專案_' + new Date().toISOString().slice(0, 10) + '.json');
+    XD.toast('已存下專案檔');
+  };
+  $('#fProj').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (!j || !Array.isArray(j.sections)) throw new Error('這不是 MS 專案檔');
+      PAGE = { sections: j.sections };
+      if (j.images) Object.keys(j.images).forEach(k => { XD.IMAGES[k] = j.images[k]; });
+      SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+      H = XD.createHistory(PAGE); paintUndo();
+      render(); XD.toast('已開啟專案：' + f.name);
+    } catch (err) { console.error(err); XD.toast('開啟失敗：' + (err.message || err)); }
+  };
+
+  /* ============ 暫存 ============
+     版面／文字（小）一定存得下；圖片（大）另外一支 key 盡力而為，
+     存不下就只提醒一次，不讓它擋掉正常的自動暫存。 */
+  const save = XD.debounce(() => {
+    try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections })); }
+    catch (err) { return; }
+    try { localStorage.setItem('xd_' + KEY_IMG, JSON.stringify(XD.IMAGES)); }
+    catch (err) {
+      try { localStorage.removeItem('xd_' + KEY_IMG); } catch (e2) {}
+      if (!imgWarned) {
+        imgWarned = true;
+        XD.toast('圖片太多存不進瀏覽器暫存，記得用「💾 存專案」留一份');
+      }
+    }
+  }, 400);
+
+  /* ============ 開機 ============ */
+  (function boot() {
+    const saved = XD.store.get(KEY);
+    const savedImg = XD.store.get(KEY_IMG);
+    if (savedImg) Object.keys(savedImg).forEach(k => { XD.IMAGES[k] = savedImg[k]; });
+    /* 存過就照存的來——包含「上次自己按了清空」留下的空頁；
+       只有真的第一次開（完全沒有這支 key）才給範例整頁。 */
+    if (saved && saved.sections) {
+      PAGE = { sections: saved.sections };
+      if (saved.sections.length) XD.toast('已還原上次的內容');
+    } else {
+      PAGE = { sections: PACK.templateDefault() };
+    }
+    H = XD.createHistory(PAGE);
+    XD.bindUndoKeys(H, ok => { if (ok) restore(); });
+    paintUndo();
+    render();
+  })();
+
+  window.__api = {
+    get PAGE() { return PAGE; },
+    get SEL() { return SEL; },
+    get H() { return H; },
+    secOf, locAtom, locCell, render, addSection, addRow, rowAct, secAct,
+    addAtomTo, setRole, delAtom,
+    select: s => { Object.assign(SEL, s); markSel(); paintPane(); paintInsp(); },
+    setTab: t => { TAB = t; paintPane(); },
+    projectJson,
+    loadTemplate: () => { PAGE.sections = PACK.templateDefault(); commit(); render(); },
+    clearAll: () => { PAGE.sections = []; commit(); render(); },
+  };
+})();
+</script>
+<!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
+     會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
+     body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
+     結束標籤時它就會挑 svg 的，把一整段 HTML 插進 JS 字串中間 -> SyntaxError
+     -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
+     註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
+</body>

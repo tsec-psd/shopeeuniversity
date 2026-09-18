@@ -1,0 +1,11 @@
+# Excel 開檔時產生的鎖定檔
+~$*.xlsx
+~$*.xls
+
+# 產出物／暫存（架構圖的來源是 ARCHITECTURE.md，圖檔不進版控）
+output/
+
+# 系統垃圾
+Thumbs.db
+desktop.ini
+.DS_Store

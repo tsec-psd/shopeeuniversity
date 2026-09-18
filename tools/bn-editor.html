@@ -178,17 +178,27 @@
    由上而下＝從最上層排到最底層，跟 PS 的圖層面板一致（state 的 photoOrder
    第一個是最底下，所以畫的時候要反過來）。點一列＝選取那一位（共編器與畫布
    都跟著切），● 是顯示/不顯示，↑ 是往上疊一層。 */
-.ph-layers{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
-.ph-lay{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:var(--ui-rf);
-        border:1px solid var(--ui-line2);background:var(--ui-surface);cursor:pointer}
-.ph-lay:hover{background:var(--ui-surface2)}
-.ph-lay.on{border-color:var(--ui-accent);background:#37302E}
-.ph-lay .th{width:26px;height:26px;flex:none;border-radius:4px;object-fit:contain;
-        background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/8px 8px}
-.ph-lay .nm{flex:1;min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ph-lay .tag{font-size:9px;color:var(--ui-dim2);flex:none}
-.ph-lay button{width:22px;height:22px;padding:0;justify-content:center;flex:none;font-size:11px}
-.ph-lay.off .th,.ph-lay.off .nm{opacity:.4}
+.ph-layers{display:flex;flex-direction:column;gap:6px}
+.ph-card{padding:5px;border:1px solid var(--ui-line2);border-radius:var(--ui-rf);
+         background:var(--ui-surface);cursor:pointer}
+.ph-card:hover{background:var(--ui-surface2)}
+.ph-card.on{border-color:var(--ui-accent);background:#37302E}
+.ph-card-head{display:flex;align-items:center;gap:6px;min-height:30px}
+.ph-card .th{width:30px;height:30px;flex:none;border-radius:4px;object-fit:contain;
+             background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/8px 8px}
+.ph-card .nm{flex:1;min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-card .tag{font-size:11px;color:var(--ui-dim2);flex:none}
+.ph-card button{height:28px;padding:0 5px;justify-content:center;flex:none;font-size:11px}
+.ph-card-head button{width:28px;padding:0}
+.ph-card button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;
+                    stroke-linecap:round;stroke-linejoin:round}
+.ph-card.off .th,.ph-card.off .nm{opacity:.4}
+.ph-card-acts{display:flex;gap:4px;margin-top:4px}
+.ph-card-acts button[data-photo-act="edit"]{flex:1}
+.ph-sub{font-size:11px;font-weight:700;color:var(--ui-dim);margin-bottom:5px}
+.ph-add-area{border-top:1px solid var(--ui-line);margin-top:12px;padding-top:8px}
+.ph-add-area button{width:100%;justify-content:center;border-style:dashed;background:transparent}
+.ph-add-area button:disabled{opacity:.7}
 
 /* ---------- 右欄：廠商 LOGO 縮圖＋編輯 ---------- */
 .vp-row{display:flex;gap:8px;margin-top:8px}
@@ -323,10 +333,11 @@
 .right-panel input:not([type=file]):not([type=checkbox]),.right-panel select{min-height:28px;min-width:28px}
 .right-panel .vtab{height:32px;font-size:13px}
 .right-panel .photo-adjust-zoom button{width:30px;height:30px;font-size:15px}
-.right-panel .ph-lay button{width:28px;height:28px;font-size:11px}
+.right-panel .ph-card button{height:28px;font-size:11px}
+.right-panel .ph-card-head button{width:28px}
 .right-panel .vp-item button{height:28px;font-size:11px}
 .right-panel .thumb{height:auto;padding:4px 3px}
-.right-panel .thumb .nm,.right-panel .ph-lay .tag,.right-panel .cc,
+.right-panel .thumb .nm,.right-panel .ph-card .tag,.right-panel .cc,
 .right-panel .mini,.right-panel .photo-adjust-hint{font-size:11px!important}
 .right-panel #themeRow{grid-template-columns:repeat(3,minmax(0,1fr));max-height:300px}
 .right-panel #themeRow .thumb{padding-left:1px;padding-right:1px}
@@ -444,12 +455,15 @@
 
           </div>
           <div id="panePhoto" style="display:none">
-            <div class="ph-layers" id="phLayers" style="display:none"></div>
-            <label class="btn" style="width:100%;justify-content:center">🖼 上傳照片<span id="fPhotoWho"></span><input type="file" id="fPhoto" accept="image/*"></label>
-            <button id="btnEditPhoto" style="width:100%;justify-content:center;margin-top:6px">✎ 去背／裁切編輯</button>
-            <button id="btnClearPhoto" style="width:100%;justify-content:center;margin-top:6px">清除這張照片</button>
-            <button id="btnAddPerson2" style="width:100%;justify-content:center;margin-top:10px">+ 新增人物2（左右並排）</button>
-
+            <div class="ph-sub" id="phUploadedCount">已上傳（0/2）</div>
+            <div class="ph-layers" id="phLayers"></div>
+            <div class="ph-add-area">
+              <div class="ph-sub">新增</div>
+              <button type="button" id="btnPhotoAdd">＋ 上傳人物1照片</button>
+              <div class="mini hint" id="phAddHint" hidden>要換照片請用上面的「替換」</div>
+            </div>
+            <input type="file" id="fPhoto" accept="image/*" hidden>
+            <input type="file" id="fPhotoReplace" accept="image/*" hidden>
           </div>
           <label class="fl" id="pvBoardRow" style="display:none;margin:6px 0 0">
             <span class="mini hint">共編預覽版位</span>
@@ -620,7 +634,7 @@
     return p.photo ? [p.photo] : [];
   }
   /* 這個定位版最多幾個人物框＝右欄要開幾個人物槽。
-     公版資料本身只有一個「雙人人物框」，但使用者可以按「+ 新增人物2」手動多開一槽——
+     公版資料本身只有一個「雙人人物框」，但上傳第二張照片會自動多開一槽——
      那一槽的框不是公版量出來的，是程式把公版那個框即時拆成左右兩塊（見 twoPersonActive／
      splitDuoFrame），所以槽數要看 state.photos 的長度，不能只看公版資料。上限鎖在 2
      （2026-09-17 使用者指定的規則只講了兩人：人物1左／人物2右）。 */
@@ -1803,7 +1817,7 @@
     const arr = (st.photos || []).slice();
     hits.forEach(h => {
       while (arr.length <= h.i) arr.push(Object.assign({}, EMPTY_PHOTO));
-      arr[h.i] = Object.assign({}, EMPTY_PHOTO, { url: h.url });
+      arr[h.i] = Object.assign({}, EMPTY_PHOTO, { url: h.url, ownUrl: h.url });
     });
     return arr;
   }
@@ -1962,61 +1976,66 @@
      解析度統一走 PHOTO_MAX（1800，見上方常數說明），不論是這裡直接選檔、還是從素材包
      依工單檔名比對進來的都一樣——後者以前沿用 LOGO 的 300px 縮圖，是「超糊」的主因。
      長邊沒超過 1800 的原圖會原封不動保留（downscaleToDataURL 不重新編碼）。 */
-  $('#fPhoto').onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    const st = S(), i = activeSlot(st);
-    try {
-      const url = await downscaleToDataURL(f, PHOTO_MAX);
-      view.frameMode = 'photo';
-      setPhotoAt(st, i, Object.assign({ url: url, ownUrl: url }, PHOTO_T_RESET));
-      XD.toast('已上傳' + photoSlotName(st, i));
-    } catch (err) { console.error(err); XD.toast('照片讀取失敗：' + err.message); }
-    e.target.value = '';
-  };
-  /* 「清除這張照片」只清「自己上傳的照片」（ownUrl）——不是清掉目前框裡不管是什麼的
-     那個 url。這顆鈕在「人物照片」分頁裡，按下去的意圖永遠是「不要我上傳的這張」，
-     跟目前是不是正顯示著圖素無關（見下面 disabled 的判斷同一個理由）。 */
-  $('#btnClearPhoto').onclick = () => {
-    const st = S(), i = activeSlot(st);
-    setPhotoAt(st, i, Object.assign({ url: '', ownUrl: '' }, PHOTO_T_RESET));
-    XD.toast('已清除' + photoSlotName(st, i));
-  };
-  /* + 新增人物2／− 移除人物2：唯一決定「要不要開第二個人物槽」的地方（見
-     photoSlotCount 讀 state.photos.length）。新增時明講 photoOrder=[1,0]——
-     使用者規則②「人物1的圖層在人物2上面」，若讓 photoOrderFor() 的預設遞補
-     （ascending）決定，結果會是人物2在上面，跟規則相反，所以這裡要明寫。 */
-  function hasPerson2(st) { return (st.photos || []).length > 1; }
-  function paintPersonToggle() {
-    const b = $('#btnAddPerson2'); if (!b) return;
-    b.textContent = hasPerson2(S()) ? '− 移除人物2（改回單人）' : '+ 新增人物2（左右並排）';
+  function firstEmptyPhotoSlot(st) {
+    const arr = (st.photos || []).slice(0, 2);
+    const empty = arr.findIndex(p => !(p && p.ownUrl));
+    return empty >= 0 ? empty : (arr.length < 2 ? arr.length : -1);
   }
-  $('#btnAddPerson2').onclick = () => {
-    const st = S();
-    if (hasPerson2(st)) {
-      const arr = (st.photos || []).slice(0, 1);
-      H.set(Object.assign({}, st, { photos: arr, photoOrder: [] }), {});
-      if (view.slot > 0) view.slot = 0;
-      XD.toast('已移除人物2，改回單人版面（可用 Ctrl+Z 復原）');
-    } else {
-      const arr = (st.photos || []).slice();
-      while (arr.length < 2) arr.push(Object.assign({}, EMPTY_PHOTO));
-      H.set(Object.assign({}, st, { photos: arr, photoOrder: [1, 0] }), {});
-      view.slot = 1;
-      XD.toast('已新增人物2——兩邊都上傳照片後會自動左右並排（重疊約 8%，人物1在上層）');
-    }
+  function hasPerson2(st) { return (st.photos || []).length > 1; }
+  $('#btnPhotoAdd').onclick = () => {
+    if (firstEmptyPhotoSlot(S()) < 0) return;
+    $('#fPhoto').click();
   };
-  $('#btnEditPhoto').onclick = () => {
-    const st = S(), i = activeSlot(st), src = photoUrl(st, i);
-    if (!src) return;
-    /* 圖素是相對路徑，編輯器要的是能直接餵給 <img> 的 src；編出來的一律是 dataURL，
-       所以編過的圖素就變成「自己的照片」，不再跟著 photo-assets.js 走。 */
-    window.LogoEditor.open(photoSrc(src), dataUrl => {
-      /* 編過的圖（不管原本是圖素還是照片）從此變成「自己的照片」，
-         記進 ownUrl——之後誤按圖素縮圖也能靠切分頁救回這次編輯結果。 */
+  $('#fPhoto').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const url = await downscaleToDataURL(file, PHOTO_MAX);
+      const st = S(), i = firstEmptyPhotoSlot(st);
+      if (i < 0) return;
+      const photos = (st.photos || []).slice();
+      while (photos.length <= i) photos.push(Object.assign({}, EMPTY_PHOTO));
+      photos[i] = Object.assign({}, photos[i], { url, ownUrl: url }, PHOTO_T_RESET);
+      view.frameMode = 'photo'; view.slot = i;
+      H.set(Object.assign({}, st, { photos,
+        photoOrder: i === 1 ? [1, 0] : st.photoOrder }), {});
+      XD.toast('已上傳' + photoSlotName(S(), i));
+    } catch (err) { console.error(err); XD.toast('照片讀取失敗：' + err.message); }
+    finally { e.target.value = ''; }
+  };
+  $('#fPhotoReplace').onchange = async e => {
+    const file = e.target.files[0], i = +e.target.dataset.slot;
+    if (!file) return;
+    try {
+      const url = await downscaleToDataURL(file, PHOTO_MAX);
+      const st = S();
+      if (!photoAt(st, i) || !photoAt(st, i).ownUrl) return;
+      view.slot = i;
+      setPhotoAt(st, i, Object.assign({ url, ownUrl: url }, PHOTO_T_RESET));
+      XD.toast('已替換' + photoSlotName(S(), i));
+    } catch (err) { console.error(err); XD.toast('照片讀取失敗：' + err.message); }
+    finally { e.target.value = ''; }
+  };
+  function removePhoto(i) {
+    const st = S(), arr = (st.photos || []).slice();
+    if (!arr[i] || !arr[i].ownUrl) return;
+    if (arr.length > 1) {
+      arr.splice(i, 1);
+    } else {
+      arr[0] = Object.assign({}, arr[0], { url: '', ownUrl: '' }, PHOTO_T_RESET);
+    }
+    view.slot = 0;
+    if (view.selBoard) view.selIdx = 0;
+    H.set(Object.assign({}, st, { photos: arr, photoOrder: [] }), {});
+  }
+  function editPhoto(i) {
+    const st = S(), ph = photoAt(st, i);
+    if (!ph || !ph.ownUrl) return;
+    window.LogoEditor.open(photoSrc(ph.ownUrl), dataUrl => {
+      view.slot = i;
       setPhotoAt(S(), i, { url: dataUrl, ownUrl: dataUrl });
       XD.toast('已更新' + photoSlotName(S(), i));
     }, err => { console.error(err); XD.toast('開啟編輯器失敗：' + err.message); });
-  };
+  }
   /* ---- 圖素縮圖列：點一下就套進人物框 ---- */
   function paintStock() {
     const row = $('#stockRow'); if (!row) return;
@@ -2082,33 +2101,55 @@
     setPhotoAt(st, i, Object.assign({ url: stockUrl(it), stockId: it.id }, PHOTO_T_RESET));
     XD.toast('已套用' + it.name);
   };
+  const PHOTO_ICON = {
+    eye: '<svg class="ph-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg class="ph-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M9.9 5.2A11.5 11.5 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3 3.6M6.1 6.1C3.4 8 2 12 2 12s3.6 7 10 7c1.4 0 2.8-.3 4-.8"/><path d="M10 10a3 3 0 0 0 4 4"/></svg>',
+  };
   function paintPhotoLayers() {
-    const st = S(), n = photoSlotCount(st), row = $('#phLayers');
-    row.style.display = n > 1 ? '' : 'none';
-    $('#fPhotoWho').textContent = n > 1 ? '（' + photoSlotName(st, activeSlot(st)) + '）' : '';
-    if (n <= 1) { row.innerHTML = ''; return; }
-    const order = photoOrderFor(st).filter(i => i < n);
-    const cur = activeSlot(st);
+    const st = S(), row = $('#phLayers');
+    const uploaded = (st.photos || []).filter(ph => ph && ph.ownUrl).length;
+    $('#phUploadedCount').textContent = '已上傳（' + uploaded + '/2）';
+    const add = $('#btnPhotoAdd'), target = firstEmptyPhotoSlot(st);
+    add.disabled = target < 0;
+    add.textContent = target < 0 ? '已有兩位人物'
+      : '＋ 上傳人物' + (target + 1) + '照片' + (target === 1 ? '（左右並排）' : '');
+    $('#phAddHint').hidden = target >= 0;
+    const order = photoOrderFor(st).filter(i => i < 2 && photoAt(st, i) && photoAt(st, i).ownUrl);
+    const cur = activeSlot(st), two = uploaded > 1;
     let h = '';
-    /* 由上而下顯示最上層 → 最底層（PS 慣例），所以把 order 反過來走 */
+    /* 由上而下顯示最上層 → 最底層（photoOrder 第一個在底層）。 */
     order.slice().reverse().forEach((i, k) => {
-      const ph = photoAt(st, i), url = (ph && ph.url) || '', off = !!(ph && ph.hidden);
-      h += '<div class="ph-lay' + (i === cur ? ' on' : '') + (off ? ' off' : '') +
-           '" data-slot="' + i + '">' +
-           (url ? '<img class="th" src="' + photoSrc(url) + '" alt="">' : '<span class="th"></span>') +
-           '<span class="nm">人物' + (i + 1) + (url ? '' : '（未上傳）') + '</span>' +
-           '<span class="tag">' + (k === 0 ? '最上層' : '') + '</span>' +
+      const ph = photoAt(st, i), off = !!ph.hidden;
+      h += '<div class="ph-card' + (i === cur ? ' on' : '') + (off ? ' off' : '') +
+           '" data-slot="' + i + '"><div class="ph-card-head">' +
+           '<img class="th" src="' + esc(photoSrc(ph.ownUrl)) + '" alt="">' +
+           '<span class="nm">人物' + (i + 1) + '</span>' +
+           (two && k === 0 ? '<span class="tag">最上層</span>' : '') +
            '<button type="button" data-lay="hide" title="' +
-             (off ? '改成顯示' : '不顯示（畫面與匯出都不畫）') + '">' + (off ? '○' : '●') + '</button>' +
-           '<button type="button" data-lay="up" title="往上疊一層"' +
-             (k === 0 ? ' disabled' : '') + '>↑</button>' +
-           '</div>';
+             (off ? '改成顯示' : '不顯示（畫面與匯出都不畫）') + '">' +
+             (off ? PHOTO_ICON.eyeOff : PHOTO_ICON.eye) + '</button>' +
+           (two ? '<button type="button" data-lay="up" title="往上疊一層"' +
+             (k === 0 ? ' disabled' : '') + '>↑</button>' : '') +
+           '</div><div class="ph-card-acts">' +
+           '<button type="button" data-photo-act="replace">替換</button>' +
+           '<button type="button" data-photo-act="edit">✎ 去背／裁切</button>' +
+           '<button type="button" data-photo-act="remove" title="移除人物' + (i + 1) + '">🗑</button>' +
+           '</div></div>';
     });
     row.innerHTML = h;
   }
   $('#phLayers').onclick = e => {
     const rowEl = e.target.closest('[data-slot]'); if (!rowEl) return;
-    const i = +rowEl.dataset.slot, btn = e.target.closest('[data-lay]');
+    const i = +rowEl.dataset.slot, act = e.target.closest('[data-photo-act]');
+    if (act) {
+      if (act.dataset.photoAct === 'replace') {
+        $('#fPhotoReplace').dataset.slot = String(i);
+        $('#fPhotoReplace').click();
+      } else if (act.dataset.photoAct === 'edit') editPhoto(i);
+      else if (act.dataset.photoAct === 'remove') removePhoto(i);
+      return;
+    }
+    const btn = e.target.closest('[data-lay]');
     if (btn && btn.dataset.lay === 'hide') {
       setPhotoAt(S(), i, { hidden: !photoHidden(S(), i) });
       return;
@@ -2351,7 +2392,7 @@
   /* 每個槽的 url 各記一份，換槽/換圖才重新量長寬比（量測是 async，不要每次重畫都跑） */
   const LAST_PHOTO_URL = [];
   function paintPhotoAdjust() {
-    const st = S(), i = activeSlot(st), url = photoUrl(st, i), ph = photoAt(st, i);
+    const st = S(), i = activeSlot(st), url = photoUrl(st, i);
     /* 所有槽的長寬比都要維持最新：畫布上兩張同時在畫，不能只量正在編的那一張 */
     const n = photoSlotCount(st);
     for (let k = 0; k < Math.max(n, (st.photos || []).length); k++) {
@@ -2362,11 +2403,7 @@
        但下面那排按鈕作用在「目前選取的那一位」，所以按鈕跟著 url 決定 disabled。 */
     const shown = anyPhoto(st);
     $('#photoAdjustWrap').style.display = shown ? '' : 'none';
-    $('#btnEditPhoto').disabled = !url;
     $('#btnPhotoApplyAll').disabled = !url;
-    /* 只看 ownUrl（自己上傳的那張），不是「目前框裡不管顯示什麼」——
-       避免使用者在「人物照片」分頁按下去，實際清掉的卻是圖素。 */
-    $('#btnClearPhoto').disabled = !(ph && ph.ownUrl);
     paintPvBoard();
     if (!shown) { $('#photoAdjust').innerHTML = ''; $('#photoAdjustOv').innerHTML = '';
                   paintPhotoScope(); return; }
@@ -3041,7 +3078,7 @@
   H.subscribe(() => {
     paintList(); renderAny(); syncInputs(); paintHistoryBtns();
     paintThemeGrid(); paintVendorCount(); paintVendorPreview();
-    paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust(); paintPersonToggle(); save();
+    paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust(); save();
   });
   function paintHistoryBtns() {
     $('#btnUndo').disabled = !H.canUndo();
@@ -3067,7 +3104,7 @@
 
   /* ============ 開機（預設總覽，仔細檢查才切畫布） ============ */
   paintList(); syncInputs(); paintHistoryBtns(); paintThemeGrid(); paintVendorCount(); paintVendorPreview();
-  paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust(); paintPersonToggle();
+  paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust();
   setMode('overview');
 
   /* 三支字型檔各 18MB，tokens.css 是 font-display:swap——在下載完成前瀏覽器會先用

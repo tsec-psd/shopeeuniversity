@@ -318,6 +318,28 @@
    所以外殼要自己撐出縮小後的尺寸，並把溢出的部分裁掉。 */
 .ovthumb{position:relative;overflow:hidden;border-radius:6px;flex:none}
 .ovthumb > .cv{position:absolute;left:0;top:0;transform-origin:0 0}
+/* 右欄操作尺寸；頂列與其他工具維持共用樣式。 */
+.right-panel button,.right-panel label.btn{height:36px;font-size:13px;min-width:28px}
+.right-panel input:not([type=file]):not([type=checkbox]),.right-panel select{min-height:28px;min-width:28px}
+.right-panel .vtab{height:32px;font-size:13px}
+.right-panel .photo-adjust-zoom button{width:30px;height:30px;font-size:15px}
+.right-panel .ph-lay button{width:28px;height:28px;font-size:11px}
+.right-panel .vp-item button{height:28px;font-size:11px}
+.right-panel .thumb{height:auto;padding:4px 3px}
+.right-panel .thumb .nm,.right-panel .ph-lay .tag,.right-panel .cc,
+.right-panel .mini,.right-panel .photo-adjust-hint{font-size:11px!important}
+.right-panel #themeRow{grid-template-columns:repeat(3,minmax(0,1fr));max-height:300px}
+.right-panel #themeRow .thumb{padding-left:1px;padding-right:1px}
+.right-panel #stockRow .th{height:52px}
+.right-panel #chkLive{width:18px;height:18px;flex:none;margin:0}
+.right-panel label:has(#chkLive){min-height:28px}
+/* 放大控制項後壓縮垂直留白；分組與操作尺寸不變。 */
+.right-panel .field{margin-bottom:4px}
+.right-panel .field:last-child{margin-bottom:0}
+.right-panel .sg-label{padding:8px 16px 6px}
+.right-panel .sg-body{padding-bottom:2px}
+#btnClearAll.danger{background:#C4362B;border-color:#C4362B;color:#fff}
+#btnClearAll.danger:hover{background:#A82D25;border-color:#A82D25}
 </style>
 
 <header>
@@ -331,7 +353,9 @@
   <label class="btn">📦 上傳素材包<input type="file" id="fAssets" webkitdirectory multiple></label>
   <button id="btnUndo" title="復原 (Ctrl+Z)">↶</button>
   <button id="btnRedo" title="重做 (Ctrl+Shift+Z)">↷</button>
+  <a class="btn" href="../BN編輯器使用說明.html" target="_blank" rel="noopener">? 說明</a>
   <span class="spacer"></span>
+  <button class="danger" id="btnClearAll">全部清除</button>
   <button class="primary" id="btnDownload">⬇ 下載整包</button>
   <span class="hint" id="src"></span>
 </header>
@@ -370,11 +394,11 @@
           </div>
           <div class="field">
             <div class="field-label"><span>小字</span><span class="cc" id="ccSmall"></span></div>
-            <input class="fi" id="inSmall" type="text" placeholder="部分版位才有（如日期時間），沒有就留空">
+            <input class="fi" id="inSmall" type="text" placeholder="日期時間等，沒有可留空">
           </div>
           <div class="field">
             <div class="field-label"><span>AR 文案</span><span class="cc" id="ccAr"></span></div>
-            <input class="fi" id="inAr" type="text" placeholder="AR 版位專用（工單「AR案型」），5 字內；4 字以上排兩排，含 $ 金額不斷行">
+            <input class="fi" id="inAr" type="text" placeholder="AR 版位專用，5 字內">
             <div class="ar-split" id="arSplitRow" style="display:none">
               <span class="mini hint">斷行</span>
               <button type="button" data-arsplit="less"></button>
@@ -392,18 +416,16 @@
           </div>
           <div class="field">
             <div class="field-label"><span>廠商 LOGO</span><span class="mini hint" id="vendorCount"></span></div>
-            <div class="mini hint">用頂列的「📦 上傳素材包」匯入</div>
+            <button id="btnAssetsPanel" style="width:100%;justify-content:center">📦 上傳素材包</button>
             <div id="vendorPreview" class="vp-row"></div>
             <button id="btnClearVendor" style="width:100%;justify-content:center;margin-top:6px">清除廠商 LOGO</button>
           </div>
           <div class="field">
             <div class="field-label"><span>蝦皮直播 LOGO</span></div>
             <label class="mini" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-              <input type="checkbox" id="chkLive"> 在 LOGO 條顯示蝦皮直播
+              <input type="checkbox" id="chkLive" title="工單蝦皮直播欄填 Y／是會自動打開"> 在 LOGO 條顯示蝦皮直播
             </label>
-            <div class="mini hint" style="margin-top:6px;line-height:1.5">
-              預設不顯示。工單若有「蝦皮直播」欄且填 Y／是，匯入時會自動打開。
-            </div>
+
           </div>
         </div>
       </div>
@@ -419,10 +441,7 @@
           <div class="mini hint" id="frameNow" style="margin-bottom:8px"></div>
           <div id="paneStock">
             <div class="thumb-grid" id="stockRow"></div>
-            <div class="mini hint" style="margin-top:6px;line-height:1.5">
-              點縮圖套進所有版位。圖素放在 <b>img/圖素版/</b>，
-              位置用設計端另外標的<b>圖素定位框</b>（照插畫實際大小貼合）。
-            </div>
+
           </div>
           <div id="panePhoto" style="display:none">
             <div class="ph-layers" id="phLayers" style="display:none"></div>
@@ -430,11 +449,7 @@
             <button id="btnEditPhoto" style="width:100%;justify-content:center;margin-top:6px">✎ 去背／裁切編輯</button>
             <button id="btnClearPhoto" style="width:100%;justify-content:center;margin-top:6px">清除這張照片</button>
             <button id="btnAddPerson2" style="width:100%;justify-content:center;margin-top:10px">+ 新增人物2（左右並排）</button>
-            <div class="mini hint" style="margin-top:6px;line-height:1.5">
-              兩個都是自己上傳的照片才會自動左右分割（重疊約 8%）：<b>人物1在左</b>、
-              <b>人物2在右</b>，預設<b>人物1的圖層在上面</b>（可在上面的圖層列用 ↑ 調整）。
-              圖素模式不會拆——插畫本身已經是完整構圖。
-            </div>
+
           </div>
           <label class="fl" id="pvBoardRow" style="display:none;margin:6px 0 0">
             <span class="mini hint">共編預覽版位</span>
@@ -452,47 +467,10 @@
           </div>
           <div id="photoScope" class="mini hint" style="margin-top:8px;line-height:1.5"></div>
           <button id="btnPhotoApplyAll" style="width:100%;justify-content:center;margin-top:6px">套用至所有版位</button>
-          <div class="mini hint" style="margin-top:8px;line-height:1.5">
-            上面調的是<b>整體</b>（一次套用到所有版位）；要單獨調某一塊板，切到<b>畫布</b>模式直接點它的人物框。
-          </div>
+          <div class="mini hint">整體設定（所有版位）</div>
         </div>
       </div>
-      <div class="sg">
-        <div class="sg-label">說明</div>
-        <div class="sg-body">
-          <div class="hint">文字／CTA 位置都照 PSD 量測值擺放（深藍圓角＝CTA）。
-          格紋底＝未選主題時的視覺佔位（KV／講師視覺本階段不處理，選了主題會換成底圖）。<br><br>
-          <b>總覽</b>：不用捲動看到所有勾選的版位縮圖，點一下放大檢視。<br>
-          <b>畫布</b>：可縮放/平移，仔細檢查或編輯用。<br><br>
-          <b>LOGO 位置</b>：依主題而定——有的主題是固定橫排（蝦大／蝦皮直播＋分隔線＋
-          最多 3 個廠商 LOGO 位，由素材包自動帶入，等距等比排列），有的主題改成圍繞
-          人物照片的圓圈徽章，數量/位置各版位自己決定。橫式版位齊左、直式／方形版位置中。<br>
-          蝦皮／直播 LOGO 有橘、白兩版，依主題底色自動挑（工單配色表指定）。<br><br>
-          <b>人物框</b>：所有主題都有人物框，預設就放第一張<b>圖素</b>（img/圖素版/ 的
-          1200×700 去背 PNG）。點右欄的縮圖換一張，或改上傳自己的照片蓋掉；
-          換圖素／換照片時，位置縮放角度都會一起歸零。<br>
-          <b>兩種來源共用同一個<b>圖素定位框</b></b>（照插畫實際大小標的框，比公版人物框更貼合，
-          下緣超出版位是設計上的出血）：圖素貼的是「插畫實際看得到的範圍」（去背 PNG 四周的
-          透明邊不算）；自己上傳的照片沒有已知的透明邊界可貼合，整張 contain 進同一個框。<br>
-          新增圖素＝把 png 丟進 img/圖素版/，再在 packs/bn/photo-assets.js 加一行。<br><br>
-          <b>雙人上傳照片</b>：按「人物照片」分頁的「+ 新增人物2」，兩邊都上傳自己的照片
-          後會自動把圖素定位框拆成左右兩塊（重疊約 8%）——<b>人物1在左、人物2在右</b>，
-          預設<b>人物1的圖層在上面</b>。圖素模式不會拆，插畫本身已經是完整構圖。<br><br>
-          <b>位置調整（兩層）</b>：套進來的時候整張固定在定位框內（不會被裁到）。<br>
-          ① <b>整體</b>＝右欄那個小預覽框，一次套用到所有版位。<br>
-          ② <b>單一版位</b>＝切到畫布模式直接點該版位的人物照片。<br>
-          兩邊的操作完全一樣：<b>拖曳</b>移動、拉<b>四角</b>等比縮放（固定對角，跟 PS
-          自由變形一樣）、拉<b>上方圓把手</b>旋轉（按住 Shift 吸附 15°），
-          倍率 20%～500%。右欄另有 ±／⟲ 按鈕可以微調與重設。<br>
-          （<b>不用滾輪縮放</b>——右欄捲動時太容易誤觸，已改成只靠選取框與按鈕。）<br>
-          單獨調過的版位<b>不會</b>再被①的整體調整覆蓋；要讓它跟回整體，按選取框下方的
-          ⟲ 還原，或按右欄黃色的「套用至所有版位」再選「覆蓋手動調整的版位」。<br><br>
-          兩層都<b>不受定位框限制</b>——可以放大到超出框、也可以拖到框外，只受版位邊界裁切。<br><br>
-          小預覽框裡的虛線＝定位框，虛線外那圈是框外空間，方便看照片溢出多少；
-          虛線與畫布上的選取框都只是編輯輔助，不會印進下載的圖。<br><br>
-          字數為軟性提示：超過仍可輸入，只是提醒版面會被撐開。</div>
-        </div>
-      </div>
+
     </div>
   </aside>
 </main>
@@ -793,6 +771,31 @@
       boards: st.photoBoards || {}, ownUrl: savedOwnPhotos[0] || '', stockId: '',
     })];
   }
+  function freshState() {
+    return {
+      title: '主標文案', sub: '副標文案', cta: '報名去', small: '',
+      /* AR 版位不跟其他版位共用文案（工單是獨立一格「AR案型」），上下兩排、共 5 字內。
+         arSplit＝奇數字時上排要拿少的('less'，例如 5 字＝上2下3)還是多的('more'，上3下2)。 */
+      arText: '', arSplit: 'less',
+      on: PACK.boards.filter(b => hasContent(b.id)).map(b => b.id),
+      theme: '', vendorLogos: [],
+      /* 蝦皮直播 LOGO 預設不畫（使用者 2026-09-11 指示：工單有讀到才要）。
+         工單多一列「蝦皮直播」填 Y 會打開，右欄也有手動開關。 */
+      liveLogo: false,
+      /* photos＝人物框的圖陣列（公版定位目前只有一個「雙人人物框」，所以長度 1；
+         多框的定位資料一進來就會自動多開槽，見 photoSlotCount()）。
+         每一張各自帶 url ＋ 一組整體設定（zoom/x/y/r，右欄小預覽框調的，套用到所有版位）
+         ＋ boards（逐版位的手動調整，畫布上直接拖／縮／轉出來的）。
+         有 boards[id] 的版位就不再跟著該張的整體設定走——見 photoTFor()。
+         url 可以是上傳的 dataURL，也可以是圖素的相對路徑（見 photoSrc()）；
+         預設就放第一張圖素，使用者不用先上傳任何東西。
+         photoSet＝用哪一份公版定位（目前只有 master 一份，見 PLACEMENT_SETS）。
+         photoOrder＝疊放順序（第一個畫在最底下），只影響前後遮擋，不影響
+         哪一張用哪個定位框——見 photoOrderFor()。
+         stockInit＝「預設圖素已經放過了」，見上面舊存檔那一段的說明。 */
+      photos: [freshPhoto(defaultStockUrl())], photoSet: DEFAULT_SET, photoOrder: [], stockInit: true,
+    };
+  }
   const initial = saved && saved.title != null
     ? (function () {
         const st = Object.assign({ arText: '', arSplit: 'less',
@@ -810,29 +813,7 @@
         delete st.photoPosY; delete st.photoRot; delete st.photoBoards;
         return st;
       })()
-    : {
-    title: '主標文案', sub: '副標文案', cta: '報名去', small: '',
-    /* AR 版位不跟其他版位共用文案（工單是獨立一格「AR案型」），上下兩排、共 5 字內。
-       arSplit＝奇數字時上排要拿少的('less'，例如 5 字＝上2下3)還是多的('more'，上3下2)。 */
-    arText: '', arSplit: 'less',
-    on: PACK.boards.filter(b => hasContent(b.id)).map(b => b.id),
-    theme: '', vendorLogos: [],
-    /* 蝦皮直播 LOGO 預設不畫（使用者 2026-09-11 指示：工單有讀到才要）。
-       工單多一列「蝦皮直播」填 Y 會打開，右欄也有手動開關。 */
-    liveLogo: false,
-    /* photos＝人物框的圖陣列（公版定位目前只有一個「雙人人物框」，所以長度 1；
-       多框的定位資料一進來就會自動多開槽，見 photoSlotCount()）。
-       每一張各自帶 url ＋ 一組整體設定（zoom/x/y/r，右欄小預覽框調的，套用到所有版位）
-       ＋ boards（逐版位的手動調整，畫布上直接拖／縮／轉出來的）。
-       有 boards[id] 的版位就不再跟著該張的整體設定走——見 photoTFor()。
-       url 可以是上傳的 dataURL，也可以是圖素的相對路徑（見 photoSrc()）；
-       預設就放第一張圖素，使用者不用先上傳任何東西。
-       photoSet＝用哪一份公版定位（目前只有 master 一份，見 PLACEMENT_SETS）。
-       photoOrder＝疊放順序（第一個畫在最底下），只影響前後遮擋，不影響
-       哪一張用哪個定位框——見 photoOrderFor()。
-       stockInit＝「預設圖素已經放過了」，見上面舊存檔那一段的說明。 */
-    photos: [freshPhoto(defaultStockUrl())], photoSet: DEFAULT_SET, photoOrder: [], stockInit: true,
-  };
+    : freshState();
   const H = XD.createHistory(initial);
   const S = () => H.getState();
 
@@ -1899,6 +1880,7 @@
       fr.readAsDataURL(file);
     });
   }
+  $('#btnAssetsPanel').onclick = () => $('#fAssets').click();
   $('#fAssets').onchange = async e => {
     const files = e.target.files;
     if (!files || !files.length) return;
@@ -2401,7 +2383,7 @@
     const who = photoSlotCount(st) > 1 ? photoSlotName(st, i) + '：' : '';
     el.innerHTML = n
       ? who + '有 <b>' + n + '</b> 個版位在畫布上單獨調整過，<b>不會</b>被上面的整體調整覆蓋。'
-      : who + '目前所有版位都跟著整體設定走。到畫布模式點人物照片可以單獨調整某一塊板。';
+      : who + '目前所有版位都跟著整體設定走。';
   }
 
   /* ---- 「套用至所有版位」：有手動版位才問，三選一 ---- */
@@ -3065,6 +3047,20 @@
     $('#btnUndo').disabled = !H.canUndo();
     $('#btnRedo').disabled = !H.canRedo();
   }
+  async function clearAll() {
+    const confirmed = await XD.confirm(
+      '文案、勾選、主題、廠商 LOGO、人物照片與所有位置調整都會回到初始狀態。清掉之後還可以用 ↶ 復原。',
+      { title: '全部清除？', ok: '全部清除', cancel: '取消', danger: 1 });
+    if (!confirmed) return false;
+    /* 素材快取保留，復原或重新匯入工單仍可配圖；檢視只取消選取。 */
+    PENDING_VENDOR_NAMES = null;
+    PENDING_PHOTO_NAMES = null;
+    view.selBoard = null;
+    H.set(freshState(), {});
+    renderAny();
+    return true;
+  }
+  $('#btnClearAll').onclick = clearAll;
   $('#btnUndo').onclick = () => { if (!H.undo()) XD.toast('沒有可以復原的步驟'); };
   $('#btnRedo').onclick = () => { if (!H.redo()) XD.toast('沒有可以重做的步驟'); };
   XD.bindUndoKeys(H, ok => { if (!ok) XD.toast('沒有更多步驟了'); });
@@ -3131,6 +3127,7 @@
   })();
 
   window.__api = {
+    freshState, clearAll,
     get state() { return S(); }, H, view,
     render, renderOverview, renderAny, setMode, focusBoard,
     fit, actualSize, zoomBy, zoomAt, applyWo,

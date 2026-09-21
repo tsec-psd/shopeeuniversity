@@ -16,6 +16,7 @@
 <script src="../core/export-package.js"></script>
 <script src="../core/history.js"></script>
 <script src="../packs/ms/presets.js"></script>
+<script src="../packs/bn/themes.js"></script>
 <style>
 /* ===== 本頁專屬（外殼在 ui.css、產出物本體在 paper.css） ===== */
 main{grid-template-columns:246px 1fr 310px}
@@ -26,6 +27,20 @@ header h1{min-width:0}
   font:inherit;font-size:12px;font-weight:400}
 #projName::placeholder{color:var(--ui-dim)}
 #projName:focus{outline:2px solid var(--ui-accent);outline-offset:1px}
+#themePicker{position:relative;flex:none}
+#themeBtn{width:112px;padding:0 8px;justify-content:flex-start;overflow:hidden;box-sizing:border-box}
+#themeBtn .theme-dot{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.45);flex:none}
+#themeBtn .theme-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#themeGrid{position:absolute;z-index:90;top:34px;left:0;width:230px;padding:8px;background:var(--ui-panel);
+  border:1px solid var(--ui-line2);border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+#themeGrid[hidden]{display:none}
+#themeDefault{width:100%;height:28px;justify-content:center;margin-bottom:7px}
+#themeCells{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.theme-cell{height:34px;padding:0;border:1px solid rgba(255,255,255,.35);border-radius:6px}
+.theme-cell:hover{border-color:#fff;filter:brightness(1.06)}
+.theme-cell.on{outline:2px solid #fff;outline-offset:1px;border-color:var(--ui-bg)}
+@media(max-width:1100px){header{gap:5px;padding-left:4px;padding-right:4px}#themeBtn{width:42px;padding:0;justify-content:center}
+  #themeBtn .theme-name{display:none}#projName{min-width:80px}}
 #zoomwrap{margin:0 auto}
 .paper{box-shadow:0 8px 40px rgba(0,0,0,.22)}
 .paper.emptypage{padding:60px}
@@ -262,6 +277,15 @@ header h1{min-width:0}
   <button id="btnUndo" title="復原 Ctrl+Z">↶</button>
   <button id="btnRedo" title="重做 Ctrl+Shift+Z">↷</button>
   <button id="btnAdv" title="打開才會出現空白容器、換容器、格的切分——那些是設計師在用的">⚙ 進階</button>
+  <div id="themePicker">
+    <button id="themeBtn" aria-haspopup="true" aria-expanded="false" title="選擇紙面配色主題">
+      <i class="theme-dot"></i><span class="theme-name">預設配色</span>
+    </button>
+    <div id="themeGrid" hidden>
+      <button id="themeDefault" data-theme="">預設配色</button>
+      <div id="themeCells"></div>
+    </div>
+  </div>
   <span class="spacer"></span>
   <button id="btnDemo">範例整頁</button>
   <button id="btnClear">清空頁面</button>
@@ -310,13 +334,14 @@ header h1{min-width:0}
   'use strict';
   const XD = window.XD, $ = XD.$, $$ = XD.$$, esc = XD.esc;
   const PACK = XD.packs.ms, SDEFS = PACK.sections, PRESETS = PACK.presets;
+  const THEMES = XD.packs.bnThemes.themes;
   const COMMONS = PACK.commons || [];
   const CONTAINERS = PACK.containers || [];
   const KEY = 'ms_live_v1', KEY_IMG = 'ms_live_img_v1';
   const PHOTO_MAX = 1400, ICON_MAX = 420;
 
   let PAGE = { sections: [] };
-  const PROJ = { name: '' };
+  const PROJ = { name: '', theme: '' };
   let H = null;
   let TAB = 'sec', SECALL = false, showMore = false;
   /* 進階＝結構編輯（空白容器、換容器、格的切分）。
@@ -350,6 +375,69 @@ header h1{min-width:0}
     setProjectName(e.target.value);
     save();
   });
+
+  /* BN 主題只覆寫紙面裡三個強調 token。工具外殼也讀 --c-*，所以不能寫到 :root。
+     相對亮度只拿來從工單既有的 CTA 兩色中選較深者，不會演算新色。 */
+  function luminance(hex) {
+    const n = parseInt(String(hex).replace('#',''),16);
+    return [n>>16,(n>>8)&255,n&255].map(v => {
+      v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
+    }).reduce((s,v,i) => s + v * [.2126,.7152,.0722][i], 0);
+  }
+  function contrast(a,b) {
+    const x = luminance(a), y = luminance(b);
+    return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+  }
+  const themeOf = id => THEMES.find(t => t.id === id) || null;
+  function themeVars(id) {
+    const t = themeOf(id); if (!t) return null;
+    const c = t.colors;
+    const darkest = [c.arc,c.title,c.sub].reduce((a,b) => luminance(a) <= luminance(b) ? a : b);
+    /* 主標在底色上未達大字 3:1 時改用副標色；5-2 兩色都略低，照使用者拍板保留。 */
+    const plainText = contrast(c.arc,c.title) >= 3 ? c.title : c.sub;
+    const cardAccent = contrast('#ffffff',c.sub) >= 3 ? c.sub : darkest;
+    return {'--c-page':c.arc,'--c-pill-bg':c.ctaBg,'--c-pill-text':c.ctaText,
+            '--c-line':c.arc,'--c-text':darkest,'--c-body':darkest,
+            '--c-blue':cardAccent,'--c-accent':cardAccent,'--c-slogan':c.sub,
+            '--c-white':plainText,'--c-badge':c.ctaBg,'--c-badge-text':c.ctaText};
+  }
+  const THEME_KEYS = ['--c-page','--c-pill-bg','--c-pill-text','--c-line','--c-text','--c-body',
+    '--c-blue','--c-accent','--c-slogan','--c-white','--c-badge','--c-badge-text'];
+  function applyTheme(node) {
+    THEME_KEYS.forEach(k => node.style.removeProperty(k));
+    const vars = themeVars(PROJ.theme);
+    if (vars) Object.keys(vars).forEach(k => node.style.setProperty(k,vars[k]));
+    return node;
+  }
+  function closeThemeGrid() {
+    $('#themeGrid').hidden = true; $('#themeBtn').setAttribute('aria-expanded','false');
+  }
+  function paintThemePicker() {
+    const t = themeOf(PROJ.theme), btn = $('#themeBtn');
+    btn.querySelector('.theme-name').textContent = t ? t.name : '預設配色';
+    btn.querySelector('.theme-dot').style.background = t ? t.colors.arc : 'var(--c-page)';
+    $$('#themeCells .theme-cell').forEach(n => n.classList.toggle('on',n.dataset.theme===PROJ.theme));
+    $('#themeDefault').classList.toggle('on',!PROJ.theme);
+  }
+  function setTheme(id, persist) {
+    PROJ.theme = themeOf(id) ? id : '';
+    applyTheme($('#paper')); applyTheme($('#miniInner'));
+    paintThemePicker();
+    if (persist !== false) save();
+  }
+  $('#themeCells').innerHTML = THEMES.map(t => '<button class="theme-cell" data-theme="' + esc(t.id) +
+    '" style="background:' + esc(t.colors.arc) + '" title="' + esc(t.name) +
+    '" aria-label="' + esc(t.name) + '"></button>').join('');
+  $('#themeBtn').onclick = e => {
+    e.stopPropagation(); const grid=$('#themeGrid'); grid.hidden=!grid.hidden;
+    $('#themeBtn').setAttribute('aria-expanded',String(!grid.hidden));
+  };
+  $('#themeGrid').onclick = e => {
+    const b=e.target.closest('[data-theme]'); if(!b)return;
+    setTheme(b.dataset.theme); closeThemeGrid();
+  };
+  document.addEventListener('click',e=>{if(!e.target.closest('#themePicker'))closeThemeGrid();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeThemeGrid();});
 
   /* ============ 位址解析 ============
      欄位位址 iid|rowId|ci|si|ai（si 空字串＝不在子網格內），格位址是前四段。 */
@@ -408,6 +496,7 @@ header h1{min-width:0}
           XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: true, live: true }) + '</div>';
       }).join('');
     }
+    applyTheme(paper);
     pruneSel(); markSel(); paintPane(); paintInsp(); paintMini(); applyZoom();
   }
   /* 結構變動後，指到不存在東西的選取要清掉 */
@@ -536,6 +625,7 @@ header h1{min-width:0}
           XD.flow.sectionBodyHTML(sec, sdef, PRESETS, { editable: false }) + '</div>';
       }).join('');
     }
+    applyTheme($('#miniInner'));
     sizeMini();
   }
   function sizeMini() {
@@ -1502,6 +1592,12 @@ header h1{min-width:0}
     el.querySelectorAll('.kvdel, .kvph').forEach(n => n.remove());
     return el;
   }
+  function exportPaper(sections) {
+    const wrap = document.createElement('div');
+    wrap.className = 'paper export';
+    (sections || PAGE.sections).forEach(sec => wrap.appendChild(sectionNode(sec)));
+    return applyTheme(wrap);
+  }
   const pageBg = () => getComputedStyle(document.documentElement)
     .getPropertyValue('--c-page').trim() || '#2358E6';
 
@@ -1516,9 +1612,7 @@ header h1{min-width:0}
   $('#btnPng').onclick = () => withBtn($('#btnPng'), async () => {
     if (!PAGE.sections.length) return XD.toast('頁面還是空的');
     await XD.withOffscreen(async c => {
-      const wrap = document.createElement('div');
-      wrap.className = 'paper export';
-      PAGE.sections.forEach(sec => wrap.appendChild(sectionNode(sec)));
+      const wrap = exportPaper();
       c.appendChild(wrap);
       const r = await XD.exportPng(wrap, fileName('png'),
         { width: 1200, height: wrap.offsetHeight, background: pageBg() });
@@ -1530,8 +1624,7 @@ header h1{min-width:0}
   $('#btnZip').onclick = () => withBtn($('#btnZip'), async () => {
     if (!PAGE.sections.length) return XD.toast('頁面還是空的');
     const items = await XD.withOffscreen(async c => {
-      const wrap = document.createElement('div');
-      wrap.className = 'paper export';
+      const wrap = exportPaper([]);
       c.appendChild(wrap);
       const out = []; let edm = 0;
       for (const sec of PAGE.sections) {
@@ -1560,7 +1653,7 @@ header h1{min-width:0}
   /* ============ 專案存讀 ============ */
   function projectJson() {
     /* 匯出時把圖片攤回檔案裡，換一台電腦打開才看得到 */
-    return { v: 1, name: PROJ.name, tool: 'ms-live', savedAt: new Date().toISOString(),
+    return { v: 1, name: PROJ.name, theme: PROJ.theme || '', tool: 'ms-live', savedAt: new Date().toISOString(),
              sections: PAGE.sections, images: XD.IMAGES };
   }
   $('#btnSaveProj').onclick = () => {
@@ -1575,6 +1668,7 @@ header h1{min-width:0}
       if (!j || !Array.isArray(j.sections)) throw new Error('這不是 MS 專案檔');
       PAGE = { sections: j.sections };
       setProjectName(j.name || f.name.replace(/\.json$/i, ''));
+      setTheme(j.theme || '', false);
       if (j.images) Object.keys(j.images).forEach(k => { XD.IMAGES[k] = j.images[k]; });
       SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
       H = XD.createHistory(PAGE); paintUndo();
@@ -1586,7 +1680,8 @@ header h1{min-width:0}
      版面／文字（小）一定存得下；圖片（大）另外一支 key 盡力而為，
      存不下就只提醒一次，不讓它擋掉正常的自動暫存。 */
   const save = XD.debounce(() => {
-    try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections, name: PROJ.name })); }
+    try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections, name: PROJ.name,
+      theme: PROJ.theme || '' })); }
     catch (err) { return; }
     try { localStorage.setItem('xd_' + KEY_IMG, JSON.stringify(XD.IMAGES)); }
     catch (err) {
@@ -1608,10 +1703,12 @@ header h1{min-width:0}
     if (saved && saved.sections) {
       PAGE = { sections: saved.sections };
       setProjectName(saved.name || '');
+      setTheme(saved.theme || '', false);
       if (saved.sections.length) XD.toast('已還原上次的內容');
     } else {
       PAGE = { sections: PACK.templateDefault() };
       setProjectName('');
+      setTheme('', false);
     }
     H = XD.createHistory(PAGE);
     XD.bindUndoKeys(H, ok => { if (ok) restore(); });
@@ -1627,8 +1724,10 @@ header h1{min-width:0}
     addAtomTo, setRole, delAtom,
     select: s => { Object.assign(SEL, s); markSel(); paintPane(); paintInsp(); },
     setTab: t => { TAB = t; paintPane(); },
-    projectJson, safeName, fileName, setProjectName, setKvImage, setAtomImage, shrink, clampPhotoT,
+    projectJson, safeName, fileName, setProjectName, setTheme, themeVars, applyTheme, exportPaper,
+    setKvImage, setAtomImage, shrink, clampPhotoT,
     get projectName() { return PROJ.name; },
+    get theme() { return PROJ.theme; },
     loadTemplate: () => { PAGE.sections = PACK.templateDefault(); commit(); render(); },
     clearAll: () => { PAGE.sections = []; commit(); render(); },
   };

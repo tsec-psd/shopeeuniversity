@@ -57,6 +57,14 @@
   const at = (ws, r, c) => (r < 1 || c < 1) ? '' : cellText(ws.getCell(r, c).value).trim();
   const rawAt = (ws, r, c) => (r < 1 || c < 1) ? null : ws.getCell(r, c).value;
 
+  function themeKey(s) {
+    return String(s).normalize('NFC').replace(/\s/g, '')
+      .replace(/[０-９]/g, ch => String(ch.charCodeAt(0) - 0xFF10))
+      .replace(/[－‐‑‒–—―～〜~]/g, '-')
+      .replace(/^(?:主題|theme)/i, '').toLowerCase();
+  }
+  bw.themeKey = themeKey;
+
   function buildSizeMap(boards) {
     const m = {};
     (boards || []).forEach(b => {
@@ -130,6 +138,34 @@
     return null;
   }
 
+  /* 主題欄專用：保留 ExcelJS 原始 Date 與該格格式，其餘欄位仍走 cellText。 */
+  function findLabelRawValue(ws, labelRe) {
+    const maxR = ws.rowCount || 0, maxC = Math.max(ws.columnCount || 0, 1);
+    for (let r = 1; r <= maxR; r++) {
+      for (let c = 1; c <= maxC; c++) {
+        const v = at(ws, r, c);
+        if (!v || !labelRe.test(v)) continue;
+        for (let cc = c + 1; cc <= maxC; cc++) {
+          const value = rawAt(ws, r, cc);
+          if (value !== null && value !== undefined && value !== '')
+            return { value, numFmt: ws.getCell(r, cc).numFmt };
+        }
+      }
+    }
+    return null;
+  }
+
+  function themeDateOf(raw) {
+    if (!raw || !(raw.value instanceof Date)) return null;
+    const m = raw.value.getMonth() + 1, d = raw.value.getDate();
+    const fmt = String(raw.numFmt || '').replace(/"(?:[^"]|"")*"/g, '').toLowerCase();
+    const mi = fmt.indexOf('m'), di = fmt.indexOf('d');
+    const order = mi < 0 || di < 0 ? null : mi < di ? 'md' : 'dm';
+    const candidates = [...new Set(order === 'md' ? [m + '-' + d]
+      : order === 'dm' ? [d + '-' + m] : [m + '-' + d, d + '-' + m])];
+    return { m, d, order, candidates };
+  }
+
   /* 同 findLabelValue，但收集「所有」符合的列（同一個標籤可能出現多次，例如人物圖片1/2） */
   function findAllLabelValues(ws, labelRe) {
     const maxR = ws.rowCount || 0, maxC = Math.max(ws.columnCount || 0, 1);
@@ -166,6 +202,7 @@
        這裡的正規表達式不加開頭^結尾$錨定，「廠商LOGO1」「廠商LOGO2」（舊工單）跟
        「廠商LOGO」（新工單，可重複列）都吃得到，新舊格式都相容。 */
     const themeName = findLabelValue(ws, /^主題$/);
+    const themeDate = themeName ? null : themeDateOf(findLabelRawValue(ws, /^主題$/));
     const vendorLogoNames = findAllLabelValues(ws, /廠商LOGO/i).filter(Boolean);
     const personImageNames = findAllLabelValues(ws, /人物圖片/).filter(Boolean);
     /* 蝦皮直播 LOGO：預設不畫，工單明講要才畫（使用者 2026-09-11 指示）。
@@ -209,6 +246,7 @@
         extra: small ? { value: small, votes: checkedMatched.length } : null,
       },
       themeName,
+      themeDate,
       vendorLogoNames,
       personImageNames,
       liveLogo,
@@ -331,6 +369,7 @@
       consensus: { main: vote('main'), sub: vote('sub'), cta: vote('cta'),
                    extra: extraTop ? { value: extraTop, votes: extraCnt[extraTop] } : null },
       themeName: null,       /* 自由格式（舊工單）沒有這些欄位 */
+      themeDate: null,
       vendorLogoNames: [],
       personImageNames: [],
       liveLogo: null,        /* null＝工單沒提到，編輯器維持現狀（預設不畫） */
@@ -364,7 +403,7 @@
     if (!result) {
       return { placements: [], onIds: [], arText: null,
                consensus: { main: null, sub: null, cta: null, extra: null },
-               themeName: null, vendorLogoNames: [], personImageNames: [],
+               themeName: null, themeDate: null, vendorLogoNames: [], personImageNames: [],
                warnings: ['這份檔案讀不到任何版位資料（找不到「尺寸」欄或「尺寸：WxH」格式）'] };
     }
     result.format = format;

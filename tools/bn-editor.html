@@ -2895,15 +2895,33 @@
     if (WO.arText) next.arText = WO.arText;
     if (WO.onIds && WO.onIds.length) next.on = WO.onIds.slice();
 
-    /* 工單指定主題就自動選（比對 packs/bn/themes.js 的 name/id，忽略大小寫/頭尾空白）；
-       找不到就當作沒指定，不擋匯入——維持原本選的主題或空白，只在訊息裡提醒。 */
+    /* 先用原字串精確比對；只有精確比對不到時才放寬全形／空白等寫法。
+       日期格僅在沒有文字值時還原，候選若有歧義就維持原主題。 */
     let themeBits = '';
+    const themes = (XD.packs.bnThemes && XD.packs.bnThemes.themes) || [];
+    const themeKey = XD.bnWorkorder.themeKey;
+    const findTheme = wanted => themes.find(t => t.name === wanted || t.id === wanted) ||
+      themes.find(t => themeKey(wanted) === themeKey(t.id) || themeKey(wanted) === themeKey(t.name));
     if (WO.themeName) {
       const wanted = String(WO.themeName).trim();
-      const found = ((XD.packs.bnThemes && XD.packs.bnThemes.themes) || [])
-        .find(t => t.name === wanted || t.id === wanted || normName(t.name) === normName(wanted));
+      const found = findTheme(wanted);
       if (found) { next.theme = found.id; themeBits = '／主題「' + found.name + '」'; }
       else themeBits = '／⚠工單指定的主題「' + wanted + '」找不到對應設定';
+    } else if (WO.themeDate) {
+      const td = WO.themeDate;
+      const found = [...new Map(td.candidates.map(s => findTheme(s)).filter(Boolean)
+        .map(t => [t.id, t])).values()];
+      const dateText = td.m + '月' + td.d + '日';
+      if (found.length === 1) {
+        next.theme = found[0].id;
+        themeBits = '／主題「' + found[0].name + '」（工單那格被 Excel 轉成日期了，建議把該欄格式設成文字）';
+      } else if (found.length > 1) {
+        themeBits = '／⚠ 工單的主題那格被 Excel 轉成日期（' + dateText + '），可能是「' +
+          found.map(t => t.name).join('」也可能是「') + '」，無法判斷。請把該欄格式設成文字後重新匯入';
+      } else {
+        themeBits = '／⚠ 工單的主題那格是日期（' + dateText +
+          '），對不到任何主題。請把該欄格式設成文字後重新匯入';
+      }
     }
 
     /* 蝦皮直播 LOGO：工單明講才改。null＝工單沒這一欄，維持畫面上目前的狀態

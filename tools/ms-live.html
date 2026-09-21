@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>MS 線上編輯器（蝦大端）</title>
+<title>MS 線上編輯器</title>
 <!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → atoms → flow-engine
      → workorder → export-png → export-package → history → packs → 頁面腳本 -->
 <link rel="stylesheet" href="../core/tokens.css">
@@ -20,6 +20,12 @@
 /* ===== 本頁專屬（外殼在 ui.css、產出物本體在 paper.css） ===== */
 main{grid-template-columns:246px 1fr 310px}
 #stage{overflow:auto;padding:26px 26px 80px}
+header h1{min-width:0}
+#projName{flex:0 1 180px;min-width:96px;height:28px;padding:0 9px;border-radius:var(--ui-r);
+  border:1px solid var(--ui-line2);background:var(--ui-surface);color:var(--ui-text);
+  font:inherit;font-size:12px;font-weight:400}
+#projName::placeholder{color:var(--ui-dim)}
+#projName:focus{outline:2px solid var(--ui-accent);outline-offset:1px}
 #zoomwrap{margin:0 auto}
 .paper{box-shadow:0 8px 40px rgba(0,0,0,.22)}
 .paper.emptypage{padding:60px}
@@ -117,6 +123,7 @@ main{grid-template-columns:246px 1fr 310px}
 .cell [data-ed]:hover,.cell [data-ed]:focus{background:rgba(35,88,230,.10)}
 [data-img]{cursor:pointer}
 [data-img]:hover{filter:brightness(1.06)}
+.kvwrap.dragover,.avatar.dragover{outline:3px solid var(--ui-accent);outline-offset:-3px}
 /* 已有照片的圖片框：改成拖曳調整位置，不再是點一下就跳選檔視窗。
    裁切框線用 ::after 疊一圈虛線，border-radius:inherit 讓圓形／方形／矩形三種
    佔位框都自動吃到自己的形狀，不用各寫一份。 */
@@ -247,7 +254,7 @@ main{grid-template-columns:246px 1fr 310px}
 
 <header>
   <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
-  <h1>MS 線上編輯器<small>蝦大端｜直接在版面上完成，不用填工單</small></h1>
+  <h1>MS 線上編輯器<input id="projName" placeholder="未命名專案" maxlength="60" aria-label="專案名稱"></h1>
   <select id="zoom">
     <option value=".5">50%</option><option value=".75" selected>75%</option>
     <option value="1">100%</option>
@@ -309,6 +316,7 @@ main{grid-template-columns:246px 1fr 310px}
   const PHOTO_MAX = 1400, ICON_MAX = 420;
 
   let PAGE = { sections: [] };
+  const PROJ = { name: '' };
   let H = null;
   let TAB = 'sec', SECALL = false, showMore = false;
   /* 進階＝結構編輯（空白容器、換容器、格的切分）。
@@ -318,6 +326,30 @@ main{grid-template-columns:246px 1fr 310px}
   let imgWarned = false;
   /* 選取狀態：四層，都是位址字串（atom 的位址不含講者的第 6 段，那段另外存） */
   let SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
+
+  function safeName(s) {
+    let out = String(s || '').trim()
+      .replace(/[\\/:*?"<>|\x00-\x1F]/g, '_')
+      .replace(/\s+/g, ' ');
+    out = Array.from(out).slice(0, 60).join('').replace(/[.\s]+$/g, '');
+    return out;
+  }
+  function fileName(ext) {
+    const name = safeName(PROJ.name);
+    if (name) return name + '.' + ext;
+    const d = new Date().toISOString().slice(0, 10);
+    return { json: 'MS專案_' + d + '.json', png: 'MS活動頁_' + d + '.png',
+             zip: 'MS_' + d + '.zip', xlsx: '蝦大MS工單_' + d + '.xlsx' }[ext];
+  }
+  function setProjectName(name) {
+    PROJ.name = String(name || '');
+    $('#projName').value = PROJ.name;
+    document.title = PROJ.name.trim() ? PROJ.name.trim() + '｜MS 線上編輯器' : 'MS 線上編輯器';
+  }
+  $('#projName').addEventListener('input', e => {
+    setProjectName(e.target.value);
+    save();
+  });
 
   /* ============ 位址解析 ============
      欄位位址 iid|rowId|ci|si|ai（si 空字串＝不在子網格內），格位址是前四段。 */
@@ -616,7 +648,7 @@ main{grid-template-columns:246px 1fr 310px}
       box.innerHTML =
         '<h3>不屬於任何一段</h3>' +
         COMMONS.map(k => cardHTML(k, PRESETS[k])).join('') +
-        '<h3>加一段到頁面最後</h3>' +
+        '<h3>加一段</h3><div class="hint">加在選取那一段的後面；沒選就加到最後。</div>' +
         '<div class="segbar" id="secseg"><button data-all="0"' + (SECALL ? '' : ' class="on"') +
         '>常用</button><button data-all="1"' + (SECALL ? ' class="on"' : '') + '>全部</button></div>' +
         keys.map(k => '<div class="card seccard" data-sec="' + k + '"><div class="nm">' +
@@ -1116,9 +1148,15 @@ main{grid-template-columns:246px 1fr 310px}
       sec.rows.push.apply(sec.rows, makeRow(pid, (sdef.cols || ['1fr']).length, { title: sec.title })));
     let idx = PAGE.sections.length;
     if (sdef.kv) idx = 0;
+    else if (SEL.sec) {
+      const i = PAGE.sections.findIndex(s => s.iid === SEL.sec);
+      if (i >= 0) idx = i + 1;
+    }
     PAGE.sections.splice(idx, 0, sec);
     SEL = { sec: sec.iid, row: null, cell: null, atom: null, spk: null };
     commit(); render();
+    const node = $('#paper .sec[data-iid="' + sec.iid + '"]');
+    if (node) node.scrollIntoView({ block: 'nearest' });
     XD.toast('已加入「' + sdef.nm + '」');
   }
   function makeRow(pid, nCol, ctx) {
@@ -1315,29 +1353,67 @@ main{grid-template-columns:246px 1fr 310px}
   }
   function pickImage(addr) { imgTarget = addr; imgIsKv = false; fImg.click(); }
   function pickKv() { imgTarget = null; imgIsKv = true; fImg.click(); }
+  async function setKvImage(sec, file) {
+    if (!sec || !file) return;
+    const id = XD.uid('img');
+    XD.IMAGES[id] = await shrink(file, PHOTO_MAX);
+    sec.kvImgId = id; delete sec.kvImg;
+    SEL.sec = sec.iid;
+    commit(); render(); XD.toast('KV 圖已放入');
+  }
+  async function setAtomImage(addr, file) {
+    const hit = locAtom(addr); if (!hit || !file) return;
+    const def = XD.ATOMS[hit.atom.t] || {};
+    const id = XD.uid('img');
+    XD.IMAGES[id] = await shrink(file, def.av === 'icon' ? ICON_MAX : PHOTO_MAX);
+    hit.atom.imgId = id;
+    hit.atom.v = file.name;
+    delete hit.atom.img;
+    delete hit.atom.tf;
+    SEL.sec = hit.sec.iid; SEL.row = hit.row.id; SEL.cell = cellAddrOf(addr); SEL.atom = addr; SEL.spk = null;
+    commit(); render(); XD.toast('已放入：' + file.name);
+  }
   fImg.onchange = async e => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;
     try {
       if (imgIsKv) {
         const sec = secOf(SEL.sec); if (!sec) return;
-        const id = XD.uid('img');
-        XD.IMAGES[id] = await shrink(f, PHOTO_MAX);
-        sec.kvImgId = id; delete sec.kvImg;
-        commit(); render(); XD.toast('KV 圖已放入');
-        return;
+        return await setKvImage(sec, f);
       }
-      const hit = locAtom(imgTarget); if (!hit) return;
-      const def = XD.ATOMS[hit.atom.t] || {};
-      const id = XD.uid('img');
-      XD.IMAGES[id] = await shrink(f, def.av === 'icon' ? ICON_MAX : PHOTO_MAX);
-      hit.atom.imgId = id;
-      hit.atom.v = f.name;
-      delete hit.atom.img;
-      delete hit.atom.tf;   /* 換照片＝重新從剛好填滿的位置開始，舊照片調過的位移對新照片沒意義 */
-      commit(); render(); XD.toast('已放入：' + f.name);
+      await setAtomImage(imgTarget, f);
     } catch (err) { console.error(err); XD.toast('讀圖失敗：' + (err.message || err)); }
   };
+
+  /* 整頁先擋瀏覽器把拖入檔案直接開成新頁；真正寫入哪裡只看 drop 落點。 */
+  const clearDragover = () => $$('.kvwrap.dragover,.avatar.dragover').forEach(el => el.classList.remove('dragover'));
+  const dropTarget = e => e.target.closest && (e.target.closest('[data-img]') || e.target.closest('[data-kv]'));
+  document.addEventListener('dragover', e => {
+    e.preventDefault();
+    clearDragover();
+    const target = dropTarget(e);
+    if (target) target.classList.add('dragover');
+    if (e.dataTransfer) e.dataTransfer.dropEffect = target ? 'copy' : 'none';
+  });
+  document.addEventListener('dragleave', e => { if (!e.relatedTarget) clearDragover(); });
+  document.addEventListener('dragend', clearDragover);
+  document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const target = dropTarget(e);
+    clearDragover();
+    if (!target) return;
+    const file = Array.from((e.dataTransfer && e.dataTransfer.files) || [])
+      .find(f => /^image\//.test(f.type));
+    if (!file) return XD.toast('這裡只吃圖片檔');
+    try {
+      if (target.dataset.img) await setAtomImage(target.dataset.img, file);
+      else {
+        const secEl = target.closest('.sec');
+        const sec = secEl && secOf(secEl.dataset.iid);
+        if (sec) await setKvImage(sec, file);
+      }
+    } catch (err) { console.error(err); XD.toast('讀圖失敗：' + (err.message || err)); }
+  });
 
   /* ============ 右欄按鈕 ============ */
   $('#inspBody').onclick = e => {
@@ -1436,7 +1512,7 @@ main{grid-template-columns:246px 1fr 310px}
       wrap.className = 'paper export';
       PAGE.sections.forEach(sec => wrap.appendChild(sectionNode(sec)));
       c.appendChild(wrap);
-      const r = await XD.exportPng(wrap, 'MS活動頁_' + new Date().toISOString().slice(0, 10) + '.png',
+      const r = await XD.exportPng(wrap, fileName('png'),
         { width: 1200, height: wrap.offsetHeight, background: pageBg() });
       XD.toast('已匯出 PNG（1200 × ' + r.height + '）');
       window.__lastPng = r;
@@ -1461,14 +1537,14 @@ main{grid-template-columns:246px 1fr 310px}
       return out;
     });
     await XD.zipAndDownload(items, projectJson(), 'project.json',
-      'MS_' + new Date().toISOString().slice(0, 10) + '.zip');
+      fileName('zip'));
     XD.toast('已下載 ' + items.length + ' 張圖＋專案檔');
     window.__lastZip = items.map(i => i.name);
   });
 
   $('#btnXlsx').onclick = () => withBtn($('#btnXlsx'), async () => {
     const r = await XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS);
-    XD.download(r.blob, r.filename);
+    XD.download(r.blob, safeName(PROJ.name) ? fileName('xlsx') : r.filename);
     XD.toast('已產出工單（給人審／留底用，不用再匯回）：' + r.fields + ' 個欄位');
     window.__lastXlsx = r;
   });
@@ -1476,12 +1552,12 @@ main{grid-template-columns:246px 1fr 310px}
   /* ============ 專案存讀 ============ */
   function projectJson() {
     /* 匯出時把圖片攤回檔案裡，換一台電腦打開才看得到 */
-    return { v: 1, tool: 'ms-live', savedAt: new Date().toISOString(),
+    return { v: 1, name: PROJ.name, tool: 'ms-live', savedAt: new Date().toISOString(),
              sections: PAGE.sections, images: XD.IMAGES };
   }
   $('#btnSaveProj').onclick = () => {
     const blob = new Blob([JSON.stringify(projectJson(), null, 2)], { type: 'application/json' });
-    XD.download(blob, 'MS專案_' + new Date().toISOString().slice(0, 10) + '.json');
+    XD.download(blob, fileName('json'));
     XD.toast('已存下專案檔');
   };
   $('#fProj').onchange = async e => {
@@ -1490,6 +1566,7 @@ main{grid-template-columns:246px 1fr 310px}
       const j = JSON.parse(await f.text());
       if (!j || !Array.isArray(j.sections)) throw new Error('這不是 MS 專案檔');
       PAGE = { sections: j.sections };
+      setProjectName(j.name || f.name.replace(/\.json$/i, ''));
       if (j.images) Object.keys(j.images).forEach(k => { XD.IMAGES[k] = j.images[k]; });
       SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
       H = XD.createHistory(PAGE); paintUndo();
@@ -1501,7 +1578,7 @@ main{grid-template-columns:246px 1fr 310px}
      版面／文字（小）一定存得下；圖片（大）另外一支 key 盡力而為，
      存不下就只提醒一次，不讓它擋掉正常的自動暫存。 */
   const save = XD.debounce(() => {
-    try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections })); }
+    try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections, name: PROJ.name })); }
     catch (err) { return; }
     try { localStorage.setItem('xd_' + KEY_IMG, JSON.stringify(XD.IMAGES)); }
     catch (err) {
@@ -1522,9 +1599,11 @@ main{grid-template-columns:246px 1fr 310px}
        只有真的第一次開（完全沒有這支 key）才給範例整頁。 */
     if (saved && saved.sections) {
       PAGE = { sections: saved.sections };
+      setProjectName(saved.name || '');
       if (saved.sections.length) XD.toast('已還原上次的內容');
     } else {
       PAGE = { sections: PACK.templateDefault() };
+      setProjectName('');
     }
     H = XD.createHistory(PAGE);
     XD.bindUndoKeys(H, ok => { if (ok) restore(); });
@@ -1540,7 +1619,8 @@ main{grid-template-columns:246px 1fr 310px}
     addAtomTo, setRole, delAtom,
     select: s => { Object.assign(SEL, s); markSel(); paintPane(); paintInsp(); },
     setTab: t => { TAB = t; paintPane(); },
-    projectJson,
+    projectJson, safeName, fileName, setProjectName, setKvImage, setAtomImage, shrink,
+    get projectName() { return PROJ.name; },
     loadTemplate: () => { PAGE.sections = PACK.templateDefault(); commit(); render(); },
     clearAll: () => { PAGE.sections = []; commit(); render(); },
   };

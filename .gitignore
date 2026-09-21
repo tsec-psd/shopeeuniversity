@@ -9,3 +9,7 @@ output/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Python 快取（跑 tests/ 會產生）
+__pycache__/
+*.pyc

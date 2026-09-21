@@ -345,14 +345,20 @@ ul.a-bul-ng li:before{content:"✗";font-weight:700;color:var(--c-accent)}
 .spk .nm2{font-size:var(--fs-topic);font-weight:700;color:var(--c-text)}
 
 /* 圖片欄：圓形照片／方形圖示／矩形圖片／講者頭像圈 */
+/* 無框面（.prow）本來就是置中的（見上面的 .prow{text-align:center}），但 text-align
+   管不到 flex 項目——.avatar 是固定寬的 flex 容器，會貼著左緣。這一條把它補齊。
+   刻意不用 .cell{align-items:center}：那會讓同一格裡每個 .aw 都縮成內容寬，
+   文字欄位的可點擊範圍跟著縮，線上編輯器是點文字選欄位的。 */
+.prow .avatar{margin-left:auto;margin-right:auto}
 .avatar{width:250px;height:250px;border-radius:50%;background:#D8E0F7;display:flex;flex-direction:column;
         align-items:center;justify-content:center;gap:6px;color:#7C8DC4;font-weight:700;font-size:30px;
         overflow:hidden}
 .avatar em{font-style:normal;font-size:15px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .avatar em.dim{opacity:.65}
 /* .imgwrap 撐滿整個佔位框、扛照片位置／縮放的 transform；<img> 本身永遠是
-   object-fit:cover 填滿 .imgwrap，兩層分工見 atoms.js 的註解 */
-.avatar.has{position:relative}
+   object-fit:cover 填滿 .imgwrap，兩層分工見 atoms.js 的註解。
+   #D8E0F7 是空框佔位色；有圖縮到框以內時，使用者指定露出 #ffffff 白底。 */
+.avatar.has{position:relative;background:#ffffff}
 .avatar.has .imgwrap{position:absolute;inset:0}
 .avatar.has .imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
 .avatar.av-icon{width:112px;height:112px;border-radius:24px;font-size:17px;gap:3px}

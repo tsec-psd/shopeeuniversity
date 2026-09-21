@@ -835,8 +835,9 @@ header h1{min-width:0}
       if (def.photo && XD.photoResolved(hitA.atom)) {
         const tf = Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
         body += '<div class="metaline" style="margin-top:8px">拖曳照片可移動位置・拖角落的把手可縮放・目前縮放 ' +
-          Math.round(tf.z * 100) + '%</div>' +
-          '<div class="btnrow"><button data-act="pzreset" title="回到剛上傳時的位置">⟲ 重設位置</button></div>';
+          Math.round(tf.z * 100) + '%（20%～300%）</div>' +
+          '<div class="btnrow"><button data-act="pz-">− 縮小</button><button data-act="pz+">＋ 放大</button>' +
+          '<button data-act="pzreset" title="回到剛上傳時的位置">⟲ 重設位置</button></div>';
       } else if (def.photo && (hitA.atom.imgId || hitA.atom.img)) {
         body += '<div class="metaline over" style="margin-top:8px">圖片暫存遺失了（通常是重新整理瀏覽器時圖片太多存不下）' +
           '，點畫布上的框可以直接重新選檔。</div>';
@@ -980,14 +981,16 @@ header h1{min-width:0}
 
   /* ============ 圖片拖曳調整位置／PS 式操作框縮放 ============
      照片＝object-fit:cover，z=1 時已經剛好填滿整個框（見 paper.css .avatar.has img）。
-     放大 z 倍之後，四邊各多出來的可視範圍＝(z-1)/2，所以位移上限用 (z-1)*50（%）鎖死——
-     公式不看照片長寬比，cover 已經先幫兩個維度都對齊了（BN 人物照片第十一輪同一條公式）。
+     z>1 時位移上限管「放大後不露底」，z<1 時則管「縮小後不跑出框」；兩邊都用
+     |z-1|*50（%）。公式不看照片長寬比，cover 已先幫兩個維度對齊。
      拖曳距離用「螢幕像素 ÷ 框的螢幕寬高」換算成 %：兩邊都是螢幕座標，畫布縮放
      （#paper 的 transform:scale）已經內含在兩者裡面，換算完自動抵消，不用另外知道倍率。
      跟其他拖曳（BN 人物照片）同一個原則：拖曳中只改 inline transform，放開才進歷史。 */
+  const PZ_MIN = 0.2, PZ_MAX = 3, PZ_STEP = 0.12;
   function clampPhotoT(tf) {
-    const lim = Math.max(0, (tf.z - 1) * 50);
-    return { x: Math.max(-lim, Math.min(lim, tf.x)), y: Math.max(-lim, Math.min(lim, tf.y)), z: tf.z };
+    const z = Math.max(PZ_MIN, Math.min(PZ_MAX, tf.z));
+    const lim = Math.abs(z - 1) * 50;
+    return { x: Math.max(-lim, Math.min(lim, tf.x)), y: Math.max(-lim, Math.min(lim, tf.y)), z };
   }
   /* 操作框＝貼著「照片實際被縮放後的範圍」，不是頻框本身。
      中心＝頻框中心 + 位移（tf.x/y% 相對頻框寬高，跟 .imgwrap 的 transform 同一套換算）；
@@ -1044,7 +1047,7 @@ header h1{min-width:0}
   window.addEventListener('mousemove', e => {
     if (PZDRAG) {
       const d1 = Math.hypot(e.clientX - PZDRAG.cx, e.clientY - PZDRAG.cy);
-      const z = Math.max(1, Math.min(3, PZDRAG.tf0.z * (d1 / PZDRAG.d0)));
+      const z = Math.max(PZ_MIN, Math.min(PZ_MAX, PZDRAG.tf0.z * (d1 / PZDRAG.d0)));
       const tf = clampPhotoT({ x: PZDRAG.tf0.x, y: PZDRAG.tf0.y, z });
       PZDRAG.tf = tf;
       PZDRAG.wrap.style.transform = 'translate(' + tf.x + '%,' + tf.y + '%) scale(' + tf.z + ')';
@@ -1439,6 +1442,11 @@ header h1{min-width:0}
     if (act === 'bul-' && hitA && hitA.atom.items.length > 1) { hitA.atom.items.pop(); commit(); render(); }
     if (act === 'img') return pickImage(SEL.atom);
     if (act === 'imgx' && hitA) { delete hitA.atom.imgId; delete hitA.atom.img; delete hitA.atom.tf; commit(); render(); }
+    if ((act === 'pz-' || act === 'pz+') && hitA) {
+      const tf = Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
+      tf.z *= act === 'pz-' ? 1 / (1 + PZ_STEP) : 1 + PZ_STEP;
+      hitA.atom.tf = clampPhotoT(tf); commit(); render(); return;
+    }
     if (act === 'pzreset' && hitA) { delete hitA.atom.tf; commit(); render(); }
     if (act === 'ctr' && hitC) { hitC.cell.ctr = hitC.cell.ctr ? 0 : 1; commit(); render(); }
     if (act === 'lab' && hitC) { hitC.cell.lab = hitC.cell.lab ? 0 : 1; commit(); render(); }
@@ -1619,7 +1627,7 @@ header h1{min-width:0}
     addAtomTo, setRole, delAtom,
     select: s => { Object.assign(SEL, s); markSel(); paintPane(); paintInsp(); },
     setTab: t => { TAB = t; paintPane(); },
-    projectJson, safeName, fileName, setProjectName, setKvImage, setAtomImage, shrink,
+    projectJson, safeName, fileName, setProjectName, setKvImage, setAtomImage, shrink, clampPhotoT,
     get projectName() { return PROJ.name; },
     loadTemplate: () => { PAGE.sections = PACK.templateDefault(); commit(); render(); },
     clearAll: () => { PAGE.sections = []; commit(); render(); },

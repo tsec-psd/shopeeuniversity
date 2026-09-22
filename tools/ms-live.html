@@ -345,7 +345,7 @@ header h1{min-width:0}
   let H = null;
   let TAB = 'sec', SECALL = false, showMore = false;
   /* 進階＝結構編輯（空白容器、換容器、格的切分）。
-     蝗大的工作只有四件：加一段、加一列、打字、換語意角色；
+     蝦大的工作只有四件：加一段、加一列、打字、換語意角色；
      剩下的是設計師遇到 preset 沒涵蓋的排法才進來補。 */
   let ADV = XD.store.get('ms_live_adv', false);
   let imgWarned = false;
@@ -946,7 +946,7 @@ header h1{min-width:0}
         '<button class="addchip" data-addrole="' + q[0] + '">' + esc(q[1]) + '</button>').join('') + '</div>';
       /* 合併／拆開：直接改 cell.cs（跨欄）。引擎的 flow.place 本來就在算跨欄，
          所以這是加操作不是改架構。比「整列換容器」好的地方是打好的字不會重來。
-         不收進進階——把標籤＋內容兩格併成一格放大字，是蝗大真的會遇到的事。 */
+         不收進進階——把標籤＋內容兩格併成一格放大字，是蝦大真的會遇到的事。 */
       const cmg = [];
       if (!hitC.cell.sub && !hitC.row.lead && !hitC.row.gid) {
         const ci = hitC.row.cells.indexOf(hitC.cell);
@@ -1563,7 +1563,7 @@ header h1{min-width:0}
     ADV = !ADV; XD.store.set('ms_live_adv', ADV);
     paintAdv(); paintPane(); paintInsp();
     XD.toast(ADV ? '進階：可以自己拼容器、改格的切分'
-                 : '進階已關（蝗大端看到的樣子）');
+                 : '進階已關（蝦大端看到的樣子）');
   };
   paintAdv();
   $('#btnUndo').onclick = () => { if (H.undo()) { restore(); paintUndo(); } };

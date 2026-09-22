@@ -10,6 +10,8 @@ fonts/
 
 # 排除第三方套件與 build 產物
 node_modules/
-dist/
 build/
 docs/開發日誌封存*
+
+# 已下架／過期檔案（2026-09-22 起，見 CLAUDE.md）
+OLD/

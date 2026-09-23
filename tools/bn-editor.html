@@ -196,9 +196,10 @@
 .ph-card-acts{display:flex;gap:4px;margin-top:4px}
 .ph-card-acts button[data-photo-act="edit"]{flex:1}
 .ph-sub{font-size:11px;font-weight:700;color:var(--ui-dim);margin-bottom:5px}
-.ph-add-area{border-top:1px solid var(--ui-line);margin-top:12px;padding-top:8px}
-.ph-add-area button{width:100%;justify-content:center;border-style:dashed;background:transparent}
-.ph-add-area button:disabled{opacity:.7}
+.ph-layer-add{width:100%;min-height:52px;display:flex;align-items:center;justify-content:center;
+              border:1px dashed var(--ui-line2);border-radius:var(--ui-rf);background:transparent;
+              color:var(--ui-accent);font-size:28px;line-height:1;cursor:pointer}
+.ph-layer-add:hover{border-color:var(--ui-accent);background:var(--ui-surface2)}
 
 /* ---------- 右欄：廠商 LOGO 縮圖＋編輯 ---------- */
 .vp-row{display:flex;gap:8px;margin-top:8px}
@@ -264,6 +265,38 @@
 .photo-adjust-zoom button{width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.3);
                     background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:1;cursor:pointer;
                     display:flex;align-items:center;justify-content:center;padding:0}
+
+/* ---------- 人物共編彈窗 ---------- */
+.ph-editor{position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.62);
+           display:flex;align-items:center;justify-content:center;padding:24px}
+.ph-editor[hidden]{display:none}
+.ph-editor-box{width:min(1100px,96vw);max-height:92vh;display:flex;flex-direction:column;
+               background:var(--ui-panel);border:1px solid var(--ui-line2);border-radius:14px;
+               box-shadow:0 22px 70px rgba(0,0,0,.55);overflow:hidden}
+.ph-editor-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--ui-line)}
+.ph-editor-head h3{margin:0;flex:1;font-size:16px;color:var(--ui-text)}
+.ph-editor-head .mini{color:var(--ui-dim)}
+.ph-editor-close{width:32px;height:32px;padding:0;justify-content:center}
+.ph-editor-close svg,#btnPhotoEditor svg{width:17px;height:17px;fill:none;stroke:currentColor;
+                    stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ph-editor-body{display:grid;grid-template-columns:minmax(210px,260px) minmax(0,1fr);
+                gap:16px;padding:16px;overflow:auto}
+.ph-editor-side{min-width:0;padding-right:14px;border-right:1px solid var(--ui-line)}
+.ph-editor-main{min-width:0}
+.ph-editor-main .photo-adjust-wrap{margin-top:34px}
+.ph-editor-main .photo-adjust{min-height:260px}
+.ph-editor-actions{display:flex;gap:8px;align-items:flex-start;margin-top:10px}
+.ph-editor-actions #photoScope{flex:1;margin-top:0!important}
+.ph-editor-actions #btnPhotoApplyAll{width:auto!important;min-width:180px;margin-top:0!important}
+#btnPhotoEditor{width:100%;margin-top:8px;justify-content:center;gap:7px;background:var(--ui-warn);
+                border-color:var(--ui-warn);color:#2A1D07;font-weight:700}
+#btnPhotoEditor:hover:not(:disabled){background:#F2AE47;border-color:#F2AE47}
+.ph-card.focus{box-shadow:inset 3px 0 0 var(--ui-accent)}
+.ph-group-note{margin:8px 0 0;color:var(--ui-dim);font-size:11px;line-height:1.45}
+@media(max-width:760px){
+  .ph-editor{padding:8px}.ph-editor-body{grid-template-columns:1fr}.ph-editor-side{border-right:0;
+  border-bottom:1px solid var(--ui-line);padding:0 0 12px}.ph-editor-main .photo-adjust{min-height:200px}
+}
 
 /* ---------- 畫布上的人物照片變形（選取框＋四角等比縮放＋旋轉把手） ----------
    .ph-layer 掛在 .bncard（不是 .cv）上並覆蓋 .cv 的範圍：.cv 是 overflow:hidden，
@@ -457,31 +490,13 @@
           <div id="panePhoto" style="display:none">
             <div class="ph-sub" id="phUploadedCount">已上傳（0/2）</div>
             <div class="ph-layers" id="phLayers"></div>
-            <div class="ph-add-area">
-              <div class="ph-sub">新增</div>
-              <button type="button" id="btnPhotoAdd">＋ 上傳人物1照片</button>
-              <div class="mini hint" id="phAddHint" hidden>要換照片請用上面的「替換」</div>
-            </div>
             <input type="file" id="fPhoto" accept="image/*" hidden>
             <input type="file" id="fPhotoReplace" accept="image/*" hidden>
           </div>
-          <label class="fl" id="pvBoardRow" style="display:none;margin:6px 0 0">
-            <span class="mini hint">共編預覽版位</span>
-            <select id="selPvBoard" style="width:100%;margin-top:4px"></select>
-          </label>
-          <div id="photoAdjustWrap" class="photo-adjust-wrap" style="display:none">
-            <div id="photoAdjust" class="photo-adjust"></div>
-            <div id="photoAdjustOv" class="ph-layer2"></div>
-            <div class="photo-adjust-hint" id="photoAdjustHint">整體：拖曳位置・拉四角等比縮放</div>
-            <div class="photo-adjust-zoom">
-              <button type="button" id="photoZoomOut" title="縮小">−</button>
-              <button type="button" id="photoZoomReset" title="重設位置/縮放/角度">⟲</button>
-              <button type="button" id="photoZoomIn" title="放大">＋</button>
-            </div>
-          </div>
-          <div id="photoScope" class="mini hint" style="margin-top:8px;line-height:1.5"></div>
-          <button id="btnPhotoApplyAll" style="width:100%;justify-content:center;margin-top:6px">套用至所有版位</button>
-          <div class="mini hint">整體設定（所有版位）</div>
+          <button type="button" id="btnPhotoEditor">
+            <svg viewBox="0 0 24 24"><path d="M4 20h16M6 16l8.5-8.5 2 2L8 18H6v-2Z"/><path d="m13 9 2 2"/></svg>
+            開啟位置／縮放編輯器
+          </button>
         </div>
       </div>
 
@@ -489,11 +504,46 @@
   </aside>
 </main>
 
+<div class="ph-editor" id="photoEditorPopup" hidden>
+  <div class="ph-editor-box" role="dialog" aria-modal="true" aria-labelledby="photoEditorTitle">
+    <div class="ph-editor-head">
+      <h3 id="photoEditorTitle">人物位置／縮放編輯器</h3>
+      <span class="mini">Shift 點選兩張照片可群組變形</span>
+      <button type="button" class="ph-editor-close" id="btnPhotoEditorClose" aria-label="關閉">
+        <svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></svg>
+      </button>
+    </div>
+    <div class="ph-editor-body">
+      <div class="ph-editor-side">
+        <div class="ph-sub" id="phUploadedCountPopup">已上傳（0/2）</div>
+        <div class="ph-layers" id="phLayersPopup"></div>
+        <div class="ph-group-note">點一下＝單選；Shift＋點擊＝加入或移出群組。群組變形只支援兩張上傳照片。</div>
+      </div>
+      <div class="ph-editor-main">
+        <div id="photoAdjustWrap" class="photo-adjust-wrap" style="display:none">
+          <div id="photoAdjust" class="photo-adjust"></div>
+          <div id="photoAdjustOv" class="ph-layer2"></div>
+          <div class="photo-adjust-hint" id="photoAdjustHint">整體：拖曳位置・拉四角等比縮放</div>
+          <div class="photo-adjust-zoom">
+            <button type="button" id="photoZoomOut" title="縮小">−</button>
+            <button type="button" id="photoZoomReset" title="重設位置/縮放/角度">⟲</button>
+            <button type="button" id="photoZoomIn" title="放大">＋</button>
+          </div>
+        </div>
+        <div class="ph-editor-actions">
+          <div id="photoScope" class="mini hint" style="line-height:1.5"></div>
+          <button id="btnPhotoApplyAll">套用至所有版位</button>
+        </div>
+        <div class="mini hint">整體設定（所有未單獨調整的版位即時同步）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="ph-confirm" id="phConfirm" hidden>
   <div class="ph-confirm-box">
     <h4>套用至所有版位</h4>
-    <p>有 <b id="phConfirmN">0</b> 個版位在畫布上單獨調整過（位置／縮放／角度）。<br>
-       要連這些版位一起覆蓋成目前的整體設定嗎？</p>
+    <p id="phConfirmText"></p>
     <div class="ph-confirm-acts">
       <button id="phcAll" class="danger">覆蓋手動調整的版位</button>
       <button id="phcSafe">僅覆蓋未手動調整版位</button>
@@ -837,7 +887,8 @@
      開機時跟著框裡實際的東西走：存檔裡是自己上傳的照片就直接開在照片模式，
      否則（圖素或空的）開在圖素模式。 */
   const view = { mode: 'overview', zoom: 1, x: 0, y: 0, userAdjusted: false,
-                 selBoard: null, selIdx: 0, slot: 0, pvBoard: null,
+                 selBoard: null, selIdx: 0, slot: 0, multiSel: [0], pvBoard: null,
+                 photoPopup: false,
                  frameMode: (function () {
                    const u = ((initial.photos || [])[0] || {}).url || '';
                    return u && !stockIdOf(u) ? 'photo' : 'stock';
@@ -1188,8 +1239,8 @@
        位移原本寫成 translate(%)，% 是相對「元素自己的邊框盒」解析的——img 尺寸從
        整個定位框改成 contain 尺寸之後，同一組百分比的意義就變了，所以改成先乘出 px
        （仍以定位框 bw/bh 為基準，跟 geomFrom() 與已存檔的各版位微調完全等價）。 */
-    const t = photoTFor(st, i, boardId);
-    const sty = photoImgStyle(bw, bh, t, i, slotInk(st, i));
+    const t = photoTFor(st, i, boardId), ink = slotInk(st, i);
+    const sty = photoImgStyle(bw, bh, t, i, ink, photoUsesDefaultAnchor(st, i, boardId));
     const nm = photoSlotName(st, i);
     return '<div class="slot photo' + (url ? '' : ' empty') + '" data-photo-board="' + esc(boardId) +
            '" data-photo-idx="' + i + '" style="left:' + (box[0] * s) + 'px;top:' + (box[1] * s) +
@@ -1521,7 +1572,7 @@
     $('#stage').classList.toggle('ov-mode', view.mode === 'overview');
     $('#footMode').textContent = view.mode === 'overview'
       ? '總覽：點縮圖放大檢視'
-      : 'Alt＋滾輪縮放 · 拖曳空白處平移 · 點人物照片可單獨拖曳/四角等比縮放/旋轉（Shift 吸附 15°）';
+      : 'Alt＋滾輪縮放 · 拖曳空白處平移 · Shift 點人物可多選群組變形（旋轉時 Shift 吸附 15°）';
   }
   function setMode(m) {
     if (m !== 'canvas') view.selBoard = null;   /* 總覽沒有變形把手，選取狀態留著只會殘影 */
@@ -1982,10 +2033,6 @@
     return empty >= 0 ? empty : (arr.length < 2 ? arr.length : -1);
   }
   function hasPerson2(st) { return (st.photos || []).length > 1; }
-  $('#btnPhotoAdd').onclick = () => {
-    if (firstEmptyPhotoSlot(S()) < 0) return;
-    $('#fPhoto').click();
-  };
   $('#fPhoto').onchange = async e => {
     const file = e.target.files[0]; if (!file) return;
     try {
@@ -1995,7 +2042,7 @@
       const photos = (st.photos || []).slice();
       while (photos.length <= i) photos.push(Object.assign({}, EMPTY_PHOTO));
       photos[i] = Object.assign({}, photos[i], { url, ownUrl: url }, PHOTO_T_RESET);
-      view.frameMode = 'photo'; view.slot = i;
+      view.frameMode = 'photo'; view.slot = i; view.multiSel = [i];
       H.set(Object.assign({}, st, { photos,
         photoOrder: i === 1 ? [1, 0] : st.photoOrder }), {});
       XD.toast('已上傳' + photoSlotName(S(), i));
@@ -2009,7 +2056,7 @@
       const url = await downscaleToDataURL(file, PHOTO_MAX);
       const st = S();
       if (!photoAt(st, i) || !photoAt(st, i).ownUrl) return;
-      view.slot = i;
+      view.slot = i; view.multiSel = [i];
       setPhotoAt(st, i, Object.assign({ url, ownUrl: url }, PHOTO_T_RESET));
       XD.toast('已替換' + photoSlotName(S(), i));
     } catch (err) { console.error(err); XD.toast('照片讀取失敗：' + err.message); }
@@ -2106,21 +2153,19 @@
     eyeOff: '<svg class="ph-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M9.9 5.2A11.5 11.5 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3 3.6M6.1 6.1C3.4 8 2 12 2 12s3.6 7 10 7c1.4 0 2.8-.3 4-.8"/><path d="M10 10a3 3 0 0 0 4 4"/></svg>',
   };
   function paintPhotoLayers() {
-    const st = S(), row = $('#phLayers');
+    const st = S(), rows = [$('#phLayers'), $('#phLayersPopup')].filter(Boolean);
     const uploaded = (st.photos || []).filter(ph => ph && ph.ownUrl).length;
     $('#phUploadedCount').textContent = '已上傳（' + uploaded + '/2）';
-    const add = $('#btnPhotoAdd'), target = firstEmptyPhotoSlot(st);
-    add.disabled = target < 0;
-    add.textContent = target < 0 ? '已有兩位人物'
-      : '＋ 上傳人物' + (target + 1) + '照片' + (target === 1 ? '（左右並排）' : '');
-    $('#phAddHint').hidden = target >= 0;
+    if ($('#phUploadedCountPopup')) $('#phUploadedCountPopup').textContent = '已上傳（' + uploaded + '/2）';
+    const target = firstEmptyPhotoSlot(st);
     const order = photoOrderFor(st).filter(i => i < 2 && photoAt(st, i) && photoAt(st, i).ownUrl);
-    const cur = activeSlot(st), two = uploaded > 1;
+    const cur = activeSlot(st), selected = panelSelectedSlots(st), two = uploaded > 1;
     let h = '';
     /* 由上而下顯示最上層 → 最底層（photoOrder 第一個在底層）。 */
     order.slice().reverse().forEach((i, k) => {
       const ph = photoAt(st, i), off = !!ph.hidden;
-      h += '<div class="ph-card' + (i === cur ? ' on' : '') + (off ? ' off' : '') +
+      h += '<div class="ph-card' + (selected.indexOf(i) >= 0 ? ' on' : '') +
+           (i === cur ? ' focus' : '') + (off ? ' off' : '') +
            '" data-slot="' + i + '"><div class="ph-card-head">' +
            '<img class="th" src="' + esc(photoSrc(ph.ownUrl)) + '" alt="">' +
            '<span class="nm">人物' + (i + 1) + '</span>' +
@@ -2136,9 +2181,15 @@
            '<button type="button" data-photo-act="remove" title="移除人物' + (i + 1) + '">🗑</button>' +
            '</div></div>';
     });
-    row.innerHTML = h;
+    if (target >= 0) {
+      const label = '上傳人物' + (target + 1) + '照片';
+      h += '<button type="button" class="ph-layer-add" data-photo-add aria-label="' +
+           label + '" title="' + label + '">＋</button>';
+    }
+    rows.forEach(row => { row.innerHTML = h; });
   }
-  $('#phLayers').onclick = e => {
+  function onPhotoLayerClick(e) {
+    if (e.target.closest('[data-photo-add]')) { $('#fPhoto').click(); return; }
     const rowEl = e.target.closest('[data-slot]'); if (!rowEl) return;
     const i = +rowEl.dataset.slot, act = e.target.closest('[data-photo-act]');
     if (act) {
@@ -2165,11 +2216,13 @@
     /* 點圖層＝切到那一位。畫布上已經選著某塊板時把選取框一起搬過去——兩人的影像
        重疊時（例如刻意左右交換後），這是最可靠的「選到人物2」的方式；那一位在這塊板
        沒東西可選才退回只切右欄。 */
-    view.slot = i;
+    setPanelSelection(i, e.shiftKey);
     if (view.selBoard && photoUrl(S(), i) && !photoHidden(S(), i)) view.selIdx = i;
     else view.selBoard = null;
     paintPhotoLayers(); paintPhotoAdjust(); paintPhotoOverlay();
-  };
+  }
+  $('#phLayers').onclick = onPhotoLayerClick;
+  $('#phLayersPopup').onclick = onPhotoLayerClick;
 
   /* ============ 人物照片：位置/縮放調整 ============
      承 01_蝦導播 v14 js/product-zoom-plugin.js 的商品圖縮放語意（0.2～5 倍、滾輪＋按鈕）：
@@ -2218,6 +2271,23 @@
     const n = photoSlotCount(st);
     return Math.max(0, Math.min(view.slot, Math.max(0, n - 1)));
   }
+  function panelSelectedSlots(st) {
+    const out = [];
+    (view.multiSel || []).forEach(i => {
+      if ((i === 0 || i === 1) && out.indexOf(i) < 0 && photoUrl(st, i) && !photoHidden(st, i)) out.push(i);
+    });
+    return out.slice(twoPersonActive(st) ? -2 : -1);
+  }
+  function setPanelSelection(i, additive) {
+    const st = S();
+    if (!additive || !twoPersonActive(st)) {
+      view.multiSel = [i]; view.slot = i; return;
+    }
+    const sel = panelSelectedSlots(st).slice(), at = sel.indexOf(i);
+    if (at >= 0) sel.splice(at, 1); else if (sel.length < 2) sel.push(i);
+    view.multiSel = sel;
+    view.slot = i;
+  }
 
   /* 一組變形＝{x,y（相對定位框的位移%）, z（等比倍率）, r（角度）}。
      CSS 函式的合成順序是「寫在右邊的先套用」，transform-origin 預設是元素中心：
@@ -2238,17 +2308,27 @@
          時的溢出行為不見得可靠，而且 html2canvas 只認版面位置）
        · 再把「墨迹中心」搬到框心（base，疊在 scale/rotate 右邊＝先套用，所以縮放旋轉
          都是繞墨迹中心轉，不是繞含透明邊的畫布中心） */
-  function photoImgStyle(bw, bh, t, i, ink) {
+  /* 上傳照片只有在「從未手動調整」時才把 contain 的上下留白全放到上方。
+     回傳的是實際 transform：第一次開始拖曳時，geomFrom() 也會把同一個值當起點，
+     因此寫入手動設定後不會跳回舊的置中位置。圖素不走這條，仍由墨迹貼合。 */
+  function bottomAnchoredPhotoT(bw, bh, t, i, ink, enabled) {
+    if (!enabled || ink || !(bh > 0)) return t;
+    const rc = containRect(bw, bh, i, ink);
+    if (rc[1] >= bh) return t;
+    return { x: t.x, y: t.y + (bh - rc[1]) / 2 / bh * 100, z: t.z, r: t.r };
+  }
+  function photoImgStyle(bw, bh, t, i, ink, anchorBottom) {
     const rc = containRect(bw, bh, i, ink);
     const iw = ink ? rc[0] / ink.fillW : rc[0];
     const ih = ink ? rc[1] / ink.fillH : rc[1];
     const qx = ink ? (ink.cx - 0.5) * iw : 0;
     const qy = ink ? (ink.cy - 0.5) * ih : 0;
     const base = (qx || qy) ? ' translate(' + (-qx) + 'px,' + (-qy) + 'px)' : '';
+    const drawT = bottomAnchoredPhotoT(bw, bh, t, i, ink, anchorBottom);
     return { w: iw, h: ih, base: base,
              css: 'width:' + iw + 'px;height:' + ih + 'px;margin-left:' + (-iw / 2) +
                   'px;margin-top:' + (-ih / 2) + 'px;transform:' +
-                  photoImgTransform(t, bw, bh) + base + ';' };
+                  photoImgTransform(drawT, bw, bh) + base + ';' };
   }
   /* 這塊板實際要用哪一組：這張照片有手動調整過（photos[i].boards[id]）就用它，
      沒有才跟著右欄的整體設定走。這就是「手動調過的版位不會被整體調整取代」。 */
@@ -2263,6 +2343,15 @@
     const ph = photoAt(st, i);
     if (!ph) return { x: 0, y: 0, z: 1, r: 0 };
     return { x: ph.x || 0, y: ph.y || 0, z: ph.zoom == null ? 1 : ph.zoom, r: ph.r || 0 };
+  }
+  /* 有逐版位紀錄（即使數值恰好是 0）或整體設定不是初始值，都代表使用者已手動調整。
+     替換照片會把這兩層一起重設，所以自然重新取得預設貼底。 */
+  function photoUsesDefaultAnchor(st, i, boardId) {
+    const ph = photoAt(st, i); if (!ph) return false;
+    if (slotIsStock(st, i)) return false;
+    if (boardId != null && Object.prototype.hasOwnProperty.call(ph.boards || {}, boardId)) return false;
+    const t = globalPhotoT(st, i);
+    return t.x === 0 && t.y === 0 && t.z === 1 && t.r === 0;
   }
   function boardsWithOverride(st, i) {
     const ph = photoAt(st, i);
@@ -2301,14 +2390,14 @@
     if (hint) hint.textContent = photoSlotName(S(), i) + ' 整體　' +
                                  Math.round(t.z * 100) + '%・' + Math.round(t.r) + '°';
   }
-  /* ---- 共編預覽：綁一塊真實版位，把它的 N 個人物框照實際相對位置畫出來 ----
+  /* ---- 共編預覽：自動綁第一塊可用版位，把它的 N 個人物框照實際相對位置畫出來 ----
      為什麼不用「平均值捏一個排列」：量過 15 塊板（雙人版定位）——
        · 單一人物框的長寬比幾乎一致：0.782~0.934，標準差 0.032（差 1.19 倍）
          ⇒ 一個人的框形狀拿任一塊板當代表都夠準（這是舊版只顯示一個框時的做法）
        · 但「人物2 相對人物1 的偏移」差到 7.9 倍（0.108~0.859 個框寬），
          而且跟版位長寬比幾乎無關（相關係數 r=0.15）
          ⇒ 兩人的相對位置沒有公式算得出來，只能照某塊板的實際資料畫。
-     所以預覽一定要指定是「哪一塊板」，並讓使用者換著看（selPvBoard）。
+     所以內部仍要指定一塊真實版位作為代表，但不再把這項實作選擇暴露成 UI。
      這也是為什麼 photoOrder/變形都存成「相對自己定位框的比例」——那部分是
      版位無關的，換版位預覽不會改變已經調好的值。 */
   function pvBoardList(st) {
@@ -2354,7 +2443,7 @@
     const st = S(), host = $('#photoAdjust'), lay = panelLayout();
     if (!lay) { host.innerHTML = ''; host.style.height = ''; return; }
     host.style.height = lay.h + 'px';
-    const cur = activeSlot(st);
+    const cur = activeSlot(st), selected = panelSelectedSlots(st);
     let h = '';
     photoOrderFor(st).forEach(i => {
       const fr = lay.frames[i];
@@ -2362,8 +2451,11 @@
       const url = photoUrl(st, i);
       /* 圖跟畫布走同一支 photoImgStyle（含圖素的墨迹貼合），所以預覽框裡看到的
          大小/位置就是畫布上的比例 */
-      const sty = photoImgStyle(fr.w, fr.h, globalPhotoT(st, i), i, slotInk(st, i));
-      h += '<div class="photo-adjust-frame' + (i === cur ? ' on' : '') + '" data-pf="' + i + '"' +
+      const ink = slotInk(st, i);
+      const sty = photoImgStyle(fr.w, fr.h, globalPhotoT(st, i), i, ink,
+                                photoUsesDefaultAnchor(st, i, null));
+      h += '<div class="photo-adjust-frame' + (selected.indexOf(i) >= 0 ? ' on' : '') +
+           (i === cur ? ' focus' : '') + '" data-pf="' + i + '"' +
            ' style="left:' + fr.left + 'px;top:' + fr.top + 'px;width:' + fr.w +
            'px;height:' + fr.h + 'px">' +
            (url ? '<img data-pf-img="' + i + '" src="' + photoSrc(url) + '" alt="" style="' +
@@ -2372,25 +2464,29 @@
     });
     host.innerHTML = h;
   }
-  function paintPvBoard() {
-    const st = S(), list = pvBoardList(st), sel = $('#selPvBoard');
-    /* 只有雙人（多個框）才需要選版位——單人版每塊板的框形狀幾乎一樣，選了沒差 */
-    $('#pvBoardRow').style.display = (photoSlotCount(st) > 1 && list.length > 1) ? '' : 'none';
-    const cur = pvBoardId(st);
-    const sig = list.join('|');
-    if (sel.dataset.sig !== sig) {
-      sel.dataset.sig = sig;
-      sel.innerHTML = list.map(id => '<option value="' + esc(id) + '">' + esc(id) + '</option>').join('');
-    }
-    if (cur) sel.value = cur;
-  }
-  $('#selPvBoard').onchange = e => { view.pvBoard = e.target.value; paintPhotoAdjust(); };
   /* 人物槽的人話名稱：只有一個槽就叫「人物照片」，多個才編號 */
   function photoSlotName(st, i) {
     return photoSlotCount(st) > 1 ? '人物' + (i + 1) : '人物照片';
   }
   /* 每個槽的 url 各記一份，換槽/換圖才重新量長寬比（量測是 async，不要每次重畫都跑） */
   const LAST_PHOTO_URL = [];
+  function openPhotoEditor() {
+    if (!anyPhoto(S())) return;
+    view.photoPopup = true;
+    $('#photoEditorPopup').hidden = false;
+    if (!panelSelectedSlots(S()).length) view.multiSel = [activeSlot(S())];
+    paintPhotoLayers(); paintPhotoAdjust();
+    requestAnimationFrame(() => paintPhotoAdjust());
+  }
+  function closePhotoEditor() {
+    view.photoPopup = false;
+    $('#photoEditorPopup').hidden = true;
+  }
+  $('#btnPhotoEditor').onclick = openPhotoEditor;
+  $('#btnPhotoEditorClose').onclick = closePhotoEditor;
+  $('#photoEditorPopup').addEventListener('pointerdown', e => {
+    if (e.target.id === 'photoEditorPopup') closePhotoEditor();
+  });
   function paintPhotoAdjust() {
     const st = S(), i = activeSlot(st), url = photoUrl(st, i);
     /* 所有槽的長寬比都要維持最新：畫布上兩張同時在畫，不能只量正在編的那一張 */
@@ -2402,9 +2498,11 @@
     /* 共編器只要「有人」就顯示（雙人版要兩人一起看得到相對位置），
        但下面那排按鈕作用在「目前選取的那一位」，所以按鈕跟著 url 決定 disabled。 */
     const shown = anyPhoto(st);
+    $('#btnPhotoEditor').style.display = shown ? '' : 'none';
     $('#photoAdjustWrap').style.display = shown ? '' : 'none';
-    $('#btnPhotoApplyAll').disabled = !url;
-    paintPvBoard();
+    const hasSelection = panelSelectedSlots(st).length > 0;
+    $('#btnPhotoApplyAll').disabled = !url || !hasSelection;
+    ['#photoZoomOut','#photoZoomReset','#photoZoomIn'].forEach(sel => { $(sel).disabled = !hasSelection; });
     if (!shown) { $('#photoAdjust').innerHTML = ''; $('#photoAdjustOv').innerHTML = '';
                   paintPhotoScope(); return; }
     paintPanelFrames();
@@ -2415,41 +2513,57 @@
      不會被整體設定蓋掉。「套用至所有版位」永遠在（黃色＝會蓋掉別人手動成果的動作），
      真的有手動版位時才會跳三選一確認。 */
   function paintPhotoScope() {
-    const st = S(), i = activeSlot(st), n = boardsWithOverride(st, i).length;
+    const st = S(), slots = panelSelectedSlots(st);
     const el = $('#photoScope'); if (!el) return;
-    const who = photoSlotCount(st) > 1 ? photoSlotName(st, i) + '：' : '';
-    el.innerHTML = n
-      ? who + '有 <b>' + n + '</b> 個版位在畫布上單獨調整過，<b>不會</b>被上面的整體調整覆蓋。'
-      : who + '目前所有版位都跟著整體設定走。';
+    if (!slots.length) { el.textContent = '未選取人物。'; return; }
+    el.innerHTML = slots.map(i => {
+      const n = boardsWithOverride(st, i).length;
+      return photoSlotName(st, i) + (n
+        ? '有 <b>' + n + '</b> 個版位單獨調整過'
+        : '所有版位都跟著整體設定');
+    }).join('；') + '。';
   }
 
   /* ---- 「套用至所有版位」：有手動版位才問，三選一 ---- */
+  let PH_CONFIRM_SLOTS = [];
   function closePhConfirm() { $('#phConfirm').hidden = true; }
   $('#btnPhotoApplyAll').onclick = () => {
-    const st = S(), i = activeSlot(st); if (!photoUrl(st, i)) return;
-    const n = boardsWithOverride(st, i).length;
-    if (!n) { XD.toast('所有版位本來就跟著整體設定，不用再套用'); return; }
-    $('#phConfirmN').textContent = n;
+    const st = S(), slots = panelSelectedSlots(st).filter(i => photoUrl(st, i));
+    const rows = slots.map(i => ({ i:i, n:boardsWithOverride(st, i).length }));
+    if (!rows.some(x => x.n)) { XD.toast('所選人物的所有版位本來就跟著整體設定，不用再套用'); return; }
+    PH_CONFIRM_SLOTS = slots;
+    $('#phConfirmText').innerHTML = rows.map(x => '<b>' + esc(photoSlotName(st, x.i)) +
+      '：' + x.n + ' 個版位</b>').join('<br>') +
+      '<br>要連這些單獨調整一起覆蓋成目前的整體設定嗎？';
     $('#phConfirm').hidden = false;
   };
   $('#phcAll').onclick = () => {
-    const st = S(), i = activeSlot(st), n = boardsWithOverride(st, i).length;
+    const st = S(), slots = PH_CONFIRM_SLOTS.slice(), photos = (st.photos || []).slice();
+    const summary = [];
+    slots.forEach(i => {
+      const ph = photos[i]; if (!ph) return;
+      summary.push(photoSlotName(st, i) + ' ' + boardsWithOverride(st, i).length + ' 個');
+      photos[i] = Object.assign({}, ph, { boards:{} });
+    });
     closePhConfirm();
-    /* 只清掉「目前這一位」的逐版位覆蓋，另一位的手動調整不受影響 */
-    setPhotoAt(st, i, { boards: {} });
-    XD.toast('已把' + photoSlotName(st, i) + '套用至所有版位，含 ' + n +
-             ' 個原本手動調整過的版位（可用 Ctrl+Z 復原）');
+    H.set(Object.assign({}, st, { photos:photos }), { key:'photoApplyAll:group' });
+    XD.toast('已套用至所有版位（' + summary.join('、') + '，可用 Ctrl+Z 復原）');
   };
   $('#phcSafe').onclick = () => {
-    const n = boardsWithOverride(S(), activeSlot(S())).length;
+    const st = S(), summary = PH_CONFIRM_SLOTS.map(i =>
+      photoSlotName(st, i) + ' ' + boardsWithOverride(st, i).length + ' 個').join('、');
     closePhConfirm();
     /* 未手動調整的版位本來就即時跟著整體設定走，不用再寫一次狀態；
        這個選項的意義是「確認過了，而且不要動我手動調過的那幾塊」。 */
-    XD.toast('未手動調整的版位已套用整體設定；保留 ' + n + ' 個手動調整的版位');
+    XD.toast('未手動調整的版位已套用整體設定；保留 ' + summary);
   };
   $('#phcCancel').onclick = closePhConfirm;
   $('#phConfirm').addEventListener('pointerdown', e => { if (e.target.id === 'phConfirm') closePhConfirm(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#phConfirm').hidden) closePhConfirm(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('#phConfirm').hidden) closePhConfirm();
+    else if (!$('#photoEditorPopup').hidden) closePhotoEditor();
+  });
 
   /* ---- 右欄整體調整：跟畫布上同一套選取框（拖曳移動／四角等比縮放／把手旋轉） ----
      原本這裡是「滾輪縮放」，使用者回報在右欄捲動時很常誤觸，改掉了：現在滾輪不做任何事，
@@ -2460,9 +2574,77 @@
     const fr = $('#photoAdjust').querySelector('[data-pf="' + i + '"]');
     if (!fr || !fr.offsetWidth || !fr.offsetHeight) return null;
     return geomFrom(fr.offsetLeft, fr.offsetTop, fr.offsetWidth, fr.offsetHeight,
-                    globalPhotoT(S(), i), i, slotInk(S(), i));
+                    globalPhotoT(S(), i), i, slotInk(S(), i), photoUsesDefaultAnchor(S(), i, null));
   }
   function panelGeom() { return panelGeomFor(activeSlot(S())); }
+  function panelSelectionItems() {
+    return panelSelectedSlots(S()).map(i => ({ i: i, g: panelGeomFor(i) })).filter(x => x.g);
+  }
+  function groupGeom(items) {
+    if (!items || !items.length) return null;
+    let cx = 0, cy = 0;
+    items.forEach(x => { cx += x.g.cx; cy += x.g.cy; });
+    cx /= items.length; cy /= items.length;
+    let hw = 0, hh = 0;
+    items.forEach(x => {
+      hw = Math.max(hw, Math.abs(x.g.cx - cx) + x.g.hw);
+      hh = Math.max(hh, Math.abs(x.g.cy - cy) + x.g.hh);
+    });
+    return { t:{x:0,y:0,z:1,r:0}, ox:cx, oy:cy, cx:cx, cy:cy, hw:hw, hh:hh,
+             rw:hw * 2, rh:hh * 2, bw:hw * 2, bh:hh * 2 };
+  }
+  function transformFromCenter(g, cx, cy, z, r) {
+    return { x:(cx - g.ox) / g.bw * 100, y:(cy - g.oy) / g.bh * 100, z:z, r:r };
+  }
+  /* 群組運算全部在彈窗預覽的絕對 px 空間完成，再換回各自定位框的百分比。
+     scale 固定群組中心；rotate 同時做各自自轉與中心公轉。 */
+  function groupPhotoTransforms(items, mode, arg) {
+    const grp = groupGeom(items), out = {};
+    if (!grp) return out;
+    let factor = arg && arg.factor == null ? 1 : +(arg && arg.factor);
+    if (mode === 'scale') {
+      let lo = 0, hi = Infinity;
+      items.forEach(x => {
+        lo = Math.max(lo, PHOTO_ZOOM_MIN / x.g.t.z);
+        hi = Math.min(hi, PHOTO_ZOOM_MAX / x.g.t.z);
+      });
+      factor = clamp(isFinite(factor) ? factor : 1, lo, hi);
+    }
+    const deg = +(arg && arg.deg) || 0, rad = deg * Math.PI / 180;
+    const dx = +(arg && arg.dx) || 0, dy = +(arg && arg.dy) || 0;
+    items.forEach(x => {
+      const g = x.g;
+      let cx = g.cx, cy = g.cy, z = g.t.z, r = g.t.r;
+      if (mode === 'move') { cx += dx; cy += dy; }
+      else if (mode === 'scale') {
+        cx = grp.cx + (g.cx - grp.cx) * factor;
+        cy = grp.cy + (g.cy - grp.cy) * factor;
+        z *= factor;
+      } else if (mode === 'rot') {
+        const qx = g.cx - grp.cx, qy = g.cy - grp.cy;
+        cx = grp.cx + qx * Math.cos(rad) - qy * Math.sin(rad);
+        cy = grp.cy + qx * Math.sin(rad) + qy * Math.cos(rad);
+        r += deg;
+      }
+      out[x.i] = transformFromCenter(g, cx, cy, z, r);
+    });
+    return out;
+  }
+  function geomsWithTransforms(items, byIdx) {
+    return items.map(x => {
+      const t = byIdx[x.i], g = x.g;
+      return { i:x.i, g:Object.assign({}, g, { t:t,
+        cx:g.ox + t.x / 100 * g.bw, cy:g.oy + t.y / 100 * g.bh,
+        hw:g.rw * t.z / 2, hh:g.rh * t.z / 2 }) };
+    });
+  }
+  function positionGroupOverlay(layer, g) {
+    const el = layer && layer.querySelector('.ph-ov');
+    if (!el || !g) return;
+    el.style.left = g.cx + 'px'; el.style.top = g.cy + 'px';
+    el.style.width = (g.hw * 2) + 'px'; el.style.height = (g.hh * 2) + 'px';
+    el.style.transform = 'translate(-50%,-50%)';
+  }
   /* 跟畫布同一套命中測試（見 photoHitAt）：座標基準是 .photo-adjust，
      框的位置本來就是用 offsetLeft/offsetTop 算的，所以基準一致。 */
   function panelHitAt(e) {
@@ -2471,13 +2653,56 @@
   }
   function paintPanelOverlay() {
     const ov = $('#photoAdjustOv'); if (!ov) return;
-    const st = S();
-    const g = photoUrl(st, activeSlot(st)) ? panelGeom() : null;
+    const items = panelSelectionItems();
+    if (items.length > 1) {
+      const g = groupGeom(items);
+      ov.innerHTML = g ? ovFrameHTML(g) : '';
+      return;
+    }
+    const g = items.length ? items[0].g : null;
     ov.innerHTML = g ? ovFrameHTML(g) : '';
   }
   function commitPhotoAdjust(t) {
     const st = S(), i = activeSlot(st);
     setPhotoAt(st, i, { x: t.x, y: t.y, zoom: t.z, r: t.r }, { key: 'photoAdjust:' + i });
+  }
+  function commitPhotoAdjustGroup(tByIdx) {
+    const st = S(), photos = (st.photos || []).slice();
+    Object.keys(tByIdx || {}).forEach(k => {
+      const i = +k, t = tByIdx[k], ph = photos[i] || EMPTY_PHOTO;
+      photos[i] = Object.assign({}, ph, { x:t.x, y:t.y, zoom:t.z, r:t.r });
+    });
+    H.set(Object.assign({}, st, { photos:photos }), { key:'photoAdjust:group' });
+  }
+  let PGRAG = null;
+  function beginPanelGroupDrag(e, mode, items) {
+    const host = $('#photoAdjust'), r = host.getBoundingClientRect(), grp = groupGeom(items);
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    PGRAG = { mode:mode, items:items, grp:grp, sx:px, sy:py, geoEl:host };
+    if (mode === 'scale') PGRAG.d0 = Math.hypot(px - grp.cx, py - grp.cy) || 1;
+    if (mode === 'rot') PGRAG.a0 = Math.atan2(py - grp.cy, px - grp.cx);
+  }
+  function movePanelGroupDrag(e) {
+    if (!PGRAG) return;
+    const d = PGRAG, r = d.geoEl.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let arg;
+    if (d.mode === 'move') arg = { dx:px - d.sx, dy:py - d.sy };
+    else if (d.mode === 'scale') arg = { factor:Math.hypot(px - d.grp.cx, py - d.grp.cy) / d.d0 };
+    else {
+      let deg = (Math.atan2(py - d.grp.cy, px - d.grp.cx) - d.a0) * 180 / Math.PI;
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      arg = { deg:deg };
+    }
+    d.tByIdx = groupPhotoTransforms(d.items, d.mode, arg);
+    Object.keys(d.tByIdx).forEach(i => applyPhotoTransformDOM(+i, d.tByIdx[i]));
+    const live = groupGeom(geomsWithTransforms(d.items, d.tByIdx));
+    positionGroupOverlay($('#photoAdjustOv'), live);
+  }
+  function endPanelGroupDrag() {
+    if (!PGRAG) return;
+    const tByIdx = PGRAG.tByIdx; PGRAG = null;
+    if (tByIdx) commitPhotoAdjustGroup(tByIdx);
   }
   $('#photoAdjustWrap').addEventListener('pointerdown', e => {
     if (e.target.closest('.photo-adjust-zoom')) return;
@@ -2491,13 +2716,33 @@
        兩人的框會重疊，而且位移一大影像就不在自己的框裡了。 */
     if (!h) {
       const pi = panelHitAt(e);
-      if (pi < 0) return;                  /* 點在空白處＝不抓（避免誤把照片拖走） */
-      if (pi !== activeSlot(S())) {
-        view.slot = pi; view.selBoard = null;
+      if (pi < 0) {
+        view.multiSel = [];
+        paintPhotoLayers(); paintPanelFrames(); paintPanelOverlay(); paintPhotoScope();
+        e.preventDefault();
+        return;
+      }
+      if (e.shiftKey) {
+        setPanelSelection(pi, true); view.selBoard = null;
         paintPhotoLayers(); paintPhotoAdjust();
+        e.preventDefault(); return;
+      }
+      if (panelSelectedSlots(S()).indexOf(pi) < 0) {
+        setPanelSelection(pi, false); view.selBoard = null;
+        paintPhotoLayers(); paintPhotoAdjust();
+      } else if (pi !== activeSlot(S())) {
+        view.slot = pi; paintPhotoLayers(); paintPhotoAdjust();
       }
     }
     if (!photoUrl(S(), activeSlot(S()))) return;
+    const items = panelSelectionItems();
+    if (items.length > 1) {
+      e.preventDefault();
+      beginPanelGroupDrag(e, h ? (h.dataset.ph === 'rot' ? 'rot' : 'scale') : 'move', items);
+      if (!h) $('#photoAdjust').classList.add('grabbing');
+      $('#photoAdjustWrap').setPointerCapture(e.pointerId);
+      return;
+    }
     const g = panelGeom(); if (!g) return;
     e.preventDefault();
     beginTransformDrag(e, {
@@ -2511,10 +2756,12 @@
     if (!h) $('#photoAdjust').classList.add('grabbing');
     $('#photoAdjustWrap').setPointerCapture(e.pointerId);
   });
-  $('#photoAdjustWrap').addEventListener('pointermove', moveTransformDrag);
+  $('#photoAdjustWrap').addEventListener('pointermove', e => {
+    if (PGRAG) movePanelGroupDrag(e); else moveTransformDrag(e);
+  });
   const endPanelDrag = () => {
     $('#photoAdjust').classList.remove('grabbing');
-    endTransformDrag();
+    if (PGRAG) endPanelGroupDrag(); else endTransformDrag();
   };
   $('#photoAdjustWrap').addEventListener('pointerup', endPanelDrag);
   $('#photoAdjustWrap').addEventListener('pointercancel', endPanelDrag);
@@ -2532,14 +2779,16 @@
   /* ±按鈕：倍率式（乘除）不是加減固定值——0.2～5 這麼大的範圍用加減的話，
      小倍率時每格都跳很大、大倍率時又幾乎不動，乘除才會整段手感一致。 */
   function zoomPhotoBy(f) {
-    const st = S(), i = activeSlot(st); if (!photoUrl(st, i)) return;
-    const t = globalPhotoT(st, i);
+    const st = S(), i = activeSlot(st); if (!panelSelectedSlots(st).length || !photoUrl(st, i)) return;
+    /* 第一次按縮放時以畫面上已貼底的實際位置為起點；否則一變成「手動」就會跳回框心。 */
+    const g = panelGeom(), t = g ? g.t : globalPhotoT(st, i);
     commitPhotoAdjust({ x: t.x, y: t.y, z: clamp(t.z * f, PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX), r: t.r });
   }
   $('#photoZoomIn').onclick = () => zoomPhotoBy(1 + PHOTO_ZOOM_STEP);
   $('#photoZoomOut').onclick = () => zoomPhotoBy(1 / (1 + PHOTO_ZOOM_STEP));
   $('#photoZoomReset').onclick = () => {
-    if (photoUrl(S(), activeSlot(S()))) commitPhotoAdjust({ x: 0, y: 0, z: 1, r: 0 });
+    if (panelSelectedSlots(S()).length && photoUrl(S(), activeSlot(S())))
+      commitPhotoAdjust({ x: 0, y: 0, z: 1, r: 0 });
   };
 
   /* ============ 人物照片變形：右欄（整體）與畫布（單一版位）共用的一套 ============
@@ -2584,19 +2833,20 @@
     return ar > bw / bh ? [bw, bw / ar] : [bh * ar, bh];
   }
   /* 一組幾何：定位框在座標系裡的位置/大小 + 這組變形算出來的影像中心與半寬高 */
-  function geomFrom(bx, by, bw, bh, t, i, ink) {
+  function geomFrom(bx, by, bw, bh, t, i, ink, anchorBottom) {
     const rc = containRect(bw, bh, i, ink);
-    return { t: t, bw: bw, bh: bh,
+    const drawT = bottomAnchoredPhotoT(bw, bh, t, i, ink, anchorBottom);
+    return { t: drawT, bw: bw, bh: bh,
              ox: bx + bw / 2, oy: by + bh / 2,                    /* 定位框中心＝位移的原點 */
-             cx: bx + bw / 2 + t.x / 100 * bw,
-             cy: by + bh / 2 + t.y / 100 * bh,
-             hw: rc[0] * t.z / 2, hh: rc[1] * t.z / 2, rw: rc[0], rh: rc[1] };
+             cx: bx + bw / 2 + drawT.x / 100 * bw,
+             cy: by + bh / 2 + drawT.y / 100 * bh,
+             hw: rc[0] * drawT.z / 2, hh: rc[1] * drawT.z / 2, rw: rc[0], rh: rc[1] };
   }
   function photoGeom(b, st, s, i) {
     const box = photoBoxAt(st, i, b.id);
     if (!box || !photoUrl(st, i)) return null;
     return geomFrom(box[0] * s, box[1] * s, box[2] * s, box[3] * s,
-                    photoTFor(st, i, b.id), i, slotInk(st, i));
+                    photoTFor(st, i, b.id), i, slotInk(st, i), photoUsesDefaultAnchor(st, i, b.id));
   }
   /* ============ 命中測試：點在「看得到的影像」上才算抓到照片 ============
      2026-09-17 使用者回報：「位移過大、左右交換的時候，人物1 的選取區域不符合圖片，
@@ -2764,24 +3014,37 @@
     const g = photoGeom(b, st, view.zoom, view.selIdx);
     return g ? { b: b, g: g } : null;
   }
+  function boardSelectionItems(id) {
+    const st = S(), b = PACK.boards.find(x => x.id === id);
+    if (!b || st.on.indexOf(id) < 0) return [];
+    return panelSelectedSlots(st).map(i => ({ i:i, g:photoGeom(b, st, view.zoom, i) }))
+      .filter(x => x.g);
+  }
   function paintPhotoOverlay() {
     XD.$$('.ph-layer').forEach(el => el.remove());
     if (view.mode !== 'canvas') return;
-    const sel = selectedGeom(); if (!sel) return;
+    if (!view.selBoard) return;
     const cv = document.querySelector('.cv[data-cv="' + CSS.escape(view.selBoard) + '"]');
     const card = cv && cv.closest('.bncard'); if (!card) return;
-    const g = sel.g;
+    const items = boardSelectionItems(view.selBoard);
+    if (!items.length) return;
+    const grouped = items.length > 1;
+    const g = grouped ? groupGeom(items) : items[0].g;
     const lay = document.createElement('div');
     lay.className = 'ph-layer';
     lay.style.cssText = 'left:' + cv.offsetLeft + 'px;top:' + cv.offsetTop +
                         'px;width:' + cv.offsetWidth + 'px;height:' + cv.offsetHeight + 'px';
     const stNow = S();
-    const phNow = photoAt(stNow, view.selIdx);
-    const own = !!((phNow && phNow.boards) || {})[view.selBoard];
-    const who = photoSlotCount(stNow) > 1 ? photoSlotName(stNow, view.selIdx) + '　' : '';
+    const selectedIdx = items.map(x => x.i);
+    const own = selectedIdx.some(i => {
+      const ph = photoAt(stNow, i); return !!((ph && ph.boards) || {})[view.selBoard];
+    });
+    const oneIdx = selectedIdx[0];
+    const who = grouped ? selectedIdx.map(i => photoSlotName(stNow, i)).join('＋')
+                        : (photoSlotCount(stNow) > 1 ? photoSlotName(stNow, oneIdx) + '　' : '');
     lay.innerHTML = ovFrameHTML(g) +
       '<div class="ph-hud" style="left:' + g.cx + 'px;top:' + (g.cy + g.hh + 14) + 'px">' +
-        '<span data-ph-val>' + who + Math.round(g.t.z * 100) + '%・' + Math.round(g.t.r) + '°</span>' +
+        '<span data-ph-val>' + (grouped ? who : who + Math.round(g.t.z * 100) + '%・' + Math.round(g.t.r) + '°') + '</span>' +
         (own ? '<button data-ph="reset" title="回到右欄的整體設定">⟲ 還原</button>'
              : '<span class="dim">跟隨整體設定</span>') +
       '</div>';
@@ -2793,6 +3056,16 @@
     pb[id] = { x: t.x, y: t.y, z: t.z, r: t.r };
     setPhotoAt(st, i, { boards: pb }, { key: 'photoBoard:' + i + ':' + id });
   }
+  function commitBoardPhotoGroup(id, tByIdx) {
+    const st = S(), photos = (st.photos || []).slice();
+    Object.keys(tByIdx || {}).forEach(k => {
+      const i = +k, t = tByIdx[k], ph = photos[i] || EMPTY_PHOTO;
+      const boards = Object.assign({}, ph.boards || {});
+      boards[id] = { x:t.x, y:t.y, z:t.z, r:t.r };
+      photos[i] = Object.assign({}, ph, { boards:boards });
+    });
+    H.set(Object.assign({}, st, { photos:photos }), { key:'photoBoard:group:' + id });
+  }
   const world = $('#world');
   /* 這塊板上的命中測試。座標換算成「.cv 內的版面 px」——畫布縮放是把座標乘上
      view.zoom 重新排版的（見 render()），#world 只有 translate 沒有 scale，
@@ -2803,6 +3076,37 @@
     const r = cv.getBoundingClientRect();
     return photoHitAt(st, e.clientX - r.left, e.clientY - r.top,
                       i => photoGeom(b, st, view.zoom, i));
+  }
+  let CGRAG = null;
+  function beginCanvasGroupDrag(e, mode, items, cv, id) {
+    const r = cv.getBoundingClientRect(), grp = groupGeom(items);
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    CGRAG = { mode:mode, items:items, grp:grp, sx:px, sy:py, geoEl:cv, id:id };
+    if (mode === 'scale') CGRAG.d0 = Math.hypot(px - grp.cx, py - grp.cy) || 1;
+    if (mode === 'rot') CGRAG.a0 = Math.atan2(py - grp.cy, px - grp.cx);
+  }
+  function moveCanvasGroupDrag(e) {
+    if (!CGRAG) return;
+    const d = CGRAG, r = d.geoEl.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    let arg;
+    if (d.mode === 'move') arg = { dx:px - d.sx, dy:py - d.sy };
+    else if (d.mode === 'scale') arg = { factor:Math.hypot(px - d.grp.cx, py - d.grp.cy) / d.d0 };
+    else {
+      let deg = (Math.atan2(py - d.grp.cy, px - d.grp.cx) - d.a0) * 180 / Math.PI;
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      arg = { deg:deg };
+    }
+    d.tByIdx = groupPhotoTransforms(d.items, d.mode, arg);
+    Object.keys(d.tByIdx).forEach(i => applyPhotoTFor(d.id, +i, d.tByIdx[i]));
+    positionGroupOverlay(document.querySelector('.ph-layer'),
+      groupGeom(geomsWithTransforms(d.items, d.tByIdx)));
+  }
+  function endCanvasGroupDrag() {
+    if (!CGRAG) return;
+    const id = CGRAG.id, tByIdx = CGRAG.tByIdx;
+    CGRAG = null;
+    if (tByIdx) commitBoardPhotoGroup(id, tByIdx);
   }
   world.addEventListener('pointerdown', e => {
     if (view.mode !== 'canvas') return;
@@ -2818,21 +3122,44 @@
       const cv = e.target.closest('.cv[data-cv]');
       idx = cv ? cvHitAt(st, cv, e) : -1;
       if (idx < 0) {
-        if (view.selBoard) { view.selBoard = null; paintPhotoOverlay(); }
+        if (view.selBoard) {
+          view.selBoard = null; view.multiSel = [];
+          paintPhotoLayers(); paintPhotoOverlay();
+        }
         return;
       }
       id = cv.dataset.cv;
     }
     if (!id || !photoUrl(st, idx)) return;
     e.preventDefault(); e.stopPropagation();               /* 不要同時觸發畫布平移 */
-    if (view.selBoard !== id || view.selIdx !== idx) {
+    if (!h && e.shiftKey && view.selBoard === id && twoPersonActive(st)) {
+      setPanelSelection(idx, true);
+      const remain = panelSelectedSlots(st);
+      if (remain.length) {
+        view.selIdx = remain[remain.length - 1]; view.slot = view.selIdx;
+      } else view.selBoard = null;
+      paintPhotoLayers(); paintPhotoOverlay();
+      return;
+    }
+    const selected = panelSelectedSlots(st);
+    if (view.selBoard !== id || selected.indexOf(idx) < 0) {
+      setPanelSelection(idx, false);
       view.selBoard = id; view.selIdx = idx;
       /* 右欄跟著跳到同一位，不然畫布在調人物2、右欄卻顯示人物1 */
       if (view.slot !== idx) { view.slot = idx; paintPhotoLayers(); paintPhotoAdjust(); }
       paintPhotoOverlay();
+    } else if (view.selIdx !== idx) {
+      view.selIdx = idx; view.slot = idx;
+      paintPhotoLayers(); paintPhotoOverlay();
+    }
+    const cv = document.querySelector('.cv[data-cv="' + CSS.escape(id) + '"]');
+    const items = boardSelectionItems(id);
+    if (items.length > 1) {
+      beginCanvasGroupDrag(e, h ? (h.dataset.ph === 'rot' ? 'rot' : 'scale') : 'move', items, cv, id);
+      world.setPointerCapture(e.pointerId);
+      return;
     }
     const sel = selectedGeom(); if (!sel) return;
-    const cv = document.querySelector('.cv[data-cv="' + CSS.escape(id) + '"]');
     beginTransformDrag(e, {
       mode: h ? (h.dataset.ph === 'rot' ? 'rot' : 'scale') : 'move',
       corner: h ? h.dataset.ph : null,
@@ -2843,14 +3170,14 @@
     });
     world.setPointerCapture(e.pointerId);
   });
-  world.addEventListener('pointermove', moveTransformDrag);
-  world.addEventListener('pointerup', endTransformDrag);
-  world.addEventListener('pointercancel', endTransformDrag);
+  world.addEventListener('pointermove', e => { moveTransformDrag(e); moveCanvasGroupDrag(e); });
+  world.addEventListener('pointerup', () => { endTransformDrag(); endCanvasGroupDrag(); });
+  world.addEventListener('pointercancel', () => { endTransformDrag(); endCanvasGroupDrag(); });
   /* 游標提示：抓得到才顯示 move。照片的空白處要交還給畫布平移，游標就不該說「抓得到」
      ——命中規則既然不是「整個框」，就得讓人看得出真正的可抓範圍在哪。 */
   let CUR_CV = null;
   world.addEventListener('pointermove', e => {
-    if (TDRAG || view.mode !== 'canvas') return;
+    if (TDRAG || CGRAG || view.mode !== 'canvas') return;
     const cv = e.target.closest('.cv[data-cv]');
     if (CUR_CV && CUR_CV !== cv) { CUR_CV.style.cursor = ''; CUR_CV = null; }
     if (!cv) return;
@@ -2860,11 +3187,16 @@
   world.addEventListener('click', e => {
     const btn = e.target.closest('[data-ph="reset"]'); if (!btn) return;
     e.stopPropagation();
-    const st = S(), i = view.selIdx, ph = photoAt(st, i) || EMPTY_PHOTO;
-    const pb = Object.assign({}, ph.boards || {});
-    delete pb[view.selBoard];
-    setPhotoAt(st, i, { boards: pb });
-    XD.toast('已還原這個版位的' + photoSlotName(st, i) + '，改回跟著整體設定');
+    const st = S(), id = view.selBoard;
+    const slots = boardSelectionItems(id).map(x => x.i);
+    const photos = (st.photos || []).slice();
+    slots.forEach(i => {
+      const ph = photos[i] || EMPTY_PHOTO, boards = Object.assign({}, ph.boards || {});
+      delete boards[id];
+      photos[i] = Object.assign({}, ph, { boards:boards });
+    });
+    H.set(Object.assign({}, st, { photos:photos }), { key:'photoBoard:reset:' + id });
+    XD.toast('已還原這個版位的' + slots.map(i => photoSlotName(st, i)).join('、') + '，改回跟著整體設定');
   });
 
   /* ============ 工單匯入：解析完直接套用，不用再按一次確認 ============
@@ -3198,7 +3530,8 @@
                          if (b) b.click(); return !!b; },
     LOGO_INK, syncVendorInk, findLogoFiles, isCentered, themeFor, placementFor, downloadPackage, boardInnerHTML, cvBgStyleExport,
     downscaleToDataURL, photoFromPool, findAssetKey, matchByNames, PHOTO_MAX, LOGO_MAX,
-    photoTFor, photoGeom, photoImgStyle, paintPhotoOverlay, setBoardPhotoT, arLines, arWraps,
+    photoTFor, photoGeom, photoImgStyle, photoUsesDefaultAnchor, bottomAnchoredPhotoT,
+    paintPhotoOverlay, setBoardPhotoT, arLines, arWraps,
     photoBoxAt, slotInk, slotIsStock, stockFrame, measureLogoInk,
     photoHitAt, photoLocalUV, photoOpaqueAt, ensurePhotoMask, panelHitAt, panelGeomFor,
     get photoMask() { return PHOTO_MASK; },
@@ -3207,11 +3540,14 @@
     twoPersonActive, splitDuoFrame, DUO_OVERLAP, hasPerson2,
     photoBoxes, photoSlotCount, photoAt, photoUrl, anyPhoto, setPhotoAt, placementSetId,
     photoOrderFor, photoHidden, panelLayout, pvBoardList, pvBoardId,
+    panelSelectedSlots, setPanelSelection, panelSelectionItems, groupGeom, groupPhotoTransforms,
+    commitPhotoAdjustGroup, openPhotoEditor, closePhotoEditor,
+    beginTransformDrag, moveTransformDrag, endTransformDrag,
     get pvBoard() { return view.pvBoard; },
-    setPvBoard: id => { const el = $('#selPvBoard'); el.value = id; el.dispatchEvent(new Event('change')); },
+    setPvBoard: id => { view.pvBoard = id; paintPhotoAdjust(); return pvBoardId(S()) === id; },
     photosFromNames, boardsWithOverride, globalPhotoT,
     get photoSlot() { return view.slot; },
-    setPhotoSlot: i => { view.slot = i; paintPhotoLayers(); paintPhotoAdjust(); paintPhotoOverlay(); },
+    setPhotoSlot: i => { view.slot = i; view.multiSel = [i]; paintPhotoLayers(); paintPhotoAdjust(); paintPhotoOverlay(); },
     get stock() { return STOCK; }, stockIdOf, stockUrl, defaultStockUrl, photoSrc, paintStock,
     pickStock: id => { const b = document.querySelector('[data-stock="' + id + '"]');
                        if (b) b.click(); return !!b; },

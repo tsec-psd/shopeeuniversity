@@ -390,6 +390,42 @@
 .right-panel .sg-body{padding-bottom:2px}
 #btnClearAll.danger{background:#C4362B;border-color:#C4362B;color:#fff}
 #btnClearAll.danger:hover{background:#A82D25;border-color:#A82D25}
+/* ---------- 開場匯入精靈 ---------- */
+.onboard{position:fixed;inset:0;z-index:10040;background:rgba(0,0,0,.56);
+         display:flex;align-items:center;justify-content:center;padding:24px}
+.onboard[hidden]{display:none}
+.onboard-box{position:relative;width:min(92vw,760px);background:var(--ui-panel);
+             border:1px solid var(--ui-line2);border-radius:14px;padding:24px;
+             box-shadow:0 22px 70px rgba(0,0,0,.55)}
+.onboard-close{position:absolute;right:14px;top:12px;width:32px;height:32px;padding:0;
+               justify-content:center;font-size:20px;background:transparent;border-color:transparent}
+.onboard h2{margin:0 0 8px;color:var(--ui-text);font-size:20px}
+.onboard-lead{margin:0 0 18px;color:var(--ui-dim);font-size:12px;line-height:1.6}
+.onboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.onboard-card{border:1px solid var(--ui-line2);border-radius:12px;padding:12px;background:var(--ui-surface)}
+.onboard-card.restore{grid-column:1/-1}
+.onboard-card-head{display:flex;align-items:center;gap:8px;margin-bottom:9px;color:var(--ui-text);
+                   font-size:13px;font-weight:600}
+.onboard-card-head small{margin-left:auto;color:var(--ui-dim);font-size:10px;font-weight:400}
+.onboard-status{width:8px;height:8px;flex:none;border-radius:50%;background:var(--ui-line2)}
+.onboard-status.on{background:var(--ui-accent);box-shadow:0 0 0 3px rgba(238,77,45,.14)}
+.onboard-drop{min-height:150px;border:2px dashed var(--ui-line2);border-radius:9px;
+              display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;
+              color:var(--ui-dim);font-size:14px;line-height:1.7;cursor:pointer;transition:.15s}
+.onboard-card.restore .onboard-drop{min-height:92px}
+.onboard-drop:hover,.onboard-drop.drag{border-color:var(--ui-accent);background:rgba(238,77,45,.08);
+                                     color:var(--ui-text)}
+.onboard-drop.done{border-color:var(--ui-accent);color:var(--ui-text)}
+.onboard-drop.error{border-color:var(--ui-warn);color:var(--ui-warn)}
+.onboard-actions{display:flex;align-items:center;gap:10px;margin-top:18px}
+.onboard-actions button:last-child{margin-left:auto}
+.onboard-link{border:0;background:transparent;color:var(--ui-dim);height:auto;padding:4px 0;
+              font-size:12px;cursor:pointer}
+.onboard-link:hover{color:var(--ui-text);text-decoration:underline}
+@media(max-width:680px){
+  .onboard{padding:12px}.onboard-box{padding:20px}.onboard-grid{grid-template-columns:1fr}
+  .onboard-card.restore{grid-column:auto}.onboard-drop{min-height:105px}
+}
 </style>
 
 <header>
@@ -556,6 +592,51 @@
       <button id="phcAll" class="danger">覆蓋手動調整的版位</button>
       <button id="phcSafe">僅覆蓋未手動調整版位</button>
       <button id="phcCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div class="onboard" id="onboardWizard" hidden>
+  <div class="onboard-box" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <button type="button" class="onboard-close" id="onboardClose" aria-label="關閉">&times;</button>
+    <h2 id="onboardTitle">匯入活動資料</h2>
+    <p class="onboard-lead">匯入工單與素材包後就可以開始編輯；如果已有暫存檔，也可直接還原。</p>
+    <div class="onboard-grid">
+      <div class="onboard-card">
+        <div class="onboard-card-head">
+          <span class="onboard-status" id="onboardWoStatus"></span>
+          <span>匯入工單文案</span>
+        </div>
+        <div class="onboard-drop" id="onboardWoDrop" role="button" tabindex="0">
+          <span id="onboardWoText">拖曳工單 .xlsx 到這裡，或點擊選擇檔案</span>
+          <input type="file" id="onboardWoInput" accept=".xlsx" hidden>
+        </div>
+      </div>
+      <div class="onboard-card">
+        <div class="onboard-card-head">
+          <span class="onboard-status" id="onboardAssetsStatus"></span>
+          <span>匯入素材包</span>
+        </div>
+        <div class="onboard-drop" id="onboardAssetsDrop" role="button" tabindex="0">
+          <span id="onboardAssetsText">拖曳素材包圖片或資料夾到這裡，或點擊選擇資料夾</span>
+          <input type="file" id="onboardAssetsInput" accept="image/*" webkitdirectory multiple hidden>
+        </div>
+      </div>
+      <div class="onboard-card restore">
+        <div class="onboard-card-head">
+          <span class="onboard-status" id="onboardRestoreStatus"></span>
+          <span>還原暫存檔</span>
+          <small>選填</small>
+        </div>
+        <div class="onboard-drop" id="onboardRestoreDrop" role="button" tabindex="0">
+          <span id="onboardRestoreText">拖曳暫存檔 .json 到這裡，或點擊選擇檔案</span>
+          <input type="file" id="onboardRestoreInput" accept="application/json,.json" hidden>
+        </div>
+      </div>
+    </div>
+    <div class="onboard-actions">
+      <button type="button" class="onboard-link" data-onboard-skip>略過，之後再匯入</button>
+      <button type="button" class="primary" id="onboardDone" disabled>完成</button>
     </div>
   </div>
 </div>
@@ -895,6 +976,13 @@
     : freshState();
   const H = XD.createHistory(initial);
   const S = () => H.getState();
+  function isEmptyState(st) {
+    const base = freshState(), s = st || {};
+    if (['title','sub','cta','small'].some(k => s[k] !== base[k])) return false;
+    if (s.theme !== '' || (s.vendorLogos || []).length || s.liveLogo !== false) return false;
+    return !(s.photos || []).some(p => p &&
+      (p.ownUrl || (p.boards && Object.keys(p.boards).length)));
+  }
 
   /* 檢視狀態（縮放/平移/模式）刻意不進歷史——倒回視角或模式會把使用者正在看的東西洗掉 */
   /* selBoard＝畫布上目前被選取、正在單獨調整人物照片的版位（不進歷史：選取只是視角狀態） */
@@ -1967,11 +2055,19 @@
     });
   }
   $('#btnAssetsPanel').onclick = () => $('#fAssets').click();
-  $('#fAssets').onchange = async e => {
-    const files = e.target.files;
-    if (!files || !files.length) return;
+  async function handleAssetFiles(fileList, opts) {
+    const files = Array.from(fileList || []), o = opts || {};
+    if (!files.length) return { ok:false, message:'沒有選擇檔案' };
+    if (!o.skipConfirm && !isEmptyState(S())) {
+      const confirmed = await XD.confirm('目前畫面上已經有內容，這個操作會直接覆蓋，確定要繼續嗎？',
+        { title:'匯入素材包？', ok:'繼續匯入', cancel:'取消' });
+      if (!confirmed) return { ok:false, message:'已取消' };
+    }
     const imgFiles = Array.from(files).filter(f => /\.(png|jpe?g|webp|gif)$/i.test(f.name));
-    if (!imgFiles.length) { XD.toast('素材包裡沒有可用的圖片檔'); e.target.value = ''; return; }
+    if (!imgFiles.length) {
+      const message = '素材包裡沒有可用的圖片檔';
+      XD.toast(message); return { ok:false, message:message };
+    }
     try {
       const urls = await Promise.all(imgFiles.map(f => downscaleToDataURL(f, LOGO_MAX)));
       ASSET_POOL = {}; ASSET_FILES = {};
@@ -2010,8 +2106,16 @@
       H.set(next, {});
       syncVendorInk();
       XD.toast(msg);
-    } catch (err) { console.error(err); XD.toast('LOGO 讀取失敗：' + err.message); }
-    e.target.value = '';
+      return { ok:true, message:msg };
+    } catch (err) {
+      console.error(err);
+      const message = 'LOGO 讀取失敗：' + err.message;
+      XD.toast(message); return { ok:false, message:message };
+    }
+  }
+  $('#fAssets').onchange = async e => {
+    try { await handleAssetFiles(e.target.files, { skipConfirm:false }); }
+    finally { e.target.value = ''; }
   };
   $('#btnClearVendor').onclick = () => H.set(Object.assign({}, S(), { vendorLogos: [] }), {});
   $('#chkLive').onchange = e =>
@@ -3221,17 +3325,36 @@
     XD.toast('已還原這個版位的' + slots.map(i => photoSlotName(st, i)).join('、') + '，改回跟著整體設定');
   });
 
-  /* ============ 工單匯入：解析完直接套用，不用再按一次確認 ============
+  /* ============ 工單匯入：解析完直接套用 ============
      解析細節（哪個尺寸對到哪個版位）不在畫面上展開報告——只在主控台留紀錄，
      使用者只需要一句話知道「匯入好了、套了什麼、選了幾張」。 */
   let WO = null;
+  async function handleWorkorderFile(file, opts) {
+    const o = opts || {};
+    if (!file) return { ok:false, message:'沒有選擇檔案' };
+    if (!o.skipConfirm && !isEmptyState(S())) {
+      const confirmed = await XD.confirm('目前畫面上已經有內容，這個操作會直接覆蓋，確定要繼續嗎？',
+        { title:'匯入工單文案？', ok:'繼續匯入', cancel:'取消' });
+      if (!confirmed) return { ok:false, message:'已取消' };
+    }
+    if (!/\.xlsx$/i.test(file.name || '')) {
+      const message = '匯入失敗：請選擇 .xlsx 工單檔';
+      XD.toast(message); return { ok:false, message:message };
+    }
+    try {
+      WO = await XD.bnWorkorder.parse(await file.arrayBuffer(), PACK.boards);
+      await applyWo();
+      return { ok:true, message:'已匯入《' + file.name + '》' };
+    } catch (err) {
+      console.error(err);
+      const message = '匯入失敗：' + err.message;
+      XD.toast(message); return { ok:false, message:message };
+    }
+  }
   $('#fWo').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
-    try {
-      WO = await XD.bnWorkorder.parse(await f.arrayBuffer(), PACK.boards);
-      await applyWo();
-    } catch (err) { console.error(err); XD.toast('匯入失敗：' + err.message); }
-    e.target.value = '';
+    try { await handleWorkorderFile(f, { skipConfirm:false }); }
+    finally { e.target.value = ''; }
   };
   /* 匯入一次改很多欄位 → 併成單一步歷史，undo 一次就整份倒回。
      工單如果有指定廠商LOGO檔名：素材包已經上傳過就當場比對套用；
@@ -3500,6 +3623,139 @@
     finally { e.target.value = ''; }
   };
 
+  /* ============ 開場匯入精靈 ============ */
+  const ONBOARD_COPY = {
+    wo:'拖曳工單 .xlsx 到這裡，或點擊選擇檔案',
+    assets:'拖曳素材包圖片或資料夾到這裡，或點擊選擇資料夾',
+    restore:'拖曳暫存檔 .json 到這裡，或點擊選擇檔案',
+  };
+  let onboardWoDone = false, onboardAssetsDone = false;
+  function updateOnboardDone() {
+    $('#onboardDone').disabled = !(onboardWoDone && onboardAssetsDone);
+  }
+  function setDropResult(drop, textEl, statusEl, result, successText) {
+    drop.classList.remove('done','error');
+    drop.classList.add(result.ok ? 'done' : 'error');
+    statusEl.classList.toggle('on', result.ok);
+    textEl.textContent = result.ok ? successText : result.message;
+  }
+  function resetOnboardFlow() {
+    onboardWoDone = false; onboardAssetsDone = false;
+    $('#onboardWoDrop').classList.remove('done','error','drag');
+    $('#onboardAssetsDrop').classList.remove('done','error','drag');
+    $('#onboardRestoreDrop').classList.remove('done','error','drag');
+    $('#onboardWoStatus').classList.remove('on');
+    $('#onboardAssetsStatus').classList.remove('on');
+    $('#onboardRestoreStatus').classList.remove('on');
+    $('#onboardWoText').textContent = ONBOARD_COPY.wo;
+    $('#onboardAssetsText').textContent = ONBOARD_COPY.assets;
+    $('#onboardRestoreText').textContent = ONBOARD_COPY.restore;
+    $('#onboardWoInput').value = ''; $('#onboardAssetsInput').value = '';
+    $('#onboardRestoreInput').value = '';
+    updateOnboardDone();
+  }
+  function openOnboardWizard() {
+    resetOnboardFlow();
+    $('#onboardWizard').hidden = false;
+  }
+  function closeOnboardWizard() {
+    $('#onboardWizard').hidden = true;
+    resetOnboardFlow();
+  }
+  async function onboardWorkorder(files) {
+    const file = Array.from(files || [])[0]; if (!file) return;
+    const result = await handleWorkorderFile(file, { skipConfirm:true });
+    onboardWoDone = result.ok;
+    setDropResult($('#onboardWoDrop'), $('#onboardWoText'), $('#onboardWoStatus'), result,
+      '✅ 已匯入《' + file.name + '》');
+    updateOnboardDone();
+  }
+  async function onboardAssets(files) {
+    const list = Array.from(files || []); if (!list.length) return;
+    const result = await handleAssetFiles(list, { skipConfirm:true });
+    onboardAssetsDone = result.ok;
+    setDropResult($('#onboardAssetsDrop'), $('#onboardAssetsText'), $('#onboardAssetsStatus'), result,
+      '✅ 已匯入 ' + list.length + ' 個檔案');
+    updateOnboardDone();
+  }
+  async function onboardProject(files) {
+    const file = Array.from(files || [])[0]; if (!file) return;
+    const ok = await importProjectFile(file);
+    if (ok) {
+      $('#onboardRestoreStatus').classList.add('on');
+      closeOnboardWizard();
+    }
+    else {
+      $('#onboardRestoreStatus').classList.remove('on');
+      $('#onboardRestoreDrop').classList.remove('done');
+      $('#onboardRestoreDrop').classList.add('error');
+      $('#onboardRestoreText').textContent = '未還原，可重新選擇檔案或略過';
+    }
+  }
+  function readDirectoryEntry(entry) {
+    if (entry.isFile) return new Promise(resolve => entry.file(f => resolve([f]), () => resolve([])));
+    if (!entry.isDirectory) return Promise.resolve([]);
+    const reader = entry.createReader(), entries = [];
+    return new Promise(resolve => {
+      const read = () => reader.readEntries(batch => {
+        if (!batch.length) { resolve(entries); return; }
+        entries.push.apply(entries, batch); read();
+      }, () => resolve(entries));
+      read();
+    }).then(list => Promise.all(list.map(readDirectoryEntry)))
+      .then(groups => groups.reduce((all, group) => all.concat(group), []));
+  }
+  async function dropFiles(e, expandDirectories) {
+    const fallback = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    if (!expandDirectories) return fallback;
+    const items = Array.from((e.dataTransfer && e.dataTransfer.items) || []);
+    if (!items.length || items.some(it => typeof it.webkitGetAsEntry !== 'function')) return fallback;
+    const entries = items.map(it => it.webkitGetAsEntry());
+    if (entries.some(entry => !entry || !entry.isDirectory)) return fallback;
+    try {
+      const groups = await Promise.all(entries.map(readDirectoryEntry));
+      const files = groups.reduce((all, group) => all.concat(group), []);
+      return files.length ? files : fallback;
+    } catch (err) { return fallback; }
+  }
+  function bindDropzone(el, onFiles, opts) {
+    const o = opts || {};
+    ['dragenter','dragover'].forEach(type => el.addEventListener(type, e => {
+      e.preventDefault(); el.classList.add('drag');
+    }));
+    el.addEventListener('dragleave', e => {
+      if (!e.relatedTarget || !el.contains(e.relatedTarget)) el.classList.remove('drag');
+    });
+    el.addEventListener('drop', async e => {
+      e.preventDefault(); el.classList.remove('drag');
+      onFiles(await dropFiles(e, !!o.directories));
+    });
+  }
+  function bindDropClick(drop, input) {
+    drop.addEventListener('click', e => { if (e.target !== input) input.click(); });
+    drop.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+  }
+  bindDropzone($('#onboardWoDrop'), onboardWorkorder);
+  bindDropzone($('#onboardAssetsDrop'), onboardAssets, { directories:true });
+  bindDropzone($('#onboardRestoreDrop'), onboardProject);
+  bindDropClick($('#onboardWoDrop'), $('#onboardWoInput'));
+  bindDropClick($('#onboardAssetsDrop'), $('#onboardAssetsInput'));
+  bindDropClick($('#onboardRestoreDrop'), $('#onboardRestoreInput'));
+  $('#onboardWoInput').onchange = e => onboardWorkorder(e.target.files);
+  $('#onboardAssetsInput').onchange = e => onboardAssets(e.target.files);
+  $('#onboardRestoreInput').onchange = e => onboardProject(e.target.files);
+  $('#onboardDone').onclick = closeOnboardWizard;
+  $('#onboardClose').onclick = closeOnboardWizard;
+  XD.$$('[data-onboard-skip]').forEach(el => el.onclick = closeOnboardWizard);
+  $('#onboardWizard').addEventListener('click', e => {
+    if (e.target === $('#onboardWizard')) closeOnboardWizard();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('#onboardWizard').hidden) closeOnboardWizard();
+  });
+
   /* ============ 訂閱：狀態一變就重畫（依目前模式） ============ */
   let photoStoreWarned = false;
   const save = XD.debounce(() => {
@@ -3561,6 +3817,7 @@
     view.selBoard = null;
     H.set(freshState(), {});
     renderAny();
+    openOnboardWizard();
     return true;
   }
   $('#btnClearAll').onclick = clearAll;
@@ -3572,6 +3829,7 @@
   paintList(); syncInputs(); paintHistoryBtns(); paintThemeGrid(); paintVendorCount(); paintVendorPreview();
   paintStock(); paintFrameMode(); paintPhotoLayers(); paintPhotoAdjust();
   setMode('overview');
+  if (isEmptyState(S())) openOnboardWizard();
 
   /* 三支字型檔各 18MB，tokens.css 是 font-display:swap——在下載完成前瀏覽器會先用
      備援字（微軟正黑體）畫。備援字有 Bold 沒有 Medium，所以主標/副標(700)看起來正常、
@@ -3630,7 +3888,7 @@
   })();
 
   window.__api = {
-    freshState, clearAll,
+    freshState, isEmptyState, clearAll,
     get state() { return S(); }, H, view,
     render, renderOverview, renderAny, setMode, focusBoard,
     fit, actualSize, zoomBy, zoomAt, applyWo,
@@ -3646,6 +3904,8 @@
                          if (b) b.click(); return !!b; },
     LOGO_INK, syncVendorInk, findLogoFiles, isCentered, themeFor, placementFor, downloadPackage, boardInnerHTML, cvBgStyleExport,
     buildProjectJson, restoreProjectJson, restoreProjectText, importProjectFile,
+    handleWorkorderFile, handleAssetFiles, bindDropzone,
+    openOnboardWizard, closeOnboardWizard,
     downloadProject, downloadSingleBoard,
     downscaleToDataURL, photoFromPool, findAssetKey, matchByNames, PHOTO_MAX, LOGO_MAX,
     photoTFor, photoGeom, photoImgStyle, photoUsesDefaultAnchor, bottomAnchoredPhotoT,
@@ -3675,7 +3935,8 @@
     get photoAR() { return PHOTO_AR; }, set photoAR(v) { PHOTO_AR = v; },
     get selBoard() { return view.selBoard; }, get selIdx() { return view.selIdx; },
     selectBoardPhoto: (id, i) => { view.selBoard = id; view.selIdx = i || 0; paintPhotoOverlay(); },
-    get assetPool() { return ASSET_POOL; }, get pendingVendorNames() { return PENDING_VENDOR_NAMES; },
+    get assetPool() { return ASSET_POOL; }, get assetFiles() { return ASSET_FILES; },
+    get pendingVendorNames() { return PENDING_VENDOR_NAMES; },
     get pendingPhotoNames() { return PENDING_PHOTO_NAMES; },
     get pendingPhotoName() { return PENDING_PHOTO_NAMES && PENDING_PHOTO_NAMES[0]; },
   };

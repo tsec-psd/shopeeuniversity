@@ -361,6 +361,12 @@
    所以外殼要自己撐出縮小後的尺寸，並把溢出的部分裁掉。 */
 .ovthumb{position:relative;overflow:hidden;border-radius:6px;flex:none}
 .ovthumb > .cv{position:absolute;left:0;top:0;transform-origin:0 0}
+.board-download{flex:none;padding:0 .6em;height:28px;min-width:28px;justify-content:center}
+.ovthumb > .board-download{position:absolute;right:4px;top:4px;z-index:2;
+                          opacity:0;background:var(--ui-panel);color:var(--ui-text)}
+.ovcard:hover .board-download,.ovcard:focus-within .board-download,
+.ovthumb > .board-download:disabled{opacity:1}
+@media(hover:none){.ovthumb > .board-download{opacity:1}}
 /* 右欄操作尺寸；頂列與其他工具維持共用樣式。 */
 .right-panel button,.right-panel label.btn{height:36px;font-size:13px;min-width:28px}
 .right-panel input:not([type=file]):not([type=checkbox]),.right-panel select{min-height:28px;min-width:28px}
@@ -401,6 +407,8 @@
   <span class="spacer"></span>
   <button class="danger" id="btnClearAll">全部清除</button>
   <button class="primary" id="btnDownload">⬇ 下載整包</button>
+  <button id="btnSaveProject" title="只存目前設定，不匯出圖片">💾 下載暫存檔</button>
+  <label class="btn">📂 匯入暫存檔<input type="file" id="fRestore" accept="application/json,.json" hidden></label>
   <span class="hint" id="src"></span>
 </header>
 
@@ -821,18 +829,25 @@
     }
     return p;
   }
-  function migratePhotos(st) {
+  function migratePhotos(st, storedPhotos, storedOwnPhotos) {
+    /* 開機時從 PHOTO_STORE 把大圖補回來；匯入外部 project.json 時則傳入空陣列，
+       否則這台電腦原有的照片會蓋掉檔案內照片，造成同檔跨機器顯示不同。 */
+    const localPhotos = storedPhotos === undefined ? savedPhotos : storedPhotos;
+    const localOwnPhotos = storedOwnPhotos === undefined ? savedOwnPhotos : storedOwnPhotos;
     if (Array.isArray(st.photos)) {
-      return st.photos.map((p, i) => backfillPhotoSides(Object.assign(
-        { url: '', zoom: 1, x: 0, y: 0, r: 0, boards: {}, ownUrl: '', stockId: '' }, p,
-        { url: savedPhotos[i] || (p && p.url) || '',
-          ownUrl: savedOwnPhotos[i] || (p && p.ownUrl) || '' })));
+      return st.photos.map((p, i) => {
+        const photo = p && typeof p === 'object' ? p : {};
+        return backfillPhotoSides(Object.assign(
+          { url: '', zoom: 1, x: 0, y: 0, r: 0, boards: {}, ownUrl: '', stockId: '' }, photo,
+          { url: localPhotos[i] || photo.url || '',
+            ownUrl: localOwnPhotos[i] || photo.ownUrl || '' }));
+      });
     }
     return [backfillPhotoSides({
-      url: savedPhotos[0] || st.personPhoto || '',
+      url: localPhotos[0] || st.personPhoto || '',
       zoom: st.photoZoom == null ? 1 : st.photoZoom,
       x: st.photoPosX || 0, y: st.photoPosY || 0, r: st.photoRot || 0,
-      boards: st.photoBoards || {}, ownUrl: savedOwnPhotos[0] || '', stockId: '',
+      boards: st.photoBoards || {}, ownUrl: localOwnPhotos[0] || '', stockId: '',
     })];
   }
   function freshState() {
@@ -1503,7 +1518,7 @@
       world.innerHTML = list.map(b => {
         const sz = b.w + '×' + b.h;
         return '<div class="bncard"><div class="cap"><b>' + esc(b.id) + '</b><span>' + sz + '</span>' +
-          '<span class="kb">' + Math.round(z * 100) + '%</span></div>' +
+          '<span class="kb">' + Math.round(z * 100) + '%</span>' + boardDownloadButton(b) + '</div>' +
           '<div class="cv" data-cv="' + esc(b.id) + '" style="width:' + (b.w * z) + 'px;height:' + (b.h * z) + 'px;' + cvBgStyle(b, st) + '">' +
           boardInnerHTML(b, st, z) + '</div></div>';
       }).join('');
@@ -1557,7 +1572,7 @@
         '<div class="ovthumb" style="width:' + (b.w * s) + 'px;height:' + (b.h * s) + 'px">' +
         '<div class="cv" data-cv="' + esc(b.id) + '" style="width:' + b.w + 'px;height:' + b.h +
         'px;transform:scale(' + s + ');' + cvBgStyle(b, st) + '">' +
-        boardInnerHTML(b, st, 1) + '</div></div>' +
+        boardInnerHTML(b, st, 1) + '</div>' + boardDownloadButton(b) + '</div>' +
         '<div class="ovcap">' + esc(b.id) + '<br>' + b.w + '×' + b.h + '</div></div>';
     }).join('') + '</div>';
     fitTexts(null, 1);   /* 總覽照 s=1 排版，判斷條件跟匯出完全同一組 */
@@ -1603,6 +1618,12 @@
     paintZoom();
   }
   $('#world').addEventListener('click', e => {
+    const dl = e.target.closest('[data-dl]');
+    if (dl) {
+      e.preventDefault(); e.stopPropagation();
+      if (!dl.disabled) downloadSingleBoard(dl.dataset.dl, dl);
+      return;
+    }
     if (view.mode !== 'overview') return;
     const card = e.target.closest('[data-ov]');
     if (card) focusBoard(card.dataset.ov);
@@ -3109,6 +3130,7 @@
     if (tByIdx) commitBoardPhotoGroup(id, tByIdx);
   }
   world.addEventListener('pointerdown', e => {
+    if (e.target.closest('[data-dl]')) { e.stopPropagation(); return; }
     if (view.mode !== 'canvas') return;
     const st = S();
     const h = e.target.closest('[data-ph]');
@@ -3312,6 +3334,86 @@
      沒選主題時螢幕預覽用格紋佔位，但那只是「還沒做視覺」的提示，不該真的出現在
      交付的圖檔裡，所以匯出用的底色改成純色，不帶格紋。 */
   function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, ''); }
+  function boardDownloadButton(b) {
+    return '<button type="button" class="board-download" data-dl="' + esc(b.id) +
+      '" title="下載這張 PNG" aria-label="下載 ' + esc(b.id) + ' PNG">⬇</button>';
+  }
+  function buildProjectJson(st) {
+    return {
+      title: st.title, sub: st.sub, cta: st.cta, small: st.small,
+      arText: st.arText, arSplit: st.arSplit, theme: st.theme,
+      vendorLogos: st.vendorLogos,
+      photoSet: st.photoSet, photos: st.photos,
+      photoOrder: st.photoOrder, liveLogo: st.liveLogo,
+      on: st.on,
+      exportedAt: new Date().toISOString(),
+    };
+  }
+  const PROJECT_FIELDS = ['title','sub','cta','small','arText','arSplit','theme','vendorLogos',
+                          'photoSet','photos','photoOrder','liveLogo','on'];
+  function isProjectJson(raw) {
+    return !!raw && typeof raw === 'object' && !Array.isArray(raw) &&
+      ['title','photos','theme'].some(k => Object.prototype.hasOwnProperty.call(raw, k));
+  }
+  function restoreProjectJson(raw) {
+    if (!isProjectJson(raw)) {
+      XD.toast('這個檔案看起來不是蝦大 BN 的暫存檔');
+      return null;
+    }
+    const whitelisted = {};
+    PROJECT_FIELDS.forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) whitelisted[k] = raw[k];
+    });
+    const merged = Object.assign({}, freshState(), whitelisted);
+    /* 空陣列代表不要混入這台瀏覽器 PHOTO_STORE 的既有照片；照片只以檔案為準。 */
+    merged.photos = migratePhotos(merged, [], []);
+    merged.vendorLogos = Array.isArray(merged.vendorLogos) ? merged.vendorLogos : [];
+    merged.photoOrder = Array.isArray(merged.photoOrder) ? merged.photoOrder : [];
+    merged.on = Array.isArray(merged.on)
+      ? merged.on.filter(id => PACK.boards.some(b => b.id === id)) : [];
+    if (merged.theme && !themeFor({ theme:merged.theme })) {
+      XD.toast('找不到主題「' + merged.theme + '」，可能是工具版本不同，已還原為未選主題');
+      merged.theme = '';
+    }
+    H.set(merged, {});
+    syncVendorInk();
+    const stamp = typeof raw.exportedAt === 'string' && raw.exportedAt ? '（' + raw.exportedAt + '）' : '';
+    XD.toast('已還原暫存檔' + stamp);
+    return merged;
+  }
+  function restoreProjectText(text) {
+    let raw;
+    try { raw = JSON.parse(text); }
+    catch (err) { XD.toast('暫存檔格式錯誤，無法讀取'); return null; }
+    return restoreProjectJson(raw);
+  }
+  function readProjectFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('讀取檔案失敗'));
+      reader.onabort = () => reject(new Error('讀取檔案已取消'));
+      reader.readAsText(file);
+    });
+  }
+  async function importProjectFile(file) {
+    const confirmed = await XD.confirm('匯入將覆蓋目前畫面上的內容，確定要繼續嗎？');
+    if (!confirmed) return false;
+    try { return !!restoreProjectText(await readProjectFile(file)); }
+    catch (err) {
+      console.error(err); XD.toast('暫存檔格式錯誤，無法讀取'); return false;
+    }
+  }
+  function downloadProject() {
+    try {
+      const projectJson = buildProjectJson(S());
+      const fn = 'BN_暫存_' + new Date().toISOString().slice(0, 10) + '.json';
+      XD.download(new Blob([JSON.stringify(projectJson, null, 2)], { type:'application/json' }), fn);
+      XD.toast('已下載暫存檔：' + fn);
+    } catch (err) {
+      console.error(err); XD.toast('下載失敗：' + (err && err.message ? err.message : err));
+    }
+  }
   function cvBgStyleExport(b, st) {
     const th = themeFor(st);
     const url = th && themeAssetFor(th, b.id);
@@ -3335,6 +3437,43 @@
     });
     return Promise.all(jobs);
   }
+  /* 單張與整包共用原生尺寸離屏擷取，確保兩種下載的 PNG 完全一致。 */
+  async function captureBoards(st, list) {
+    await ensurePhotoAR(st);
+    /* LOGO 墨迹須先量完，首開立即下載也使用正確貼合尺寸。 */
+    await LOGO_INK_READY;
+    return XD.withOffscreen(async container => {
+      const out = [];
+      for (const b of list) {
+        const el = document.createElement('div');
+        el.className = 'cv export';
+        el.style.cssText = 'width:' + b.w + 'px;height:' + b.h + 'px;' + cvBgStyleExport(b, st);
+        el.innerHTML = boardInnerHTML(b, st, 1);
+        container.appendChild(el);
+        fitTexts(el, 1);
+        try {
+          const r = await XD.captureNodeH2C(el, { background:'#DCE4F2' });
+          out.push({ name:safeName(b.id) + '.png', dataUrl:r.dataUrl });
+        } catch (err) {
+          throw new Error('版位「' + b.id + '」擷取失敗：' + (err && err.message ? err.message : err));
+        } finally { el.remove(); }
+      }
+      return out;
+    });
+  }
+  async function downloadSingleBoard(boardId, button) {
+    const st = S(), b = PACK.boards.find(x => x.id === boardId);
+    if (!b || (button && button.disabled)) return;
+    if (button) button.disabled = true;
+    try {
+      const items = await captureBoards(st, [b]), item = items[0];
+      const blob = await (await fetch(item.dataUrl)).blob();
+      XD.download(blob, item.name);
+      XD.toast('已下載：' + item.name);
+    } catch (err) {
+      console.error(err); XD.toast('下載失敗：' + (err && err.message ? err.message : err));
+    } finally { if (button) button.disabled = false; }
+  }
   async function downloadPackage() {
     const st = S();
     const list = PACK.boards.filter(b => st.on.indexOf(b.id) >= 0);
@@ -3342,37 +3481,8 @@
     const btn = $('#btnDownload'), oldLabel = btn.textContent;
     btn.disabled = true; btn.textContent = '匯出中…';
     try {
-      await ensurePhotoAR(st);
-      /* LOGO 圖案邊界要量完才匯出，否則首開就按下載會輸出「照畫布 contain」
-         的版本（直播 LOGO 會偏小），跟畫面上看到的不一致。 */
-      await LOGO_INK_READY;
-      const items = await XD.withOffscreen(async container => {
-        const out = [];
-        for (const b of list) {
-          const el = document.createElement('div');
-          el.className = 'cv export';
-          el.style.cssText = 'width:' + b.w + 'px;height:' + b.h + 'px;' + cvBgStyleExport(b, st);
-          el.innerHTML = boardInnerHTML(b, st, 1);
-          container.appendChild(el);
-          fitTexts(el, 1);
-          try {
-            const r = await XD.captureNodeH2C(el, { background: '#DCE4F2' });
-            out.push({ name: safeName(b.id) + '.png', dataUrl: r.dataUrl });
-          } catch (err) {
-            throw new Error('版位「' + b.id + '」擷取失敗：' + (err && err.message ? err.message : err));
-          }
-          container.removeChild(el);
-        }
-        return out;
-      });
-      const projectJson = {
-        title: st.title, sub: st.sub, cta: st.cta, small: st.small,
-        arText: st.arText, arSplit: st.arSplit, theme: st.theme,
-        vendorLogos: st.vendorLogos,
-        photoSet: st.photoSet, photos: st.photos,
-        on: st.on,
-        exportedAt: new Date().toISOString(),
-      };
+      const items = await captureBoards(st, list);
+      const projectJson = buildProjectJson(st);
       const fn = 'BN_' + new Date().toISOString().slice(0, 10) + '.zip';
       await XD.zipAndDownload(items, projectJson, 'project.json', fn);
       XD.toast('已下載 ' + items.length + ' 張圖＋暫存 JSON：' + fn);
@@ -3383,6 +3493,12 @@
     }
   }
   $('#btnDownload').onclick = downloadPackage;
+  $('#btnSaveProject').onclick = downloadProject;
+  $('#fRestore').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { await importProjectFile(f); }
+    finally { e.target.value = ''; }
+  };
 
   /* ============ 訂閱：狀態一變就重畫（依目前模式） ============ */
   let photoStoreWarned = false;
@@ -3529,6 +3645,8 @@
     setFrameMode: m => { const b = document.querySelector('[data-fmode="' + m + '"]');
                          if (b) b.click(); return !!b; },
     LOGO_INK, syncVendorInk, findLogoFiles, isCentered, themeFor, placementFor, downloadPackage, boardInnerHTML, cvBgStyleExport,
+    buildProjectJson, restoreProjectJson, restoreProjectText, importProjectFile,
+    downloadProject, downloadSingleBoard,
     downscaleToDataURL, photoFromPool, findAssetKey, matchByNames, PHOTO_MAX, LOGO_MAX,
     photoTFor, photoGeom, photoImgStyle, photoUsesDefaultAnchor, bottomAnchoredPhotoT,
     paintPhotoOverlay, setBoardPhotoT, arLines, arWraps,

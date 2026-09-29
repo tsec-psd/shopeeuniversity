@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <title>MS 線上編輯器</title>
-<!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → atoms → flow-engine
+<!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → icons → tool-menus → atoms → flow-engine
      → workorder → export-png → export-package → history → packs → 頁面腳本 -->
 <link rel="stylesheet" href="../core/tokens.css">
 <link rel="stylesheet" href="../core/ui.css">
@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../core/xd-core.js"></script>
+<script src="../core/icons.js"></script>
+<script src="../core/tool-menus.js"></script>
 <script src="../core/atoms.js"></script>
 <script src="../core/flow-engine.js"></script>
 <script src="../core/workorder.js"></script>
@@ -62,7 +64,7 @@ header h1{min-width:0}
 .card .nm{font-weight:700;font-size:12.5px;margin-bottom:2px}
 .card .ds{font-size:11px;color:var(--ui-dim);line-height:1.4}
 .card svg{display:block;margin:6px 0 4px;width:100%;height:26px}
-.card.seccard .nm:before{content:"▦ ";color:var(--ui-accent)}
+.card.seccard .nm>svg{display:inline-block;width:16px;height:16px;margin:0 4px 0 0;vertical-align:middle;color:var(--ui-accent)}
 .card.seccard svg{height:40px}
 .card.fullcard{border-style:dashed;border-color:var(--ui-line2)}
 .card.fullcard:hover{border-style:solid}
@@ -267,17 +269,11 @@ header h1{min-width:0}
 .chip{height:30px;padding:0 13px;font-size:12.5px}
 </style>
 
-<header>
-  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
-  <h1>MS 線上編輯器<input id="projName" placeholder="未命名專案" maxlength="60" aria-label="專案名稱"></h1>
-  <select id="zoom">
+<header class="tool-header">
+<a class="btn icon-button" href="../index.html" title="回到工具選擇頁" aria-label="回到工具選擇頁"><span class="ui-icon" data-icon="arrow-left"></span></a><input id="projName" placeholder="未命名專案" maxlength="60" aria-label="專案名稱"><span class="divider"></span><select id="zoom">
     <option value=".5">50%</option><option value=".75" selected>75%</option>
     <option value="1">100%</option>
-  </select>
-  <button id="btnUndo" title="復原 Ctrl+Z">↶</button>
-  <button id="btnRedo" title="重做 Ctrl+Shift+Z">↷</button>
-  <button id="btnAdv" title="打開才會出現空白容器、換容器、格的切分——那些是設計師在用的">⚙ 進階</button>
-  <div id="themePicker">
+  </select><span class="divider"></span><button class="icon-button" aria-label="復原" id="btnUndo" title="復原 Ctrl+Z"><span class="ui-icon" data-icon="undo"></span></button><button class="icon-button" aria-label="重做" id="btnRedo" title="重做 Ctrl+Shift+Z"><span class="ui-icon" data-icon="redo"></span></button><span class="spacer"></span>  <div id="themePicker">
     <button id="themeBtn" aria-haspopup="true" aria-expanded="false" title="選擇紙面配色主題">
       <i class="theme-dot"></i><span class="theme-name">預設配色</span>
     </button>
@@ -286,14 +282,7 @@ header h1{min-width:0}
       <div id="themeCells"></div>
     </div>
   </div>
-  <span class="spacer"></span>
-  <button id="btnDemo">範例整頁</button>
-  <button id="btnClear">清空頁面</button>
-  <label class="btn" title="開啟先前存的 .json 專案">📂 開專案<input type="file" id="fProj" accept=".json"></label>
-  <button id="btnSaveProj">💾 存專案</button>
-  <button id="btnXlsx" title="產出一份給人審閱／留底的試算表（不用再匯回）">📄 工單</button>
-  <button id="btnPng">⬇ 整張 PNG</button>
-  <button class="primary" id="btnZip">⬇ 分段切圖 ZIP</button>
+<button id="btnAdv" title="打開才會出現空白容器、換容器、格的切分——那些是設計師在用的"><span class="ui-icon" data-icon="sliders"></span> 進階</button><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="檔案" aria-expanded="false" aria-controls="fileMenu">檔案</button><div class="ui-popup" id="fileMenu" hidden><label class="btn" title="開啟先前存的 .json 專案"><span class="ui-icon" data-icon="folder-open"></span> 開專案<input type="file" id="fProj" accept=".json"></label><button id="btnSaveProj"><span class="ui-icon" data-icon="save"></span> 存專案</button><button id="btnDemo">範例整頁</button><button class="danger" id="btnClear">清空頁面</button></div></div><div class="ui-menu"><button class="ui-menu-toggle icon-button" aria-label="更多" aria-expanded="false" aria-controls="moreMenu"><span class="ui-icon" data-icon="more"></span></button><div class="ui-popup" id="moreMenu" hidden><button id="btnXlsx" title="產出一份給人審閱／留底的試算表（不用再匯回）"><span class="ui-icon" data-icon="sheet"></span> 工單</button></div></div><div class="ui-split"><button class="primary" id="btnZip"><span class="ui-icon" data-icon="layers"></span> 匯出</button><div class="ui-menu"><button class="ui-menu-toggle primary chevron export-toggle" aria-label="匯出選項" aria-expanded="false" aria-controls="exportMenu"></button><div class="ui-popup" id="exportMenu" hidden><button id="btnPng"><span class="ui-icon" data-icon="save"></span> 整張 PNG</button></div></div></div>
 </header>
 
 <main>
@@ -321,12 +310,7 @@ header h1{min-width:0}
   </aside>
 </main>
 
-<footer>
-  <span>直接點版面上的字就能改；<kbd>Enter</kbd> 在條列裡＝加一條</span>
-  <span>右欄可換<b>語意角色</b>（主標／內文／條列…）——字級字重由設計端定，選的是「這句是什麼」</span>
-  <span>點圖片框上傳圖；<kbd>Ctrl+Z</kbd> 復原</span>
-  <span>內容自動暫存在這台電腦</span>
-</footer>
+<footer><span class="status-dot"></span><span>已暫存於這台電腦</span><span class="spacer"></span><span><kbd>Ctrl+Z</kbd> 復原</span></footer>
 <div id="msg"></div>
 
 <script>
@@ -745,7 +729,7 @@ header h1{min-width:0}
         '<h3>加一段</h3><div class="hint">加在選取那一段的後面；沒選就加到最後。</div>' +
         '<div class="segbar" id="secseg"><button data-all="0"' + (SECALL ? '' : ' class="on"') +
         '>常用</button><button data-all="1"' + (SECALL ? ' class="on"' : '') + '>全部</button></div>' +
-        keys.map(k => '<div class="card seccard" data-sec="' + k + '"><div class="nm">' +
+        keys.map(k => '<div class="card seccard" data-sec="' + k + '"><div class="nm">' + XD.icon('table') +
           esc(SDEFS[k].nm) + '</div>' + XD.flow.secThumb(SDEFS[k]) +
           '<div class="ds">' + esc(SDEFS[k].ds || '') + '</div></div>').join('');
       return;
@@ -920,7 +904,7 @@ header h1{min-width:0}
           (Number.isInteger(longest) ? longest : longest.toFixed(1)) + ' / ' + def.max + ' 字</span>' : '') +
         '</div>';
       body += '<div class="btnrow">' +
-        (def.list ? '<button data-act="bul+">＋ 一條</button><button data-act="bul-">− 一條</button>' : '') +
+        (def.list ? '<button data-act="bul+">' + XD.icon("plus") + ' 一條</button><button data-act="bul-">− 一條</button>' : '') +
         (def.photo ? '<button data-act="img">' + ICON.pic + '選圖</button>' +
                      (hitA.atom.imgId || hitA.atom.img
                        ? '<button data-act="imgx">' + ICON.picOff + '清除圖</button>' : '') : '') +
@@ -930,7 +914,7 @@ header h1{min-width:0}
         const tf = Object.assign({ x: 0, y: 0, z: 1 }, hitA.atom.tf);
         body += '<div class="metaline" style="margin-top:8px">拖曳照片可移動位置・拖角落的把手可縮放・目前縮放 ' +
           Math.round(tf.z * 100) + '%（20%～300%）</div>' +
-          '<div class="btnrow"><button data-act="pz-">− 縮小</button><button data-act="pz+">＋ 放大</button>' +
+          '<div class="btnrow"><button data-act="pz-">− 縮小</button><button data-act="pz+">' + XD.icon("plus") + ' 放大</button>' +
           '<button data-act="pzreset" title="回到剛上傳時的位置">⟲ 重設位置</button></div>';
       } else if (def.photo && (hitA.atom.imgId || hitA.atom.img)) {
         body += '<div class="metaline over" style="margin-top:8px">圖片暫存遺失了（通常是重新整理瀏覽器時圖片太多存不下）' +
@@ -963,7 +947,7 @@ header h1{min-width:0}
           flags.push('<button data-act="ctr">' + (hitC.cell.ctr ? '✓ ' : '') + '置中</button>');
           flags.push('<button data-act="lab">' + (hitC.cell.lab ? '✓ ' : '') + '標籤底色</button>');
         } else {
-          flags.push('<button data-act="sub+">＋ 一欄</button><button data-act="sub-">− 一欄</button>');
+          flags.push('<button data-act="sub+">' + XD.icon("plus") + ' 一欄</button><button data-act="sub-">− 一欄</button>');
         }
         body += '<div class="btnrow" style="margin-top:6px">' + flags.join('') + '</div>';
       }
@@ -1557,7 +1541,7 @@ header h1{min-width:0}
   function paintAdv() {
     const b = $('#btnAdv');
     b.classList.toggle('on', ADV);
-    b.textContent = (ADV ? '✓ ' : '⚙ ') + '進階';
+    b.innerHTML = XD.icon(ADV ? 'check' : 'sliders') + '進階';
   }
   $('#btnAdv').onclick = () => {
     ADV = !ADV; XD.store.set('ms_live_adv', ADV);

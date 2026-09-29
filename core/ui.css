@@ -6,32 +6,32 @@
    ========================================================= */
 
 *{box-sizing:border-box}
-body{margin:0;font:14px/1.6 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+body{margin:0;font:var(--fs-ui-md)/1.6 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
      color:var(--ui-text);background:var(--ui-bg);height:100vh;
      display:flex;flex-direction:column;overflow:hidden}
 
 /* ---------- 頂列 ---------- */
 header{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;
        background:var(--ui-topbar);border-bottom:1px solid var(--ui-line)}
-header h1{font-size:13px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
-header h1 small{font-weight:400;color:var(--ui-dim);font-size:11px;
+header h1{font-size:var(--fs-ui-md);font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
+header h1 small{font-weight:400;color:var(--ui-dim);font-size:var(--fs-ui-xs);
        background:var(--ui-surface);border:1px solid var(--ui-line2);
-       padding:1px 6px;border-radius:3px;letter-spacing:.3px}
+       padding:1px 6px;border-radius:var(--ui-r1);letter-spacing:.3px}
 .spacer{flex:1}
 
 /* ---------- 控制項 ---------- */
-button,select,label.btn,a.btn{font:inherit;font-size:12px}
-button,label.btn,a.btn{height:28px;padding:0 12px;border-radius:var(--ui-r);
+button,select,label.btn,a.btn{font:inherit;font-size:var(--fs-ui-sm)}
+button,label.btn,a.btn{height:32px;padding:0 12px;border-radius:var(--ui-r2);
        border:1px solid var(--ui-line2);background:var(--ui-surface);color:var(--ui-dim);
        font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
        white-space:nowrap;transition:all .15s;text-decoration:none;box-sizing:border-box}
-button:hover,label.btn:hover,a.btn:hover{color:var(--ui-text);background:var(--ui-surface2)}
+button:hover,label.btn:hover,a.btn:hover{color:var(--ui-text);background:var(--ui-surface2);border-color:var(--ui-line3)}
 button:disabled{opacity:.35;cursor:not-allowed}
 button.primary{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:600}
 button.primary:hover{filter:brightness(1.1);color:#fff}
 button.ghost{background:transparent}
 label.btn input{display:none}
-select{height:28px;padding:0 8px;border:1px solid var(--ui-line2);border-radius:var(--ui-rf);
+select{height:32px;padding:0 8px;border:1px solid var(--ui-line2);border-radius:var(--ui-r1);
        background:var(--ui-surface);color:var(--ui-text)}
 
 /* ---------- 三欄版面 ---------- */
@@ -45,51 +45,51 @@ main.two-col{grid-template-columns:288px 1fr}
 /* 分組（右欄的段落） */
 .sg{border-bottom:1px solid var(--ui-line)}
 .sg:last-child{border-bottom:none}
-.sg-label{font-size:13px;font-weight:700;color:#fff;padding:18px 16px 8px;
+.sg-label{font-size:var(--fs-ui-md);font-weight:700;color:#fff;padding:18px 16px 8px;
           display:flex;align-items:center;justify-content:space-between;gap:8px}
 .sg-body{padding:0 12px 14px}
 
 /* 欄位 */
 .field{margin-bottom:14px}
 .field-label{display:flex;justify-content:space-between;align-items:center;
-             font-size:11px;color:var(--ui-dim);margin-bottom:4px}
-.cc{font-size:10px;color:var(--ui-dim2);font-variant-numeric:tabular-nums}
+             font-size:var(--fs-ui-xs);color:var(--ui-dim);margin-bottom:4px}
+.cc{font-size:var(--fs-ui-xs);color:var(--ui-dim2);font-variant-numeric:tabular-nums}
 .cc.over{color:var(--ui-accent);font-weight:700}
 .fi{width:100%;padding:7px 10px;background:var(--ui-surface);border:1px solid var(--ui-line);
-    border-radius:var(--ui-rf);color:var(--ui-text);font:inherit;font-size:12px;
+    border-radius:var(--ui-r1);color:var(--ui-text);font:inherit;font-size:var(--fs-ui-sm);
     transition:border-color .15s;-webkit-appearance:none}
 .fi::placeholder{color:var(--ui-dim2)}
 .fi:focus{outline:none;border-color:var(--ui-line2);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
 .fi.over{border-color:var(--ui-accent);box-shadow:0 0 0 3px var(--ui-accent-dim)}
 
 /* 提示文字 */
-.hint{font-size:12px;color:var(--ui-dim);line-height:1.65}
-kbd{background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:5px;
-    padding:1px 6px;font-size:11px;color:var(--ui-dim)}
+.hint{font-size:var(--fs-ui-sm);color:var(--ui-dim);line-height:1.65}
+kbd{background:var(--ui-surface);border:1px solid var(--ui-line2);border-radius:var(--ui-r1);
+    padding:1px 6px;font-size:var(--fs-ui-xs);color:var(--ui-dim)}
 
 /* ---------- 畫布區 ---------- */
 #stage{background:var(--ui-bg);overflow:hidden;position:relative}
 
 /* 縮放列（右下角浮動） */
 .zoombar{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:4px;
-         background:rgba(36,36,36,.94);border:1px solid var(--ui-line2);border-radius:var(--ui-r);
+         background:rgba(36,36,36,.94);border:1px solid var(--ui-line2);border-radius:var(--ui-r2);
          padding:4px 6px;z-index:30;backdrop-filter:blur(6px)}
-.zoombar button{height:24px;padding:0 9px;border-radius:9px;font-size:12px;
+.zoombar button{height:32px;padding:0 9px;border-radius:var(--ui-r2);font-size:var(--fs-ui-sm);
                 background:transparent;border-color:transparent}
 .zoombar button:hover{background:var(--ui-surface)}
-.zoom-readout{font-size:11px;color:var(--ui-text);min-width:44px;text-align:center;
+.zoom-readout{font-size:var(--fs-ui-xs);color:var(--ui-text);min-width:44px;text-align:center;
               font-variant-numeric:tabular-nums}
-.zoom-hint{font-size:10px;color:var(--ui-dim2);margin-left:6px;padding-right:4px}
+.zoom-hint{font-size:var(--fs-ui-xs);color:var(--ui-dim2);margin-left:6px;padding-right:4px}
 
 /* ---------- 底部列 ---------- */
 footer{flex:none;background:var(--ui-topbar);border-top:1px solid var(--ui-line);
-       padding:7px 16px;font-size:11.5px;color:var(--ui-dim);
+       padding:7px 16px;font-size:var(--fs-ui-xs);color:var(--ui-dim);
        display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 
 /* ---------- toast ---------- */
 #msg{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);
      background:#0D0D0D;border:1px solid var(--ui-line2);color:#fff;
-     padding:9px 17px;border-radius:10px;font-size:13px;opacity:0;
+     padding:9px 17px;border-radius:var(--ui-r2);font-size:var(--fs-ui-md);opacity:0;
      pointer-events:none;transition:.2s;z-index:99;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #msg.on{opacity:1}
 
@@ -100,31 +100,31 @@ footer{flex:none;background:var(--ui-topbar);border-top:1px solid var(--ui-line)
 .xd-modal.open{display:flex}
 .xd-modal [hidden]{display:none!important}
 .xd-mbox{width:min(92vw,400px);background:var(--ui-panel);color:var(--ui-text);
-         border:1px solid var(--ui-line2);border-radius:12px;padding:20px 20px 15px;
+         border:1px solid var(--ui-line2);border-radius:var(--ui-r3);padding:20px 20px 15px;
          box-shadow:0 18px 50px rgba(0,0,0,.55);animation:xd-pop .13s ease-out}
 @keyframes xd-pop{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
-.xd-mtitle{font-size:14px;font-weight:700;margin-bottom:7px}
-.xd-mtext{font-size:13px;line-height:1.7;color:var(--ui-dim);white-space:pre-wrap}
-.xd-minput{width:100%;height:32px;margin-top:13px;padding:0 10px;font:inherit;font-size:13px;
+.xd-mtitle{font-size:var(--fs-ui-md);font-weight:700;margin-bottom:7px}
+.xd-mtext{font-size:var(--fs-ui-md);line-height:1.7;color:var(--ui-dim);white-space:pre-wrap}
+.xd-minput{width:100%;height:32px;margin-top:13px;padding:0 10px;font:inherit;font-size:var(--fs-ui-md);
            color:var(--ui-text);background:var(--ui-surface);
-           border:1px solid var(--ui-line2);border-radius:var(--ui-rf)}
+           border:1px solid var(--ui-line2);border-radius:var(--ui-r1)}
 .xd-minput:focus{outline:none;border-color:var(--ui-accent)}
 .xd-macts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
-.xd-macts button{height:30px;padding:0 16px}
+.xd-macts button{height:32px;padding:0 16px}
 .xd-mok:focus-visible{outline:2px solid #fff;outline-offset:1px}
 .xd-mok.danger{background:#C4362B;border-color:#C4362B;color:#fff}
 .xd-mok.danger:hover{filter:brightness(1.12);color:#fff}
 
 /* ---------- LOGO 編輯器 Modal（core/logo-editor.js，改寫自 02_吸底 imageEditor） ---------- */
-.crop-panel button.mini{height:24px;padding:0 9px;font-size:11px}
+.crop-panel button.mini{height:32px;padding:0 9px;font-size:var(--fs-ui-xs)}
 .crop-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;
             align-items:center;justify-content:center;z-index:10020}
 .crop-modal.open{display:flex}
 .crop-panel{width:min(90vw,860px);background:var(--ui-panel);border:1px solid var(--ui-line2);
-            border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+            border-radius:var(--ui-r2);overflow:hidden;display:flex;flex-direction:column}
 .crop-panel header{height:auto;display:flex;align-items:center;justify-content:space-between;
                    padding:10px 14px;background:var(--ui-topbar);border-bottom:1px solid var(--ui-line);
-                   font-size:13px;color:var(--ui-text)}
+                   font-size:var(--fs-ui-md);color:var(--ui-text)}
 .crop-body{padding:26px;background:#111}
 .crop-body.checker,.crop-body .cropper-canvas,.crop-body .cropper-view-box{
   background-color:#2a2a2a;
@@ -135,17 +135,49 @@ footer{flex:none;background:var(--ui-topbar);border-top:1px solid var(--ui-line)
 .crop-body img{max-width:100%;max-height:52vh;display:block;margin:0 auto}
 .crop-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 14px;
             border-top:1px solid var(--ui-line)}
-.crop-group-label{font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--ui-dim2);
+.crop-group-label{font-size:var(--fs-ui-xs);font-weight:700;letter-spacing:1px;color:var(--ui-dim2);
                   width:34px;flex-shrink:0}
-.crop-slider{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ui-dim);margin-left:auto}
+.crop-slider{display:flex;align-items:center;gap:7px;font-size:var(--fs-ui-xs);color:var(--ui-dim);margin-left:auto}
 .crop-slider input[type="range"]{width:130px;accent-color:var(--ui-accent);cursor:pointer}
 .crop-slider span{min-width:28px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-text)}
 .crop-actions{display:flex;align-items:center;gap:8px;padding:10px 14px;
              border-top:1px solid var(--ui-line);background:var(--ui-topbar)}
-.crop-status{flex:1;font-size:11px;color:var(--ui-dim);text-align:right}
+.crop-status{flex:1;font-size:var(--fs-ui-xs);color:var(--ui-dim);text-align:right}
 
 /* ---------- 捲軸 ---------- */
 *::-webkit-scrollbar{width:8px;height:8px}
 *::-webkit-scrollbar-track{background:transparent}
-*::-webkit-scrollbar-thumb{background:var(--ui-line2);border-radius:4px}
+*::-webkit-scrollbar-thumb{background:var(--ui-line2);border-radius:var(--ui-r1)}
 *::-webkit-scrollbar-thumb:hover{background:#555}
+
+/* spec012: tool chrome, isolated from artwork. */
+.sidebar,.right-panel,.card{box-shadow:var(--ui-elev1)}
+.xd-mbox,.crop-panel{box-shadow:var(--ui-elev2)}
+.ui-icon{display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ui-icon svg{display:block;flex:none}
+header.tool-header{height:52px;gap:8px;position:relative;z-index:91}
+.tool-header>*{flex-shrink:0}
+.tool-header .spacer{flex:1;min-width:0}
+.tool-header .icon-button{width:32px;height:32px;padding:0;justify-content:center;background:transparent;border-color:transparent}
+.tool-header .icon-button:hover{background:var(--ui-surface2);border-color:var(--ui-line3)}
+.tool-header .divider{height:20px;border-left:1px solid var(--ui-line2)}
+.tool-header #projName{flex:0 1 180px;min-width:80px;width:180px;height:32px;border:0;border-radius:var(--ui-r1);background:transparent;font-size:13px;font-weight:600}
+.tool-header #projName:hover,.tool-header #projName:focus{background:var(--ui-surface)}
+.tool-header select{appearance:none;padding-right:26px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 12px) 13px,calc(100% - 8px) 13px;background-size:4px 4px;background-repeat:no-repeat}
+.ui-menu{position:relative;display:inline-flex}
+.ui-menu-toggle.chevron:after{content:'';width:6px;height:6px;border-right:1.5px solid;border-bottom:1.5px solid;transform:rotate(45deg);margin:0 2px 3px 4px}
+.ui-popup{position:fixed;z-index:1000;width:210px;max-width:calc(100vw - 16px);padding:6px;display:flex;flex-direction:column;gap:3px;background:var(--ui-panel);border:1px solid var(--ui-line2);border-radius:var(--ui-r2);box-shadow:var(--ui-elev2)}
+.ui-popup[hidden]{display:none}
+.ui-popup button,.ui-popup .btn{width:100%;border-color:transparent;background:transparent;justify-content:flex-start;border-radius:var(--ui-r1)}
+.ui-popup button:hover,.ui-popup .btn:hover{background:var(--ui-surface2)}
+.ui-popup .danger{color:var(--ui-danger);border-top:1px solid var(--ui-line2);margin-top:4px}
+.ui-split{display:inline-flex}
+.ui-split>#btnZip{border-radius:var(--ui-r1) 0 0 var(--ui-r1)}
+.ui-split .ui-menu-toggle{border-radius:0 var(--ui-r1) var(--ui-r1) 0;border-left-color:rgba(255,255,255,.25);padding:0 8px}
+.tool-header .viewtabs{border-radius:var(--ui-r1);padding:2px}
+.tool-header .vtab{height:28px;border-radius:var(--ui-r1);font-size:var(--fs-ui-sm)}
+.tool-header .vtab.on{background:var(--ui-surface2);box-shadow:var(--ui-elev1)}
+.tool-header #src{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-dot{width:6px;height:6px;border-radius:99px;background:var(--ui-success)}
+button:focus-visible,a.btn:focus-visible,.btn:focus-within{outline:2px solid var(--ui-accent);outline-offset:2px}
+@media(max-width:1100px){header.tool-header{gap:5px;padding:0 6px}.tool-header #src{display:none}}

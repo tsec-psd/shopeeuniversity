@@ -1,40 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>蝦大素材工具</title>
 <link rel="stylesheet" href="core/tokens.css">
 <style>
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.7 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
-     background:var(--ui-bg);color:var(--ui-text);min-height:100vh;
-     display:flex;flex-direction:column;align-items:center;padding:70px 24px}
-h1{font-size:26px;margin:0 0 6px}
-p.sub{color:var(--ui-dim);margin:0 0 36px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,280px);gap:18px;justify-content:center}
-a.tool{display:block;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;
-       padding:22px 24px;text-decoration:none;color:inherit;transition:.15s}
-a.tool:hover{border-color:var(--ui-accent);box-shadow:0 4px 20px rgba(238,77,45,.2);transform:translateY(-2px)}
-a.tool b{display:block;font-size:17px;margin-bottom:6px}
-a.tool span{font-size:13px;color:var(--ui-dim)}
-a.tool .tag{display:inline-block;font-size:11px;padding:1px 9px;border-radius:99px;margin-bottom:10px;
-            background:var(--ui-accent-dim);color:var(--ui-accent);font-weight:700}
-a.tool.off{opacity:.4;pointer-events:none}
-a.tool.off .tag{background:var(--ui-surface);color:var(--ui-dim2)}
-footer{margin-top:auto;padding-top:40px;font-size:12px;color:var(--ui-dim2)}
+:root{--tg-blend:overlay}
+html,body{min-height:100%}
+body{margin:0;background:#0E0E10;color:var(--ui-text);overflow-x:hidden;min-height:100vh;
+     font:15px/1.7 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(54px,9.5vh,108px);padding:0 16px 6vh}
+
+/* ---------- 背景：由下往上的橘色漸層 ＋ 顆粒 ----------
+   取代原本三顆漂移光斑（使用者 2026-09-29 指定參考圖：上黑、下橘）。
+   用 ellipse 而不是 linear：光源在畫面下方外側，四個上角自然收到全黑。
+   z-index:0 ＋ position:fixed 讓 .bg 自成堆疊脈絡，裡面的 overlay 圖層
+   只會跟這片漸層混合，不會混到上層的標題與作品。 */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    background:radial-gradient(ellipse 132% 92% at calc(50% + var(--gx,0px)) 118%,
+      #F2903F 0%, #EE6A26 22%, #CB3F11 42%, #7A220A 62%, #2A1109 82%, #0E0E10 100%)}
+/* 縱向半徑 92%、圓心 118% → 最上緣收黑在 118-92 = 26% 視窗高，剛好是大字下緣 */
+/* 游標光源：四層各自用不同的緩動係數追游標。
+   停住時四層疊在一起＝一顆柔光；快速移動時後面幾層跟不上＝自然拉成一條尾巴。
+   （單層只會「整顆在跑」，做不出拖曳感）
+   mix-blend-mode:overlay＝Photoshop 的「覆蓋」：亮處提亮、暗處加深，
+   所以它是在「揉」底下那片漸層，不是蓋一層半透明橘。 */
+.tg{position:absolute;left:0;top:0;border-radius:50%;opacity:0;transition:opacity .7s ease-out;
+    mix-blend-mode:var(--tg-blend);
+    transform:translate3d(var(--x,50vw),var(--y,44vh),0)}
+.bg.live .tg{opacity:1}   /* 滑鼠動過才淡入：靜置時不要在版面正中間糊一坨 */
+/* overlay 的視覺強度遠低於 normal／screen，alpha 要拉高一個檔次才看得出來 */
+.t0{width:560px;height:560px;margin:-280px 0 0 -280px;
+    background:radial-gradient(circle,rgba(255,140,80,.72),rgba(255,140,80,0) 60%)}
+.t1{width:700px;height:700px;margin:-350px 0 0 -350px;
+    background:radial-gradient(circle,rgba(255,140,80,.48),rgba(255,140,80,0) 60%)}
+.t2{width:860px;height:860px;margin:-430px 0 0 -430px;
+    background:radial-gradient(circle,rgba(255,140,80,.30),rgba(255,140,80,0) 60%)}
+.t3{width:1040px;height:1040px;margin:-520px 0 0 -520px;
+    background:radial-gradient(circle,rgba(255,140,80,.18),rgba(255,140,80,0) 62%)}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ---------- 大字（頁面上唯一的一行字） ---------- */
+h1{position:relative;z-index:2;margin:0;text-align:center;color:#FFFFFF;
+   font-size:clamp(38px,7.4vw,104px);font-weight:800;line-height:1;
+   letter-spacing:.10em;text-indent:.10em}   /* text-indent 抵銷尾字的字距，維持視覺置中 */
+
+/* ---------- 兩件作品 ---------- */
+.stage{position:relative;z-index:2;display:flex;align-items:flex-end;
+       gap:clamp(34px,7vw,118px);perspective:1500px}
+.obj{--ry:0deg;--rx:0deg;
+     position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;
+     text-decoration:none;color:inherit;cursor:pointer;
+     transform:perspective(1500px) rotateY(var(--ry)) rotateX(var(--rx));
+     transition:transform .55s cubic-bezier(.16,1,.3,1)}
+.obj.ms{--ry:11deg;--rx:5deg}
+.obj.bn{--ry:-11deg;--rx:5deg}
+.obj:is(:hover,:focus-visible),.obj:focus-visible{transform:perspective(1500px) rotateY(0deg) rotateX(0deg) translateY(-20px) scale(1.035)}
+.obj:focus-visible{outline:none}
+
+/* 不畫落影：背景是大面積橘，黑色投影糊在上面會發灰發髒（使用者指示移除）。
+   只留一圈 1px 的描邊當作品的邊界，hover 時把描邊提亮。 */
+.plate-wrap{position:relative}
+
+.plate{--mx:50%;--my:50%;
+       position:relative;overflow:hidden;border-radius:14px;
+       box-shadow:0 0 0 1px rgba(255,255,255,.10);
+       transition:box-shadow .55s cubic-bezier(.16,1,.3,1)}
+.obj:is(:hover,:focus-visible) .plate{box-shadow:0 0 0 1px rgba(255,255,255,.34)}
+/* 游標跟隨光暈 */
+.plate::before{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
+  background:radial-gradient(260px circle at var(--mx) var(--my),rgba(255,255,255,.22),transparent 70%);
+  transition:opacity .35s}
+.obj:is(:hover,:focus-visible) .plate::before{opacity:1}
+/* 掃光 */
+.plate::after{content:"";position:absolute;inset:-40%;z-index:5;pointer-events:none;
+  background:linear-gradient(104deg,transparent 38%,rgba(255,255,255,.26) 48%,transparent 58%);
+  transform:translateX(-120%)}
+.obj:is(:hover,:focus-visible) .plate::after{animation:sweep .95s cubic-bezier(.3,0,.2,1) .05s}
+@keyframes sweep{to{transform:translateX(120%)}}
+
+/* MS：縱長表格頁（用產出物真實配色） */
+.ms .plate{width:clamp(146px,15.5vw,206px);aspect-ratio:1/1.42;background:var(--c-page);
+           padding:9.5% 8.5%;display:flex;flex-direction:column;gap:5.5%}
+.ms .pill{height:7.2%;width:58%;border-radius:99px;background:var(--c-pill-bg);flex:none}
+.ms .row{flex:none;border-radius:4px;background:var(--c-card);padding:5.5% 6%;
+         display:flex;flex-direction:column;gap:4px;opacity:.94}
+.ms .row i{display:block;height:2.5px;border-radius:2px;background:var(--c-line)}
+.ms .row i.k{background:var(--c-text);opacity:.55}
+.ms .row.tall{flex:1}
+.obj:is(:hover,:focus-visible) .ms-lit .pill,.obj:is(:hover,:focus-visible) .ms-lit .row{animation:lit .7s ease-out both}
+.ms .pill{animation-delay:0s}
+.ms .row:nth-child(2){animation-delay:.07s}
+.ms .row:nth-child(3){animation-delay:.13s}
+.ms .row:nth-child(4){animation-delay:.19s}
+.ms .row:nth-child(5){animation-delay:.25s}
+@keyframes lit{40%{filter:brightness(1.55)}100%{filter:brightness(1)}}
+
+/* BN：多尺寸版位接觸表（比例取自 packs/bn/placements.js 的真實 17 塊板） */
+.bn .plate{width:clamp(212px,25vw,318px);aspect-ratio:1.42/1;background:#17171A;
+           padding:16px;display:grid;grid-template-columns:repeat(6,1fr);
+           grid-auto-rows:1fr;gap:6px}
+.bn .t{border-radius:3px;
+       background:linear-gradient(135deg,#FF8A4C,#EE4D2D 58%,#C4361C);
+       box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+/* 一部分版位畫成「未勾選」的空框：BN 本來就是勾選要出哪幾塊板，
+   混搭實心／空框也順便把「磚牆感」打散 */
+.bn .t.off{background:rgba(255,255,255,.035);
+       box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.bn .t.dim{background:linear-gradient(135deg,#C4562F,#A33A1C 58%,#7E2B12)}
+.bn .t.a{grid-column:span 4;grid-row:span 2}   /* 1080x608 */
+.bn .t.b{grid-column:span 2;grid-row:span 2}   /* 608x608  */
+.bn .t.c{grid-column:span 6;grid-row:span 1}   /* 1200x360 */
+.bn .t.d{grid-column:span 2;grid-row:span 2}   /* 800x800  */
+.bn .t.e{grid-column:span 3;grid-row:span 2}   /* 800x720  */
+.bn .t.f{grid-column:span 1;grid-row:span 2}   /* 531x792  */
+.bn .t.g{grid-column:span 3;grid-row:span 1}   /* 1125x324 */
+.bn .t.h{grid-column:span 2;grid-row:span 1}   /* 600x150  */
+.bn .t.i{grid-column:span 1;grid-row:span 1}   /* 100x100  */
+.obj:is(:hover,:focus-visible) .bn-lit .t{animation:lit .7s ease-out both}
+.bn .t:nth-child(1){animation-delay:.02s}.bn .t:nth-child(2){animation-delay:.09s}
+.bn .t:nth-child(3){animation-delay:.05s}.bn .t:nth-child(4){animation-delay:.16s}
+.bn .t:nth-child(5){animation-delay:.11s}.bn .t:nth-child(6){animation-delay:.21s}
+.bn .t:nth-child(7){animation-delay:.14s}.bn .t:nth-child(8){animation-delay:.25s}
+.bn .t:nth-child(9){animation-delay:.18s}
+
+/* 標記 */
+.tag{font-size:clamp(13px,1.3vw,17px);font-weight:700;letter-spacing:.14em;
+     color:#FFFFFF;text-shadow:0 1px 10px rgba(0,0,0,.55);
+     transition:letter-spacing .5s cubic-bezier(.16,1,.3,1),text-shadow .4s}
+.obj:is(:hover,:focus-visible) .tag{letter-spacing:.22em;text-shadow:0 1px 14px rgba(0,0,0,.75)}
+
+/* file:// 提示（平時完全不存在） */
+#fileWarn{position:fixed;left:0;right:0;bottom:0;z-index:9;display:none;
+  padding:9px 16px;text-align:center;font-size:12.5px;color:#FFD9CE;
+  background:rgba(238,77,45,.16);border-top:1px solid rgba(238,77,45,.42)}
+#fileWarn.on{display:block}
+
+@media(max-width:820px){
+  body{padding-top:32px}
+  .stage{flex-direction:column;align-items:center;gap:44px}
+  .ms .plate{width:170px}.bn .plate{width:250px}
+}
+@media(prefers-reduced-motion:reduce){
+  .bg{--gx:0px!important}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .obj:is(:hover,:focus-visible){transform:perspective(1500px) rotateY(var(--ry)) rotateX(var(--rx))}
+  .plate::before{display:none}
+  .obj:is(:hover,:focus-visible) .plate::after{animation:none}
+  .obj:is(:hover,:focus-visible) .ms-lit .pill,.obj:is(:hover,:focus-visible) .ms-lit .row,.obj:is(:hover,:focus-visible) .bn-lit .t{animation:none}
+}
 </style>
+
+<div class="bg">
+  <i class="tg t3"></i><i class="tg t2"></i><i class="tg t1"></i><i class="tg t0"></i>
+</div>
+<div class="grain"></div>
+
 <h1>蝦大素材工具</h1>
-<p class="sub">蝦皮大學課程活動 — 工單與素材產製</p>
-<div class="cards">
-  <a class="tool" href="tools/ms-live.html">
-    <span class="tag">蝦大端</span>
-    <b>MS 線上編輯器</b>
-    <span>直接在版面上打字、換語意角色、上傳圖 → 一次做完 MS，不用填工單</span>
+
+<div class="stage">
+  <a class="obj ms" href="tools/ms-live.html" aria-label="MS 線上編輯器">
+    <div class="plate-wrap">
+      <div class="plate ms-lit">
+        <div class="pill"></div>
+        <div class="row"><i class="k"></i><i></i><i></i></div>
+        <div class="row"><i class="k"></i><i></i></div>
+        <div class="row tall"><i class="k"></i><i></i><i></i><i></i><i></i></div>
+        <div class="row"><i class="k"></i><i></i></div>
+      </div>
+    </div>
+    <span class="tag">MS 編輯器</span>
   </a>
-  <a class="tool" href="tools/bn-editor.html">
-    <span class="tag">定位版</span>
-    <b>BN 編輯器</b>
-    <span>14 個 BN 版位定位＋文案連動編輯（視覺後續再校）</span>
+
+  <a class="obj bn" href="tools/bn-editor.html" aria-label="BN 編輯器">
+    <div class="plate-wrap">
+      <div class="plate bn-lit">
+        <i class="t a"></i><i class="t b off"></i><i class="t c dim"></i>
+        <i class="t d off"></i><i class="t e"></i><i class="t f off"></i>
+        <i class="t g dim"></i><i class="t h"></i><i class="t i off"></i>
+      </div>
+    </div>
+    <span class="tag">BN 編輯器</span>
   </a>
 </div>
-<footer>core/packs/tools 架構｜token 來源：Seller Talk_MS.psd 實測</footer>
+
+<div id="fileWarn">以 <b>file://</b> 開啟 — BN 編輯器匯出 PNG 會失敗。請改用 <b>python -m http.server 8080</b> 或 Live Server。</div>
+
+<script>
+/* 卡片上的游標光暈：只更新兩個 CSS 變數，rAF 節流 */
+(function(){
+  if (location.protocol === 'file:') document.getElementById('fileWarn').classList.add('on');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var raf = 0, pend = null;
+  document.querySelectorAll('.obj').forEach(function(o){
+    var plate = o.querySelector('.plate');
+    o.addEventListener('pointermove', function(e){
+      pend = [plate, e.clientX, e.clientY];
+      if (raf) return;
+      raf = requestAnimationFrame(function(){
+        raf = 0;
+        if (!pend) return;
+        var p = pend[0], r = p.getBoundingClientRect();
+        p.style.setProperty('--mx', (pend[1] - r.left) + 'px');
+        p.style.setProperty('--my', (pend[2] - r.top) + 'px');
+      });
+    });
+  });
+  if (location.protocol === 'file:') document.getElementById('fileWarn').classList.add('on');
+})();
+
+/* 背景光斑跟著滑鼠：
+   ① 游標光源＝四層各自用不同緩動係數追同一個目標 → 停住時疊成一顆、移動時拉成尾巴
+   ② 底部漸層圓心跟隨頭部小幅偏移
+   一支 rAF 迴圈統一寫，滑鼠停下就自己停。 */
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var bg = document.querySelector('.bg');
+  var tx = innerWidth / 2, ty = innerHeight * .44;   // 目標＝滑鼠
+  // 係數越大跟得越緊：t0 是頭，t3 最拖。差距要拉開才看得出尾巴。
+  var trail = [
+    {el: document.querySelector('.t0'), k: .30, x: tx, y: ty},
+    {el: document.querySelector('.t1'), k: .17, x: tx, y: ty},
+    {el: document.querySelector('.t2'), k: .10, x: tx, y: ty},
+    {el: document.querySelector('.t3'), k: .06, x: tx, y: ty}
+  ];
+  var running = false;
+
+  var lit = false;
+  addEventListener('pointermove', function(e){
+    tx = e.clientX; ty = e.clientY;
+    if (!lit) {                                      // 第一次動滑鼠才讓尾巴淡入
+      lit = true;
+      trail.forEach(function(t){ t.x = tx; t.y = ty; });   // 先歸位，免得從畫面中央飛過來
+      bg.classList.add('live');
+    }
+    if (!running) { running = true; requestAnimationFrame(tick); }
+  }, {passive:true});
+
+  function tick(){
+    var moving = false;
+    for (var i = 0; i < trail.length; i++){
+      var t = trail[i];
+      t.x += (tx - t.x) * t.k;
+      t.y += (ty - t.y) * t.k;
+      t.el.style.setProperty('--x', t.x.toFixed(1) + 'px');
+      t.el.style.setProperty('--y', t.y.toFixed(1) + 'px');
+      if (Math.abs(tx - t.x) > .4 || Math.abs(ty - t.y) > .4) moving = true;
+    }
+    // 漸層的圓心也跟著「頭」那一層小幅左右移動（±56px），讓底光有一點活的感覺
+    var nx = (trail[0].x / innerWidth - .5) * 2;     // -1 ~ 1
+    bg.style.setProperty('--gx', (nx * 56).toFixed(1) + 'px');
+    if (moving) requestAnimationFrame(tick);
+    else running = false;                            // 全部追到了就收工，不空轉
+  }
+})();
+</script>
 <!-- 檔尾這個 body 結束標籤必須留著：VS Code Live Server（live-server 的 inject 中介層）
      會把 livereload 的 script 插在它找到的第一個結束標籤前面，候選順序是
      body -> svg -> head。本專案的 icon 是寫在 JS 字串裡的行內 SVG，檔案裡沒有 body
@@ -42,3 +264,5 @@ footer{margin-top:auto;padding-top:40px;font-size:12px;color:var(--ui-dim2)}
      -> 整頁腳本不執行（2026-09-16 實測 live-server 5.7.10 / 擴充套件 ritwickdey.LiveServer）。
      註解裡刻意不寫出那幾個標籤的字面值，否則它會比真正的標籤更早被比對到。 -->
 </body>
+
+</html>

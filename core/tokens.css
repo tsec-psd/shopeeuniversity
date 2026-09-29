@@ -59,21 +59,26 @@
   /* --- 工具介面（深色，跟產出物完全分開）---
      色票對齊 shrimp2choice：工具是暗的，產出物照樣是自己的顏色。
      改這裡會同時影響 ms-editor / ms-studio / bn-editor。 */
-  --ui-bg:#1A1A1A;          /* 工作區底（畫布區） */
-  --ui-topbar:#242424;      /* 頂列 */
-  --ui-panel:#303030;       /* 左右面板 */
-  --ui-surface:#383838;     /* 輸入框、卡片、按鈕底 */
-  --ui-surface2:#2E2E2E;    /* hover */
-  --ui-line:#383838;        /* 分隔線 */
-  --ui-line2:#444444;       /* 較亮的框線 */
-  --ui-text:#F0F0F0;
-  --ui-dim:#999999;
-  --ui-dim2:#666666;
+  --ui-bg:#121214;          /* 工作區底（畫布區） */
+  --ui-topbar:#1B1B1F;      /* 頂列 */
+  --ui-panel:#1B1B1F;       /* 左右面板 */
+  --ui-surface:#26262C;     /* 輸入框、卡片、按鈕底 */
+  --ui-surface2:#33333B;    /* hover */
+  --ui-line:#2A2A31;        /* 分隔線 */
+  --ui-line2:#3A3A44;       /* 較亮的框線 */
+  --ui-text:#F2F2F4;
+  --ui-dim:#9A9AA4;
+  --ui-dim2:#63636D;
   --ui-accent:#EE4D2D;      /* Shopee 橘 */
   --ui-accent-dim:rgba(238,77,45,.14);
   --ui-success:#3D9970;
   --ui-warn:#E9A23B;
   --ui-danger:#E5544B;
-  --ui-r:15px;              /* 按鈕圓角 */
-  --ui-rf:8px;              /* 輸入框圓角 */
+  --ui-line3:#4A4A56;
+  --ui-r1:6px; --ui-r2:10px; --ui-r3:16px;
+  --ui-elev1:0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.045);
+  --ui-elev2:0 10px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  --fs-ui-xs:11px; --fs-ui-sm:12.5px; --fs-ui-md:13.5px; --fs-ui-lg:15px;
+  --ui-r:var(--ui-r2);              /* 按鈕圓角 */
+  --ui-rf:var(--ui-r1);              /* 輸入框圓角 */
 }

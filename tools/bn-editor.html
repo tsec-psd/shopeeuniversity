@@ -1,12 +1,14 @@
 <meta charset="utf-8">
 <title>BN 編輯器（定位版）</title>
-<!-- 載入順序契約：tokens.css → ui.css → xd-core → history → bn-workorder → packs → 頁面腳本 -->
+<!-- 載入順序契約：tokens.css → ui.css → xd-core → icons → tool-menus → history → bn-workorder → packs → 頁面腳本 -->
 <link rel="stylesheet" href="../core/tokens.css">
 <link rel="stylesheet" href="../core/ui.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../core/xd-core.js"></script>
+<script src="../core/icons.js"></script>
+<script src="../core/tool-menus.js"></script>
 <script src="../core/history.js"></script>
 <script src="../core/bn-workorder.js"></script>
 <script src="../core/export-png.js"></script>
@@ -188,8 +190,9 @@
              background:repeating-conic-gradient(#3a3a3a 0 25%,#2e2e2e 0 50%) 0 0/8px 8px}
 .ph-card .nm{flex:1;min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ph-card .tag{font-size:11px;color:var(--ui-dim2);flex:none}
-.ph-card button{height:28px;padding:0 5px;justify-content:center;flex:none;font-size:11px}
-.ph-card-head button{width:28px;padding:0}
+.ph-card button{height:32px;padding:0 5px;justify-content:center;flex:none;font-size:11px}
+.ph-card-head button{width:32px;padding:0}
+.ph-card-acts button[data-photo-act="remove"]{width:32px;padding:0}
 .ph-card button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;
                     stroke-linecap:round;stroke-linejoin:round}
 .ph-card.off .th,.ph-card.off .nm{opacity:.4}
@@ -371,10 +374,10 @@
 .right-panel button,.right-panel label.btn{height:36px;font-size:13px;min-width:28px}
 .right-panel input:not([type=file]):not([type=checkbox]),.right-panel select{min-height:28px;min-width:28px}
 .right-panel .vtab{height:32px;font-size:13px}
-.right-panel .photo-adjust-zoom button{width:30px;height:30px;font-size:15px}
-.right-panel .ph-card button{height:28px;font-size:11px}
-.right-panel .ph-card-head button{width:28px}
-.right-panel .vp-item button{height:28px;font-size:11px}
+.right-panel .photo-adjust-zoom button{width:32px;height:32px;font-size:15px}
+.right-panel .ph-card button{height:32px;font-size:11px}
+.right-panel .ph-card-head button{width:32px}
+.right-panel .vp-item button{height:32px;font-size:11px}
 .right-panel .thumb{height:auto;padding:4px 3px}
 .right-panel .thumb .nm,.right-panel .ph-card .tag,.right-panel .cc,
 .right-panel .mini,.right-panel .photo-adjust-hint{font-size:11px!important}
@@ -428,24 +431,11 @@
 }
 </style>
 
-<header>
-  <a class="btn" href="../index.html" title="回到工具選擇頁">← 首頁</a>
-  <h1>BN 編輯器<small>定位版</small></h1>
-  <div class="viewtabs">
+<header class="tool-header">
+<a class="btn icon-button" href="../index.html" title="回到工具選擇頁" aria-label="回到工具選擇頁"><span class="ui-icon" data-icon="arrow-left"></span></a><h1>BN 編輯器</h1><span class="divider"></span><div class="viewtabs">
     <button class="vtab" id="tabOverview">總覽</button>
     <button class="vtab" id="tabCanvas">畫布</button>
-  </div>
-  <label class="btn">📄 匯入工單文案<input type="file" id="fWo" accept=".xlsx"></label>
-  <label class="btn">📦 上傳素材包<input type="file" id="fAssets" webkitdirectory multiple></label>
-  <button id="btnUndo" title="復原 (Ctrl+Z)">↶</button>
-  <button id="btnRedo" title="重做 (Ctrl+Shift+Z)">↷</button>
-  <a class="btn" href="../BN編輯器使用說明.html" target="_blank" rel="noopener">? 說明</a>
-  <span class="spacer"></span>
-  <button class="danger" id="btnClearAll">全部清除</button>
-  <button class="primary" id="btnDownload">⬇ 下載整包</button>
-  <button id="btnSaveProject" title="只存目前設定，不匯出圖片">💾 下載暫存檔</button>
-  <label class="btn">📂 匯入暫存檔<input type="file" id="fRestore" accept="application/json,.json" hidden></label>
-  <span class="hint" id="src"></span>
+  </div><span class="divider"></span><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="匯入" aria-expanded="false" aria-controls="importMenu">匯入</button><div class="ui-popup" id="importMenu" hidden><label class="btn"><span class="ui-icon" data-icon="sheet"></span> 匯入工單文案<input type="file" id="fWo" accept=".xlsx"></label><label class="btn"><span class="ui-icon" data-icon="folder-up"></span> 上傳素材包<input type="file" id="fAssets" webkitdirectory multiple></label><label class="btn"><span class="ui-icon" data-icon="folder-open"></span> 匯入暫存檔<input type="file" id="fRestore" accept="application/json,.json" hidden></label></div></div><button class="icon-button" aria-label="復原" id="btnUndo" title="復原 (Ctrl+Z)"><span class="ui-icon" data-icon="undo"></span></button><button class="icon-button" aria-label="重做" id="btnRedo" title="重做 (Ctrl+Shift+Z)"><span class="ui-icon" data-icon="redo"></span></button><span class="spacer"></span><span class="hint" id="src"></span><div class="ui-menu"><button class="ui-menu-toggle icon-button" aria-label="更多" aria-expanded="false" aria-controls="moreMenu"><span class="ui-icon" data-icon="more"></span></button><div class="ui-popup" id="moreMenu" hidden><a class="btn" href="../BN編輯器使用說明.html" target="_blank" rel="noopener"><span class="ui-icon" data-icon="help"></span> 說明</a><button id="btnSaveProject" title="只存目前設定，不匯出圖片"><span class="ui-icon" data-icon="save"></span> 下載暫存檔</button><button class="danger" id="btnClearAll">全部清除</button></div></div><button class="primary" id="btnDownload"><span class="ui-icon" data-icon="save"></span> 下載整包</button>
 </header>
 
 <main>
@@ -504,7 +494,7 @@
           </div>
           <div class="field">
             <div class="field-label"><span>廠商 LOGO</span><span class="mini hint" id="vendorCount"></span></div>
-            <button id="btnAssetsPanel" style="width:100%;justify-content:center">📦 上傳素材包</button>
+            <button id="btnAssetsPanel" style="width:100%;justify-content:center"><span class="ui-icon" data-icon="folder-up"></span> 上傳素材包</button>
             <div id="vendorPreview" class="vp-row"></div>
             <button id="btnClearVendor" style="width:100%;justify-content:center;margin-top:6px">清除廠商 LOGO</button>
           </div>
@@ -571,7 +561,7 @@
           <div class="photo-adjust-zoom">
             <button type="button" id="photoZoomOut" title="縮小">−</button>
             <button type="button" id="photoZoomReset" title="重設位置/縮放/角度">⟲</button>
-            <button type="button" id="photoZoomIn" title="放大">＋</button>
+            <button type="button" id="photoZoomIn" title="放大"><span class="ui-icon" data-icon="plus"></span></button>
           </div>
         </div>
         <div class="ph-editor-actions">
@@ -1765,7 +1755,7 @@
   }
   $('#zoombar').innerHTML =
     '<button id="zOut" title="縮小">−</button><span class="zoom-readout" id="zoomReadout">100%</span>' +
-    '<button id="zIn" title="放大">＋</button>' +
+    '<button id="zIn" title="放大">' + XD.icon("plus") + '</button>' +
     '<button id="z100" title="以實際像素檢視">100%</button>' +
     '<button id="zFit" title="把勾選的版位縮到看得完">符合視窗</button>' +
     '<span class="zoom-hint">Alt+滾輪縮放</span>';
@@ -2130,7 +2120,7 @@
     const vendor = S().vendorLogos || [];
     $('#vendorPreview').innerHTML = vendor.map((url, i) =>
       '<div class="vp-item"><div class="vp-thumb"><img src="' + url + '" alt="廠商LOGO' + (i + 1) + '"></div>' +
-      '<button class="mini" data-editvendor="' + i + '">✎ 編輯</button></div>').join('');
+      '<button class="mini" data-editvendor="' + i + '">' + XD.icon("pencil") + ' 編輯</button></div>').join('');
   }
   $('#vendorPreview').addEventListener('click', e => {
     const btn = e.target.closest('[data-editvendor]'); if (!btn) return;
@@ -2299,17 +2289,17 @@
              (off ? '改成顯示' : '不顯示（畫面與匯出都不畫）') + '">' +
              (off ? PHOTO_ICON.eyeOff : PHOTO_ICON.eye) + '</button>' +
            (two ? '<button type="button" data-lay="up" title="往上疊一層"' +
-             (k === 0 ? ' disabled' : '') + '>↑</button>' : '') +
+             (k === 0 ? ' disabled' : '') + '>' + XD.icon("arrow-up") + '</button>' : '') +
            '</div><div class="ph-card-acts">' +
            '<button type="button" data-photo-act="replace">替換</button>' +
-           '<button type="button" data-photo-act="edit">✎ 去背／裁切</button>' +
-           '<button type="button" data-photo-act="remove" title="移除人物' + (i + 1) + '">🗑</button>' +
+           '<button type="button" data-photo-act="edit">' + XD.icon("pencil") + ' 去背／裁切</button>' +
+           '<button type="button" data-photo-act="remove" title="移除人物' + (i + 1) + '">' + XD.icon("trash") + '</button>' +
            '</div></div>';
     });
     if (target >= 0) {
       const label = '上傳人物' + (target + 1) + '照片';
       h += '<button type="button" class="ph-layer-add" data-photo-add aria-label="' +
-           label + '" title="' + label + '">＋</button>';
+           label + '" title="' + label + '">' + XD.icon("plus") + '</button>';
     }
     rows.forEach(row => { row.innerHTML = h; });
   }
@@ -3459,7 +3449,7 @@
   function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]/g, ''); }
   function boardDownloadButton(b) {
     return '<button type="button" class="board-download" data-dl="' + esc(b.id) +
-      '" title="下載這張 PNG" aria-label="下載 ' + esc(b.id) + ' PNG">⬇</button>';
+      '" title="下載這張 PNG" aria-label="下載 ' + esc(b.id) + ' PNG">' + XD.icon("save") + '</button>';
   }
   function buildProjectJson(st) {
     return {

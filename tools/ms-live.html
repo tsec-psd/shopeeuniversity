@@ -1,11 +1,13 @@
 <meta charset="utf-8">
 <title>MS 線上編輯器</title>
 <!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → icons → tool-menus → atoms → flow-engine
-     → workorder → export-png → export-package → history → packs → 頁面腳本 -->
+     → export-png → export-package → history → packs → 頁面腳本
+     ⚠ 2026-09-29 起這頁不載 core/workorder.js 與 ExcelJS：使用者指示「不用匯出工單了」，
+       #btnXlsx 是這頁對 workorder 的唯一用途。workorder.js 本身留著（OLD/ms-editor.html
+       與 tests/probes/ms-workorder.html 的往返測試還在用）。 -->
 <link rel="stylesheet" href="../core/tokens.css">
 <link rel="stylesheet" href="../core/ui.css">
 <link rel="stylesheet" href="../core/paper.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../core/xd-core.js"></script>
@@ -13,7 +15,6 @@
 <script src="../core/tool-menus.js"></script>
 <script src="../core/atoms.js"></script>
 <script src="../core/flow-engine.js"></script>
-<script src="../core/workorder.js"></script>
 <script src="../core/export-png.js"></script>
 <script src="../core/export-package.js"></script>
 <script src="../core/history.js"></script>
@@ -270,7 +271,7 @@ header h1{min-width:0}
 </style>
 
 <header class="tool-header">
-<a class="btn icon-button" href="../index.html" title="回到工具選擇頁" aria-label="回到工具選擇頁"><span class="ui-icon" data-icon="arrow-left"></span></a><input id="projName" placeholder="未命名專案" maxlength="60" aria-label="專案名稱"><span class="divider"></span><select id="zoom">
+<a class="btn icon-button" href="../index.html" title="回到工具選擇頁" aria-label="回到工具選擇頁"><span class="ui-icon" data-icon="home"></span></a><input id="projName" placeholder="未命名專案" maxlength="60" aria-label="專案名稱"><span class="divider"></span><select id="zoom">
     <option value=".5">50%</option><option value=".75" selected>75%</option>
     <option value="1">100%</option>
   </select><span class="divider"></span><button class="icon-button" aria-label="復原" id="btnUndo" title="復原 Ctrl+Z"><span class="ui-icon" data-icon="undo"></span></button><button class="icon-button" aria-label="重做" id="btnRedo" title="重做 Ctrl+Shift+Z"><span class="ui-icon" data-icon="redo"></span></button><span class="spacer"></span>  <div id="themePicker">
@@ -282,7 +283,7 @@ header h1{min-width:0}
       <div id="themeCells"></div>
     </div>
   </div>
-<button id="btnAdv" title="打開才會出現空白容器、換容器、格的切分——那些是設計師在用的"><span class="ui-icon" data-icon="sliders"></span> 進階</button><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="檔案" aria-expanded="false" aria-controls="fileMenu">檔案</button><div class="ui-popup" id="fileMenu" hidden><label class="btn" title="開啟先前存的 .json 專案"><span class="ui-icon" data-icon="folder-open"></span> 開專案<input type="file" id="fProj" accept=".json"></label><button id="btnSaveProj"><span class="ui-icon" data-icon="save"></span> 存專案</button><button id="btnDemo">範例整頁</button><button class="danger" id="btnClear">清空頁面</button></div></div><div class="ui-menu"><button class="ui-menu-toggle icon-button" aria-label="更多" aria-expanded="false" aria-controls="moreMenu"><span class="ui-icon" data-icon="more"></span></button><div class="ui-popup" id="moreMenu" hidden><button id="btnXlsx" title="產出一份給人審閱／留底的試算表（不用再匯回）"><span class="ui-icon" data-icon="sheet"></span> 工單</button></div></div><div class="ui-split"><button class="primary" id="btnZip"><span class="ui-icon" data-icon="layers"></span> 匯出</button><div class="ui-menu"><button class="ui-menu-toggle primary chevron export-toggle" aria-label="匯出選項" aria-expanded="false" aria-controls="exportMenu"></button><div class="ui-popup" id="exportMenu" hidden><button id="btnPng"><span class="ui-icon" data-icon="save"></span> 整張 PNG</button></div></div></div>
+<button class="icon-button" id="btnAdv" aria-label="進階模式" aria-pressed="false" title="進階：打開才會出現空白容器、換容器、格的切分——那些是設計師在用的"><span class="ui-icon" data-icon="sliders"></span></button><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="開啟" aria-expanded="false" aria-controls="fileMenu"><span class="ui-icon" data-icon="folder-open"></span>開啟</button><div class="ui-popup" id="fileMenu" hidden><label class="btn" title="開啟先前存的 .json 專案"><span class="ui-icon" data-icon="folder-open"></span> 開專案<input type="file" id="fProj" accept=".json"></label><button id="btnDemo"><span class="ui-icon" data-icon="table"></span> 範例整頁</button></div></div><button class="danger" id="btnClear" title="清空整頁內容"><span class="ui-icon" data-icon="trash"></span> 清空頁面</button><button id="btnSaveProj" title="存下 .json 專案檔"><span class="ui-icon" data-icon="save"></span> 存專案</button><button id="btnPng" title="只要一張整張的時候用"><span class="ui-icon" data-icon="image"></span> 整張 PNG</button><button class="primary" id="btnZip"><span class="ui-icon" data-icon="package"></span> 匯出整包</button>
 </header>
 
 <main>
@@ -348,7 +349,7 @@ header h1{min-width:0}
     if (name) return name + '.' + ext;
     const d = new Date().toISOString().slice(0, 10);
     return { json: 'MS專案_' + d + '.json', png: 'MS活動頁_' + d + '.png',
-             zip: 'MS_' + d + '.zip', xlsx: '蝦大MS工單_' + d + '.xlsx' }[ext];
+             zip: 'MS_' + d + '.zip' }[ext];
   }
   function setProjectName(name) {
     PROJ.name = String(name || '');
@@ -1539,15 +1540,18 @@ header h1{min-width:0}
 
   /* ============ 頂列 ============ */
   function paintAdv() {
+    /* icon-only：狀態靠 .on 的橘框＋橘字表達，不再附「進階」兩個字
+       （頂列已經有五顆帶標籤的動作鈕，這顆是低頻的設計師開關） */
     const b = $('#btnAdv');
     b.classList.toggle('on', ADV);
-    b.innerHTML = XD.icon(ADV ? 'check' : 'sliders') + '進階';
+    b.setAttribute('aria-pressed', ADV ? 'true' : 'false');
+    b.innerHTML = XD.icon(ADV ? 'check' : 'sliders');
   }
   $('#btnAdv').onclick = () => {
     ADV = !ADV; XD.store.set('ms_live_adv', ADV);
     paintAdv(); paintPane(); paintInsp();
     XD.toast(ADV ? '進階：可以自己拼容器、改格的切分'
-                 : '進階已關（蝦大端看到的樣子）');
+                 : '進階已關');
   };
   paintAdv();
   $('#btnUndo').onclick = () => { if (H.undo()) { restore(); paintUndo(); } };
@@ -1597,45 +1601,48 @@ header h1{min-width:0}
     finally { btn.disabled = false; btn.textContent = old; }
   }
 
-  $('#btnPng').onclick = () => withBtn($('#btnPng'), async () => {
-    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
-    await XD.withOffscreen(async c => {
-      const wrap = exportPaper();
-      c.appendChild(wrap);
-      const r = await XD.exportPng(wrap, fileName('png'),
-        { width: 1200, height: wrap.offsetHeight, background: pageBg() });
-      XD.toast('已匯出 PNG（1200 × ' + r.height + '）');
-      window.__lastPng = r;
-    });
-  });
-
-  $('#btnZip').onclick = () => withBtn($('#btnZip'), async () => {
-    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
-    const items = await XD.withOffscreen(async c => {
+  /* 逐段擷取（各段都在安全高度內，不會踩到 html2canvas 對「整個超長節點」
+     一次擷取的色塊 bug——見 XD.stitchVertical 的說明），回傳的 canvas
+     之後拿去拼整張、也拿去轉 JPG。#btnPng／#btnZip 共用這條路徑，
+     兩邊拼出來的整張 PNG 保證一致，也不會為了拼接再多擷一次。 */
+  function captureSections() {
+    return XD.withOffscreen(async c => {
       const wrap = exportPaper([]);
       c.appendChild(wrap);
       const out = []; let edm = 0;
       for (const sec of PAGE.sections) {
         const el = sectionNode(sec);
         wrap.appendChild(el);
-        const nm = SDEFS[sec.type].kv ? 'KV' : 'EDM' + (++edm);
-        const r = await XD.captureNode(el, { type: 'jpeg', quality: .92, background: pageBg() });
-        out.push({ name: nm + '.jpg', dataUrl: r.dataUrl });
+        const r = await XD.captureNodeH2C(el, { background: pageBg() });
+        out.push({ name: SDEFS[sec.type].kv ? 'KV' : 'EDM' + (++edm), canvas: r.canvas });
         wrap.removeChild(el);
       }
       return out;
     });
-    await XD.zipAndDownload(items, projectJson(), 'project.json',
-      fileName('zip'));
-    XD.toast('已下載 ' + items.length + ' 張圖＋專案檔');
-    window.__lastZip = items.map(i => i.name);
+  }
+
+  $('#btnPng').onclick = () => withBtn($('#btnPng'), async () => {
+    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
+    const segs = await captureSections();
+    const full = await XD.stitchVertical(segs, { width: 1200, background: pageBg() });
+    const blob = await (await fetch(full.dataUrl)).blob();
+    XD.download(blob, fileName('png'));
+    XD.toast('已匯出 PNG（1200 × ' + full.height + '）');
+    window.__lastPng = full;
   });
 
-  $('#btnXlsx').onclick = () => withBtn($('#btnXlsx'), async () => {
-    const r = await XD.workorder.makePageXlsx(PAGE, PRESETS, SDEFS);
-    XD.download(r.blob, safeName(PROJ.name) ? fileName('xlsx') : r.filename);
-    XD.toast('已產出工單（給人審／留底用，不用再匯回）：' + r.fields + ' 個欄位');
-    window.__lastXlsx = r;
+  $('#btnZip').onclick = () => withBtn($('#btnZip'), async () => {
+    if (!PAGE.sections.length) return XD.toast('頁面還是空的');
+    const segs = await captureSections();
+    const items = segs.map(s => ({ name: s.name + '.jpg', dataUrl: s.canvas.toDataURL('image/jpeg', .92) }));
+    /* 整包一律附一張整張 PNG，不用再另外去選一次；
+       跟 #btnPng 共用同一批段落 canvas 拼接，所以兩邊產出的是同一張。 */
+    const full = await XD.stitchVertical(segs, { width: 1200, background: pageBg() });
+    items.unshift({ name: fileName('png'), dataUrl: full.dataUrl });
+    await XD.zipAndDownload(items, projectJson(), 'project.json',
+      fileName('zip'));
+    XD.toast('已下載 ' + (items.length - 1) + ' 張分段圖＋整張 PNG＋專案檔');
+    window.__lastZip = items.map(i => i.name);
   });
 
   /* ============ 專案存讀 ============ */

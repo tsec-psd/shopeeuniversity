@@ -161,7 +161,9 @@
     const dataUrl = o.type === 'jpeg'
       ? canvas.toDataURL('image/jpeg', o.quality || 0.92)
       : canvas.toDataURL('image/png');
-    return { dataUrl, width: canvas.width, height: canvas.height };
+    /* canvas 也一起回傳（呼叫端拿去做二次處理，如拼接／改存別的格式，
+       不用為了拿到 pixel 資料再重新擷取一次）。 */
+    return { dataUrl, width: canvas.width, height: canvas.height, canvas };
   };
 
   XD.exportPng = async function (node, filename, opts) {

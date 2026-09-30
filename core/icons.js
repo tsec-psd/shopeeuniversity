@@ -26,7 +26,8 @@
   'zoom':'M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z|M21 21l-4.3-4.3',
   'check':'M20 6 9 17l-5-5',
   'close':'M18 6 6 18M6 6l12 12',
-  'table':'M3 4h18v16H3z|M3 9h18M9 9v11'
+  'table':'M3 4h18v16H3z|M3 9h18M9 9v11',
+  'home':'M3 10.2 12 3l9 7.2V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z|M9.3 21v-7.2h5.4V21'
 };
   XD.icon = function(name, opts){
     if (!Object.prototype.hasOwnProperty.call(icons,name)) return '';

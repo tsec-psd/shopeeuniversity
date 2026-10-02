@@ -13,3 +13,9 @@ desktop.ini
 # Python 快取（跑 tests/ 會產生）
 __pycache__/
 *.pyc
+
+# 內部協作文件，不上 GitHub（2026-10-02 起已從歷史紀錄徹底移除，僅留本機）
+/ARCHITECTURE.md
+/CLAUDE.md
+/AGENTS.md
+/COLLAB.md

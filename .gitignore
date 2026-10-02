@@ -19,3 +19,16 @@ __pycache__/
 /CLAUDE.md
 /AGENTS.md
 /COLLAB.md
+
+# 開發／測試／已下架輔助資料，不上 GitHub（2026-10-02 起已從歷史紀錄徹底移除，僅留本機）
+# GitHub 只留「真正運作需要」：index.html／core／packs／tools／img／fonts
+# ＋ BN／MS 使用說明.html（工具頁說明鈕連結）與 docs/截圖（說明文件內嵌圖）
+/OLD/
+/specs/
+/tests/
+/workorders/
+/蝦大BN新工單.xlsx
+/docs/MS討論記錄.md
+/docs/PRD_v0.1_封存.md
+/docs/開發日誌封存_第1-60輪.md
+/docs/簡報/

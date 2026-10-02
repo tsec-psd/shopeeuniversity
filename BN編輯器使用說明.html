@@ -19,57 +19,22 @@
   --warn-bg:#F7ECD6;
   --danger:#B23A30;
   --danger-bg:#F6E1DE;
-  --kraft:#EDE0C4;
-  --kraft-ink:#5B4A26;
   --code-bg:#EDEAE3;
   --shadow:0 1px 2px rgba(33,30,26,.06),0 8px 24px rgba(33,30,26,.05);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#171615;
-    --panel:#232120;
-    --panel-2:#2C2A28;
-    --ink:#EDEAE5;
-    --ink-dim:#9C968E;
-    --line:#3A3733;
-    --accent:#F0714A;
-    --accent-ink:#1A1310;
-    --success:#3D9970;
-    --warn:#E9A23B;
-    --warn-bg:#3A301C;
-    --danger:#E5544B;
-    --danger-bg:#3A2220;
-    --kraft:#3A3122;
-    --kraft-ink:#D9C79A;
-    --code-bg:#2C2A28;
+    --bg:#171615; --panel:#232120; --panel-2:#2C2A28; --ink:#EDEAE5; --ink-dim:#9C968E; --line:#3A3733;
+    --accent:#F0714A; --accent-ink:#1A1310; --success:#3D9970; --warn:#E9A23B; --warn-bg:#3A301C;
+    --danger:#E5544B; --danger-bg:#3A2220; --code-bg:#2C2A28;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#171615;
-  --panel:#232120;
-  --panel-2:#2C2A28;
-  --ink:#EDEAE5;
-  --ink-dim:#9C968E;
-  --line:#3A3733;
-  --accent:#F0714A;
-  --accent-ink:#1A1310;
-  --success:#3D9970;
-  --warn:#E9A23B;
-  --warn-bg:#3A301C;
-  --danger:#E5544B;
-  --danger-bg:#3A2220;
-  --kraft:#3A3122;
-  --kraft-ink:#D9C79A;
-  --code-bg:#2C2A28;
+  --bg:#171615; --panel:#232120; --panel-2:#2C2A28; --ink:#EDEAE5; --ink-dim:#9C968E; --line:#3A3733;
+  --accent:#F0714A; --accent-ink:#1A1310; --success:#3D9970; --warn:#E9A23B; --warn-bg:#3A301C;
+  --danger:#E5544B; --danger-bg:#3A2220; --code-bg:#2C2A28;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
-}
-
-/* ---- 這幾個是「工具本身畫面」的固定深色配色，跟本頁的閱讀主題無關 ---- */
-.chrome{
-  --cx-bg:#1A1A1A; --cx-topbar:#242424; --cx-panel:#303030; --cx-surface:#383838;
-  --cx-text:#F0F0F0; --cx-dim:#999999; --cx-accent:#EE4D2D; --cx-accent-dim:rgba(238,77,45,.16);
-  --cx-line:#3d3d3d;
 }
 
 *{box-sizing:border-box}
@@ -90,227 +55,237 @@ a{color:var(--accent)}
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);max-width:1180px;margin:0 auto;gap:0}
 @media (max-width:860px){.shell{grid-template-columns:1fr}}
 
-/* ---------- 左側目錄 ---------- */
-.toc{
-  position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
-  padding:36px 20px 36px 28px;border-right:1px solid var(--line);
-  scrollbar-width:thin;
-}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:36px 20px 36px 28px;border-right:1px solid var(--line);scrollbar-width:thin}
 @media (max-width:860px){.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);padding:24px 20px}}
 .toc-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
 .toc-mark{width:26px;height:26px;border-radius:7px;background:var(--accent);color:var(--accent-ink);
   display:flex;align-items:center;justify-content:center;font-family:"JetBrains Mono";font-weight:700;font-size:12px;flex:none}
 .toc-brand b{font-size:14.5px;letter-spacing:.01em}
 .toc nav{display:flex;flex-direction:column;gap:2px}
-.toc a{
-  color:var(--ink-dim);text-decoration:none;font-size:13.5px;padding:7px 10px;border-radius:8px;
-  border-left:2px solid transparent;transition:background .12s,color .12s;
-}
+.toc a{color:var(--ink-dim);text-decoration:none;font-size:13.5px;padding:7px 10px;border-radius:8px;
+  border-left:2px solid transparent;transition:background .12s,color .12s}
 .toc a:hover{background:var(--panel-2);color:var(--ink)}
-.toc a.active{color:var(--accent);background:var(--panel-2);border-left-color:var(--accent);font-weight:600}
 .toc .grp{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-dim);opacity:.7;
   margin:16px 10px 6px;font-weight:600}
 .toc .grp:first-of-type{margin-top:2px}
 
-/* ---------- 主內容 ---------- */
 main{padding:56px 44px 100px;min-width:0}
 @media (max-width:640px){main{padding:36px 20px 80px}}
 
-.cover{margin-bottom:56px}
-.cover .kicker{
-  font-family:"JetBrains Mono";font-size:12px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--accent);font-weight:700;margin-bottom:14px;display:block
-}
+.cover{margin-bottom:48px}
+.cover .kicker{font-family:"JetBrains Mono";font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;margin-bottom:14px;display:block}
 .cover h1{font-size:clamp(30px,4.4vw,42px);font-weight:900;line-height:1.2;margin-bottom:14px}
 .cover .lede{font-size:17px;color:var(--ink-dim);max-width:60ch;line-height:1.7}
-.cover .who{
-  margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;
-}
+.cover .who{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
 .tag{font-size:12.5px;padding:5px 12px;border-radius:99px;background:var(--panel-2);color:var(--ink-dim);
   border:1px solid var(--line);font-weight:600}
 
-section{margin-bottom:64px;scroll-margin-top:24px}
-.stepnum{
-  font-family:"JetBrains Mono";font-size:13px;color:var(--accent);font-weight:700;
-  display:block;margin-bottom:6px;letter-spacing:.04em
-}
-h2{font-size:24px;font-weight:700;margin-bottom:14px;display:flex;align-items:baseline;gap:10px}
-h3{font-size:16.5px;font-weight:700;margin:28px 0 10px}
-p{margin:0 0 14px;max-width:66ch}
-p.tight{margin-bottom:8px}
-ul,ol{margin:0 0 16px;padding-left:1.3em;max-width:64ch}
-li{margin-bottom:6px}
+section{margin-bottom:50px;scroll-margin-top:24px}
+.stepnum{font-family:"JetBrains Mono";font-size:13px;color:var(--accent);font-weight:700;
+  display:block;margin-bottom:6px;letter-spacing:.04em}
+h2{font-size:22px;font-weight:700;margin-bottom:10px}
+p{margin:0 0 12px;max-width:66ch}
+ul,ol{margin:0 0 14px;padding-left:1.3em;max-width:64ch}
+li{margin-bottom:5px}
 strong{font-weight:700}
-.muted{color:var(--ink-dim)}
+.muted{color:var(--ink-dim);font-size:13.5px}
+.lead{color:var(--ink-dim);font-size:14.5px;max-width:64ch;margin-bottom:14px}
 
-.btnlabel{
-  display:inline-flex;align-items:center;gap:4px;font-family:"JetBrains Mono";font-size:12.5px;font-weight:600;
-  background:var(--code-bg);color:var(--ink);padding:2px 8px;border-radius:6px;border:1px solid var(--line);
-  white-space:nowrap;
-}
-kbd{
-  font-family:"JetBrains Mono";font-size:12px;font-weight:600;background:var(--code-bg);color:var(--ink);
-  padding:2px 7px;border-radius:5px;border:1px solid var(--line);border-bottom-width:2px;
-}
+kbd{font-family:"JetBrains Mono";font-size:12px;font-weight:600;background:var(--code-bg);color:var(--ink);
+  padding:2px 7px;border-radius:5px;border:1px solid var(--line);border-bottom-width:2px}
 
-/* callout boxes */
-.box{border-radius:14px;padding:18px 20px;margin:18px 0;max-width:64ch;box-shadow:var(--shadow)}
-.box .label{
-  font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
-  display:block;margin-bottom:8px
-}
+.box{border-radius:14px;padding:16px 18px;margin:16px 0;max-width:64ch;box-shadow:var(--shadow)}
+.box .label{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+  display:block;margin-bottom:7px}
 .box p:last-child{margin-bottom:0}
 .box.tip{background:var(--panel);border:1px solid var(--line)}
 .box.tip .label{color:var(--accent)}
 .box.warn{background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 35%, transparent)}
 .box.warn .label{color:var(--warn)}
-.box.danger{background:var(--danger-bg);border:1px solid color-mix(in srgb, var(--danger) 35%, transparent)}
-.box.danger .label{color:var(--danger)}
-.box.kraft{background:var(--kraft);color:var(--kraft-ink);border:1px solid color-mix(in srgb, var(--kraft-ink) 25%, transparent)}
-.box.kraft .label{color:var(--kraft-ink)}
-.box.kraft strong{color:var(--kraft-ink)}
 
-/* ---------- 工具畫面示意（固定深色，不隨本頁主題變化） ---------- */
-figure.shot{margin:22px 0 26px;max-width:100%}
-figure.shot figcaption{
-  font-size:12.5px;color:var(--ink-dim);margin-top:9px;font-family:"JetBrains Mono";
-}
-.chrome{
-  background:var(--cx-bg);border-radius:14px;padding:14px;box-shadow:var(--shadow);
-  border:1px solid var(--cx-line); overflow:hidden;
-}
-.cx-top{
-  display:flex;align-items:center;gap:8px;background:var(--cx-topbar);border-radius:9px;
-  padding:8px 10px;flex-wrap:wrap;
-}
-.cx-btn{
-  font-family:"Noto Sans TC","JetBrains Mono";font-size:11.5px;color:var(--cx-text);background:var(--cx-surface);
-  padding:5px 9px;border-radius:7px;white-space:nowrap;font-weight:500;
-}
-.cx-btn.ghost{background:transparent;color:var(--cx-dim)}
-.cx-btn.accent{background:var(--cx-accent);color:#fff;font-weight:700}
-.cx-sep{width:1px;height:18px;background:var(--cx-line);margin:0 2px;flex:none}
-.cx-title{color:var(--cx-text);font-size:12.5px;font-weight:700;margin-right:auto;padding-left:2px}
+/* ---- 實機截圖 ---- */
+figure.shot{margin:14px 0 20px;max-width:100%}
+figure.shot img{display:block;max-width:100%;height:auto;border-radius:10px;
+  border:1px solid var(--line);box-shadow:var(--shadow)}
+figure.shot figcaption{font-size:12px;color:var(--ink-dim);margin-top:9px}
+.shotrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.shotrow figure.shot{flex:1 1 220px;min-width:180px}
 
-.cx-zones{display:grid;grid-template-columns:.85fr 2.3fr 1fr;gap:10px;margin-top:10px}
-.cx-zone{background:var(--cx-panel);border-radius:9px;padding:10px;min-height:150px}
-.cx-zone .zt{font-size:11px;color:var(--cx-accent);font-weight:700;margin-bottom:8px;font-family:"JetBrains Mono";text-transform:uppercase;letter-spacing:.05em}
-.cx-zone .zd{font-size:11.5px;color:var(--cx-dim);line-height:1.6}
-.cx-card{background:var(--cx-surface);border-radius:7px;padding:8px;margin-bottom:7px;font-size:11px;color:var(--cx-text)}
-.cx-canvas{background:#2358E6;border-radius:8px;padding:16px;min-height:130px;display:flex;flex-direction:column;gap:8px}
-.cx-pill{align-self:flex-start;background:#FFEB00;color:#2358E6;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:99px}
-.cx-line{background:rgba(255,255,255,.85);height:8px;border-radius:3px}
-.cx-line.w60{width:60%}
-.cx-line.w80{width:80%}
-.cx-line.w40{width:40%}
-.cx-bottom{
-  margin-top:10px;background:var(--cx-topbar);border-radius:9px;padding:9px 12px;
-  font-size:11px;color:var(--cx-dim);display:flex;gap:18px;flex-wrap:wrap
-}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:66ch;margin-bottom:8px}
+.xcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.xcard .xh{font-family:"JetBrains Mono";font-weight:700;font-size:12.5px;color:var(--accent);margin-bottom:7px}
+.xcard p{font-size:13px;margin-bottom:0;color:var(--ink-dim)}
 
-/* 角色列示意 */
-.rolebar{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);max-width:64ch}
-.rolerow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 16px;border-bottom:1px solid var(--line)}
-.rolerow:last-child{border-bottom:none}
-.rolerow .sample{flex:1;min-width:0}
-.rolerow .meta{font-size:11.5px;color:var(--ink-dim);font-family:"JetBrains Mono";flex:none}
-.rolerow.r-head .sample{font-family:"Noto Serif TC";font-weight:900;font-size:19px}
-.rolerow.r-sub .sample{font-weight:700;font-size:15px;color:var(--ink-dim)}
-.rolerow.r-body .sample{font-size:14.5px}
-.rolerow.r-bullet .sample{font-size:14px}
-.rolerow.r-note .sample{font-size:12.5px;color:var(--ink-dim)}
-
-/* 對話框示意 */
-.dlgwrap{background:var(--cx-bg,#1A1A1A);border-radius:14px;padding:36px 20px;display:flex;justify-content:center}
-.dlg{background:#303030;border-radius:14px;padding:20px 22px;width:280px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
-.dlg .dt{color:#F0F0F0;font-weight:700;font-size:14.5px;margin-bottom:8px}
-.dlg .dd{color:#999;font-size:12.5px;line-height:1.6;margin-bottom:16px}
-.dlg .da{display:flex;justify-content:flex-end;gap:8px}
-.dlg button{border:none;border-radius:8px;font-size:12.5px;font-weight:600;padding:7px 14px;font-family:inherit}
-.dlg .dc{background:#444;color:#ddd}
-.dlg .dk{background:#E5544B;color:#fff}
-
-/* icon buttons row (rowbar) */
-.iconrow{display:flex;gap:8px;max-width:64ch}
-.iconchip{
-  display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;
-  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)
-}
-.iconchip svg{width:16px;height:16px;stroke:var(--ink);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-
-/* tables */
-.tbl-wrap{overflow-x:auto;max-width:66ch;margin-bottom:18px}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-family:"JetBrains Mono";font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);font-weight:600}
-td.k{font-family:"JetBrains Mono";font-weight:600;white-space:nowrap}
-
-/* export comparison cards */
-.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;max-width:66ch;margin-bottom:8px}
-.xcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
-.xcard .xh{font-family:"JetBrains Mono";font-weight:700;font-size:13px;color:var(--accent);margin-bottom:8px}
-.xcard p{font-size:13.5px;margin-bottom:0;color:var(--ink-dim)}
-
-footer{border-top:1px solid var(--line);padding-top:22px;color:var(--ink-dim);font-size:12.5px;max-width:64ch}
-
-.top-btn{
-  position:fixed;bottom:22px;right:22px;width:42px;height:42px;border-radius:11px;background:var(--accent);
-  color:var(--accent-ink);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);
-  text-decoration:none;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;transform:translateY(6px);
-}
-.top-btn.show{opacity:1;pointer-events:auto;transform:translateY(0)}
-.top-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+footer{border-top:1px solid var(--line);padding-top:20px;color:var(--ink-dim);font-size:12.5px;max-width:64ch}
 </style>
 </head>
 <body>
-<div class="shell"><aside class="toc"><div class="toc-brand"><span class="toc-mark">BN</span><b>編輯器手冊</b></div><nav><a href="#mode">版位與模式</a><a href="#logo">LOGO</a><a href="#frame">人物框與圖素</a><a href="#duo">雙人</a><a href="#position">位置調整兩層</a><a href="#copy">文案與字數</a><a href="tools/bn-editor.html">開啟 BN 編輯器</a></nav></aside><main><div class="cover"><span class="kicker">蝦皮大學課程活動素材工具</span><h1>BN 編輯器操作手冊</h1><p class="lede">版位、主題、LOGO 與人物框的操作說明。</p></div><section id="mode"><h2>版位與模式</h2><p>文字／CTA 位置都照 PSD 量測值擺放（深藍圓角＝CTA）。
-          格紋底＝未選主題時的視覺佔位（KV／講師視覺本階段不處理，選了主題會換成底圖）。<br><br>
-          <b>總覽</b>：不用捲動看到所有勾選的版位縮圖，點一下放大檢視。<br>
-          <b>畫布</b>：可縮放/平移，仔細檢查或編輯用。<br><br>
-          </p></section>
-<section id="logo"><h2>LOGO</h2><p><b>LOGO 位置</b>：依主題而定——有的主題是固定橫排（蝦大／蝦皮直播＋分隔線＋
-          最多 3 個廠商 LOGO 位，由素材包自動帶入，等距等比排列），有的主題改成圍繞
-          人物照片的圓圈徽章，數量/位置各版位自己決定。橫式版位齊左、直式／方形版位置中。<br>
-          蝦皮／直播 LOGO 有橘、白兩版，依主題底色自動挑（工單配色表指定）。<br><br>
-          </p></section>
-<section id="frame"><h2>人物框與圖素</h2><p><b>人物框</b>：所有主題都有人物框，預設就放第一張<b>圖素</b>（img/圖素版/ 的
-          1200×700 去背 PNG）。點右欄的縮圖換一張，或改上傳自己的照片蓋掉；
-          換圖素／換照片時，位置縮放角度都會一起歸零。<br>
-          <b>兩種來源共用同一個<b>圖素定位框</b></b>（照插畫實際大小標的框，比公版人物框更貼合，
-          下緣超出版位是設計上的出血）：圖素貼的是「插畫實際看得到的範圍」（去背 PNG 四周的
-          透明邊不算）；自己上傳的照片沒有已知的透明邊界可貼合，整張 contain 進同一個框。<br>
-          新增圖素＝把 png 丟進 img/圖素版/，再在 packs/bn/photo-assets.js 加一行。<br><br>
-          </p></section>
-<section id="duo"><h2>雙人</h2><p><b>雙人上傳照片</b>：在「人物照片」分頁上傳第一張後，再上傳第二張就會自動變成人物2，
-          並把圖素定位框拆成左右兩塊（重疊約 8%）——<b>人物1在左、人物2在右</b>，
-          預設<b>人物1的圖層在上面</b>。每張已上傳照片都能在卡片上替換、去背裁切或移除。
-          移除人物1 時，人物2 會遞補成人物1；只剩一張時恢復成完整的單人框。
-          圖素模式不會拆，插畫本身已經是完整構圖。<br><br>
-          </p></section>
-<section id="position"><h2>位置調整兩層</h2><p><b>位置調整（兩層）</b>：套進來的時候整張固定在定位框內（不會被裁到）。<br>
-          ① <b>整體</b>＝右欄那個小預覽框，一次套用到所有版位。<br>
-          ② <b>單一版位</b>＝切到畫布模式直接點該版位的人物照片。<br>
-          兩邊的操作完全一樣：<b>拖曳</b>移動、拉<b>四角</b>等比縮放（固定對角，跟 PS
-          自由變形一樣）、拉<b>上方圓把手</b>旋轉（按住 Shift 吸附 15°），
-          倍率 20%～500%。右欄另有 ±／⟲ 按鈕可以微調與重設。<br>
-          （<b>不用滾輪縮放</b>——右欄捲動時太容易誤觸，已改成只靠選取框與按鈕。）<br>
-          單獨調過的版位<b>不會</b>再被①的整體調整覆蓋；要讓它跟回整體，按選取框下方的
-          ⟲ 還原，或按右欄黃色的「套用至所有版位」再選「覆蓋手動調整的版位」。<br><br>
-          兩層都<b>不受定位框限制</b>——可以放大到超出框、也可以拖到框外，只受版位邊界裁切。<br><br>
-          小預覽框裡的虛線＝定位框，虛線外那圈是框外空間，方便看照片溢出多少；
-          虛線與畫布上的選取框都只是編輯輔助，不會印進下載的圖。<br><br>
-          </p></section>
-<section id="copy"><h2>文案與字數</h2><p>字數為軟性提示：超過仍可輸入，只是提醒版面會被撐開。</p></section><section id="tips"><h2>操作補充</h2><p>
-              預設不顯示。工單若有「蝦皮直播」欄且填 Y／是，匯入時會自動打開。
-            </p><p>
-              點縮圖套進所有版位。圖素放在 <b>img/圖素版/</b>，
-              位置用設計端另外標的<b>圖素定位框</b>（照插畫實際大小貼合）。
-            </p><p>
-              兩個都是自己上傳的照片才會自動左右分割（重疊約 8%）：<b>人物1在左</b>、
-              <b>人物2在右</b>，預設<b>人物1的圖層在上面</b>（可在已上傳卡片用 ↑ 調整）。
-              圖素模式不會拆——插畫本身已經是完整構圖。
-            </p><p>
-            上面調的是<b>整體</b>（一次套用到所有版位）；要單獨調某一塊板，切到<b>畫布</b>模式直接點它的人物框。
-          </p><p>AR 版位專用（工單「AR案型」），5 字內；4 字以上排兩排，含 $ 金額不斷行。</p><p>小字僅部分版位使用（如日期時間），沒有就留空。</p><p>素材包可從頂列或右欄選取整個資料夾，瀏覽器會再問一次。</p></section></main></div>
+<div class="shell">
+<aside class="toc">
+  <div class="toc-brand"><span class="toc-mark">BN</span><b>編輯器手冊</b></div>
+  <nav>
+    <span class="grp">開始</span>
+    <a href="#start">第一次打開怎麼做</a>
+    <a href="#header">頂列工具</a>
+    <span class="grp">編輯</span>
+    <a href="#mode">總覽與畫布</a>
+    <a href="#copy">文案與主題配色</a>
+    <a href="#logo">LOGO</a>
+    <a href="#frame">人物框與圖素</a>
+    <a href="#duo">雙人上傳</a>
+    <a href="#position">位置調整</a>
+    <span class="grp">交件</span>
+    <a href="#export">下載與暫存</a>
+    <a href="#limits">已知限制</a>
+    <a href="../tools/bn-editor.html">開啟 BN 編輯器 ↗</a>
+  </nav>
+</aside>
+<main>
+
+<div class="cover">
+  <span class="kicker">蝦皮大學課程活動素材工具</span>
+  <h1>BN 編輯器操作手冊</h1>
+  <p class="lede">17 個版位 × 20 個主題：匯入工單文案與素材包、調整人物照片位置，一次下載整包 BN 圖。畫面全部是實機截圖，跟你打開工具看到的一模一樣。</p>
+  <div class="who"><span class="tag">蝦大</span><span class="tag">設計師</span></div>
+</div>
+
+<section id="start">
+  <span class="stepnum">START</span>
+  <h2>第一次打開怎麼做</h2>
+  <p class="lead">沒有資料時（全新專案，或剛按過「全部清除」）會自動跳出匯入精靈：</p>
+  <figure class="shot"><img src="docs/截圖/bn-01-onboard.png" alt="BN 編輯器匯入活動資料精靈，三張卡片並排：匯入工單文案、匯入素材包、還原暫存檔">
+  <figcaption>三張卡並排：工單與素材包都完成「完成」鈕才會亮；暫存檔卡獨立，成功即關閉精靈</figcaption></figure>
+  <ul>
+    <li>工單／素材包任一張沒做完都沒關係——左下角「略過，之後再匯入」、<kbd>Esc</kbd>、右上角 <kbd>✕</kbd>、點背景都能先關掉，之後從頂列「匯入 ▾」補匯。</li>
+    <li>瀏覽器裡已經有暫存內容時（不是空白狀態），重新整理<strong>不會</strong>自動跳出這個精靈打斷你。</li>
+  </ul>
+</section>
+
+<section id="header">
+  <span class="stepnum">01</span>
+  <h2>頂列工具</h2>
+  <p class="lead">由左到右（沒有收進「⋯」之類的隱藏選單，只有「匯入」是下拉）：</p>
+  <figure class="shot"><img src="docs/截圖/bn-02-header.png" alt="BN 編輯器頂列：回首頁、總覽／畫布切換、匯入、復原重做、使用說明、全部清除、下載暫存檔、下載整包">
+  <figcaption>回首頁・總覽／畫布・匯入▾・復原／重做・（版本資訊）・使用說明・全部清除・下載暫存檔・下載整包</figcaption></figure>
+  <ul>
+    <li><strong>匯入 ▾</strong>：三項——匯入工單文案（.xlsx）、上傳素材包（整個資料夾）、匯入暫存檔（.json）。</li>
+    <li><strong>復原／重做</strong>：<kbd>Ctrl Z</kbd> / <kbd>Ctrl Shift Z</kbd>，涵蓋文案、版位勾選、主題、廠商 LOGO、人物照片調整。</li>
+    <li><strong>全部清除</strong>（紅字）：跳確認、可復原。</li>
+    <li><strong>下載暫存檔</strong>：只存設定，不渲染圖。<strong>下載整包</strong>（橘底）：勾選版位 PNG＋json。</li>
+  </ul>
+  <figure class="shot"><img src="docs/截圖/bn-03-importmenu.png" alt="點開匯入下拉選單，顯示匯入工單文案、上傳素材包、匯入暫存檔三個選項">
+  <figcaption>點「匯入 ▾」展開的選單</figcaption></figure>
+  <p class="muted">「上傳素材包」用瀏覽器原生選資料夾，點下去會再跳一次「要上傳這個資料夾裡的 N 個檔案嗎」——這是瀏覽器的提醒，不是出錯。</p>
+</section>
+
+<section id="mode">
+  <span class="stepnum">02</span>
+  <h2>總覽與畫布</h2>
+  <p class="lead">左欄「版位」清單兩種模式都在：勾選才會出現在畫面上，也才會被「下載整包」收進去。</p>
+  <figure class="shot"><img src="docs/截圖/bn-04-overview.png" alt="BN 編輯器總覽模式：左邊版位勾選清單、中間 17 個版位縮圖、右邊文案與主題背景面板">
+  <figcaption>總覽模式（預設畫面）：不用捲動就能一次看完所有勾選的版位</figcaption></figure>
+  <figure class="shot"><img src="docs/截圖/bn-05-canvas.png" alt="BN 編輯器畫布模式：版位逐一放大排列，每塊卡片右上角有獨立下載鈕">
+  <figcaption>畫布模式：可拖曳平移、Alt+滾輪縮放，<strong>只有這個模式能直接拖拽人物照片</strong>；每塊卡片角落有獨立下載鈕</figcaption></figure>
+  <p>版位名稱旁邊標尺寸；文案或 CTA 還沒填齊的版位，清單上會用橘字提醒「無文字定位」「無CTA」。每塊版位卡片角落的下載鈕<strong>不受勾選狀態限制</strong>，不用先按「下載整包」就能單獨存一張。</p>
+</section>
+
+<section id="copy">
+  <span class="stepnum">03</span>
+  <h2>文案與主題配色</h2>
+  <p>右欄「文案」區的主標、副標、CTA 文字、小字、AR 文案，改一個字就<strong>同步套到全部 17 個版位</strong>（共用同一份公版定位，只是每個版位的框大小不同）。字數提示是軟性的，超過仍可輸入，只是提醒版面可能被撐開。</p>
+  <figure class="shot"><img src="docs/截圖/bn-06-theme-logo.png" alt="右欄主題背景區：20 款主題縮圖、廠商 LOGO 上傳按鈕、蝦皮直播 LOGO 開關">
+  <figcaption>右欄「主題背景」：選一款換三件事——底圖、文案六色票、LOGO 配色；20 款位置排版完全一樣</figcaption></figure>
+  <p class="muted">工單「主題」欄位有填值時，匯入會自動比對套用；對不到名稱只會跳警告，不會讓整次匯入失敗，照提示手動選一次即可。</p>
+</section>
+
+<section id="logo">
+  <span class="stepnum">04</span>
+  <h2>LOGO</h2>
+  <p>固定橫排主題的 LOGO 條順序：<strong>蝦大</strong> ＋ <strong>蝦皮直播</strong>（可關）│<strong>廠商1／2／3</strong>（素材包帶入）。有的主題改成圍繞人物照片的圓圈徽章；橫式版位齊左、直式／方形版位置中。蝦皮／直播 LOGO 的橘、白兩版由主題自動挑，不用手動調。</p>
+  <p>右欄「主題背景」區（見上圖）可以：<strong>上傳素材包</strong>帶入廠商 LOGO（或「清除廠商 LOGO」整批移除）、勾選「在 LOGO 條顯示蝦皮直播」（工單填 Y／是會自動打開）。</p>
+  <div class="box warn">
+    <span class="label">已知限制</span>
+    <p>蝦皮直播 LOGO 目前是上下兩段直式鎖定圖，文字只佔總高約 37%，暫時無法跟廠商 LOGO 一樣大。窄版位（如 300×250）塞滿 3 顆廠商 LOGO 時，每顆大約只有 27px 寬，是版面限制，不是上傳錯誤。</p>
+  </div>
+</section>
+
+<section id="frame">
+  <span class="stepnum">05</span>
+  <h2>人物框與圖素</h2>
+  <p class="lead">右欄「人物框」區用「圖素」「人物照片」兩個分頁切換，各自記住自己最後一次的內容：</p>
+  <figure class="shot"><img src="docs/截圖/bn-07-frame-tabs.png" alt="右欄人物框區：圖素／人物照片分頁、目前框裡圖素縮圖格、人物照片上傳卡片">
+  <figcaption>上：圖素分頁（五款去背插畫縮圖）／下：切到人物照片分頁，顯示「已上傳（0/2）」＋「＋」上傳卡</figcaption></figure>
+  <ul>
+    <li><strong>圖素</strong>——新專案預設就帶一張，點縮圖換一張套用到所有版位；去背 PNG，用「圖素定位框」貼合插畫實際看得到的範圍。</li>
+    <li><strong>人物照片</strong>——自己上傳的照片，整張 contain 進同一個框。</li>
+  </ul>
+  <p>上傳、替換照片、或切換圖素，都會把該人物的位置／縮放／角度<strong>重設為預設值</strong>（自己上傳的照片預設貼齊框底）。</p>
+  <figure class="shot"><img src="docs/截圖/bn-12-single.png" alt="單人上傳實例：版位人物框換成自己上傳的真人照片，整張 contain 貼齊框底">
+  <figcaption>單人上傳實例：換成自己的照片後，整張 contain 進同一個人物框、預設貼齊框底</figcaption></figure>
+</section>
+
+<section id="duo">
+  <span class="stepnum">06</span>
+  <h2>雙人上傳</h2>
+  <p class="lead">上傳第一張後卡片列下方會出現「＋」；再上傳第二張就自動變成人物 2，人物框自動左右拆開：</p>
+  <figure class="shot"><img src="docs/截圖/bn-09-duoboard.png" alt="版位畫面：人物框拆成左右兩塊，兩張真人照片各自貼齊，中間重疊約8%">
+  <figcaption>實際版位效果：人物1固定在左、人物2在右，重疊約 8%；人物1 的圖層固定疊在最上面</figcaption></figure>
+  <figure class="shot"><img src="docs/截圖/bn-10-duolayers.png" alt="右欄已上傳（2/2）：人物1最上層卡片、人物2卡片，各自有替換、去背／裁切、刪除按鈕">
+  <figcaption>右欄「已上傳（2/2）」：每張卡片都能替換、去背／裁切、或移除（🗑）</figcaption></figure>
+  <div class="box tip">
+    <span class="label">提示</span>
+    <p>只有「兩邊都是自己上傳的照片」才會拆框；只要有一邊還是圖素，就維持單人完整框——圖素插畫本身已經是完整構圖，拆了會破壞畫面。</p>
+  </div>
+  <p>只剩一張時移除＝清空該槽；兩張時移除人物1，人物2 自動遞補成人物1。</p>
+</section>
+
+<section id="position">
+  <span class="stepnum">07</span>
+  <h2>位置調整</h2>
+  <p class="lead">按右欄「開啟位置／縮放編輯器」，彈出的面板左邊是圖層列表、右邊是可操作的預覽：</p>
+  <figure class="shot"><img src="docs/截圖/bn-08-photoeditor.png" alt="人物位置／縮放編輯器彈窗：左邊圖層列表，右邊照片預覽，四角與上方有縮放旋轉把手">
+  <figcaption>拖曳＝移動・拉四角＝等比縮放・拉上方圓把手＝旋轉（按住 Shift 吸附 15°）</figcaption></figure>
+  <p>位置調整分兩層，操作手感完全一樣：</p>
+  <ul>
+    <li><strong>整體</strong>——這個編輯器彈窗裡調，套用到所有<strong>還沒被單獨調整過</strong>的版位。</li>
+    <li><strong>單一版位</strong>——切到畫布模式直接點該版位的人物照片調，只影響這一塊，調過之後不再跟著整體變動；選取框下方「⟲ 還原」可以讓它重新跟回整體。</li>
+  </ul>
+  <p>兩層都支援 Shift 多選兩張做群組變形（僅限兩邊都是自己上傳的照片）：拖曳一起平移、縮放固定群組中心同步等比、旋轉各自自轉並繞群組中心公轉。縮放範圍 20%～500%，<strong>不受定位框限制</strong>（放大超框、拖出框外都允許，只受版位邊界裁切）。</p>
+  <p>按「套用至所有版位」會跳出三選一確認：「覆蓋手動調整的版位」／「僅覆蓋未手動調整版位」／「取消」。</p>
+</section>
+
+<section id="export">
+  <span class="stepnum">08</span>
+  <h2>下載與暫存</h2>
+  <div class="cardgrid">
+    <div class="xcard"><div class="xh">下載整包</div><p>勾選版位各一張 PNG ＋ project.json 打包 zip。正式交件用。</p></div>
+    <div class="xcard"><div class="xh">下載暫存檔</div><p>只存 .json 設定快照，不渲染圖片。待會／明天繼續編輯用，沒勾選版位也能存。</p></div>
+    <div class="xcard"><div class="xh">單張 PNG</div><p>每塊版位卡片角落的下載鈕，不受勾選限制。臨時補一張圖最快。</p></div>
+  </div>
+  <p>「匯入暫存檔」一律先跳確認再覆蓋目前畫面；頂列直接匯入工單／素材包，只有「目前畫面已有內容」才會先問一次，全新畫面不會多問。編輯過程會自動暫存在這台電腦（約 300 毫秒寫入一次），但換電腦或清瀏覽器資料就會不見，重要進度建議還是按一次「下載暫存檔」。</p>
+  <figure class="shot"><img src="docs/截圖/bn-11-confirm.png" alt="全部清除確認對話框：文案、勾選、主題、廠商LOGO、人物照片與所有位置調整都會回到初始狀態">
+  <figcaption>「全部清除」的確認對話框（不是瀏覽器原生 confirm，是工具自己畫的）</figcaption></figure>
+  <div class="box warn">
+    <span class="label">容量提醒</span>
+    <p>人物照片太大、瀏覽器暫存放不下時會跳一次性提示：畫面與下載整包都不受影響，只是重新整理後要再上傳一次。</p>
+  </div>
+</section>
+
+<section id="limits">
+  <span class="stepnum">09</span>
+  <h2>已知限制</h2>
+  <ul>
+    <li>上傳素材包會跳瀏覽器原生「要上傳這個資料夾」確認框，正常現象。</li>
+    <li>位置調整編輯器固定抓一塊代表版位算整體設定，沒有「選版位」下拉；要看特定版位請切到畫布模式調那一塊。</li>
+    <li>復原／重做涵蓋文案、版位勾選、主題、LOGO、人物照片；但「看的狀態」（總覽/畫布、縮放平移、選到哪一塊）不會進復原堆疊。</li>
+    <li>窄版位塞滿 3 顆廠商 LOGO、蝦皮直播 LOGO 想跟廠商 LOGO 一樣大——受限於既有素材／版面，暫無解法。</li>
+  </ul>
+</section>
+
+<footer>蝦皮大學課程活動素材工具・內部使用・畫面截自實際工具（2026-10）</footer>
+</main>
+</div>
 </body>
 </html>

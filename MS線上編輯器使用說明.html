@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MS線上編輯器操作手冊</title>
+<style>
+:root{
+  --bg:#F7F6F3;
+  --panel:#FFFFFF;
+  --panel-2:#EFEBE3;
+  --ink:#211E1B;
+  --ink-dim:#6B6560;
+  --line:#E1DCD3;
+  --accent:#D8431C;
+  --accent-ink:#FFFFFF;
+  --success:#2E8659;
+  --warn:#9C6A17;
+  --warn-bg:#F7ECD6;
+  --danger:#B23A30;
+  --danger-bg:#F6E1DE;
+  --code-bg:#EDEAE3;
+  --shadow:0 1px 2px rgba(33,30,26,.06),0 8px 24px rgba(33,30,26,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#171615; --panel:#232120; --panel-2:#2C2A28; --ink:#EDEAE5; --ink-dim:#9C968E; --line:#3A3733;
+    --accent:#F0714A; --accent-ink:#1A1310; --success:#3D9970; --warn:#E9A23B; --warn-bg:#3A301C;
+    --danger:#E5544B; --danger-bg:#3A2220; --code-bg:#2C2A28;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#171615; --panel:#232120; --panel-2:#2C2A28; --ink:#EDEAE5; --ink-dim:#9C968E; --line:#3A3733;
+  --accent:#F0714A; --accent-ink:#1A1310; --success:#3D9970; --warn:#E9A23B; --warn-bg:#3A301C;
+  --danger:#E5544B; --danger-bg:#3A2220; --code-bg:#2C2A28;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","Noto Sans","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:16px;line-height:1.75;
+  font-feature-settings:"tnum" 1;
+}
+h1,h2,h3{font-family:"Noto Serif TC","Noto Sans TC",serif;text-wrap:balance;margin:0}
+code,kbd,.mono{font-family:"JetBrains Mono","SFMono-Regular",Consolas,ui-monospace,monospace}
+a{color:var(--accent)}
+::selection{background:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);max-width:1180px;margin:0 auto;gap:0}
+@media (max-width:860px){.shell{grid-template-columns:1fr}}
+
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:36px 20px 36px 28px;border-right:1px solid var(--line);scrollbar-width:thin}
+@media (max-width:860px){.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);padding:24px 20px}}
+.toc-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.toc-mark{width:26px;height:26px;border-radius:7px;background:var(--accent);color:var(--accent-ink);
+  display:flex;align-items:center;justify-content:center;font-family:"JetBrains Mono";font-weight:700;font-size:12px;flex:none}
+.toc-brand b{font-size:14.5px;letter-spacing:.01em}
+.toc nav{display:flex;flex-direction:column;gap:2px}
+.toc a{color:var(--ink-dim);text-decoration:none;font-size:13.5px;padding:7px 10px;border-radius:8px;
+  border-left:2px solid transparent;transition:background .12s,color .12s}
+.toc a:hover{background:var(--panel-2);color:var(--ink)}
+.toc .grp{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-dim);opacity:.7;
+  margin:16px 10px 6px;font-weight:600}
+.toc .grp:first-of-type{margin-top:2px}
+
+main{padding:56px 44px 100px;min-width:0}
+@media (max-width:640px){main{padding:36px 20px 80px}}
+
+.cover{margin-bottom:48px}
+.cover .kicker{font-family:"JetBrains Mono";font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;margin-bottom:14px;display:block}
+.cover h1{font-size:clamp(30px,4.4vw,42px);font-weight:900;line-height:1.2;margin-bottom:14px}
+.cover .lede{font-size:17px;color:var(--ink-dim);max-width:60ch;line-height:1.7}
+.cover .who{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
+.tag{font-size:12.5px;padding:5px 12px;border-radius:99px;background:var(--panel-2);color:var(--ink-dim);
+  border:1px solid var(--line);font-weight:600}
+
+section{margin-bottom:50px;scroll-margin-top:24px}
+.stepnum{font-family:"JetBrains Mono";font-size:13px;color:var(--accent);font-weight:700;
+  display:block;margin-bottom:6px;letter-spacing:.04em}
+h2{font-size:22px;font-weight:700;margin-bottom:10px}
+p{margin:0 0 12px;max-width:66ch}
+ul,ol{margin:0 0 14px;padding-left:1.3em;max-width:64ch}
+li{margin-bottom:5px}
+strong{font-weight:700}
+.muted{color:var(--ink-dim);font-size:13.5px}
+.lead{color:var(--ink-dim);font-size:14.5px;max-width:64ch;margin-bottom:14px}
+
+kbd{font-family:"JetBrains Mono";font-size:12px;font-weight:600;background:var(--code-bg);color:var(--ink);
+  padding:2px 7px;border-radius:5px;border:1px solid var(--line);border-bottom-width:2px}
+
+.box{border-radius:14px;padding:16px 18px;margin:16px 0;max-width:64ch;box-shadow:var(--shadow)}
+.box .label{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+  display:block;margin-bottom:7px}
+.box p:last-child{margin-bottom:0}
+.box.tip{background:var(--panel);border:1px solid var(--line)}
+.box.tip .label{color:var(--accent)}
+.box.warn{background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 35%, transparent)}
+.box.warn .label{color:var(--warn)}
+
+/* ---- 實機截圖 ---- */
+figure.shot{margin:14px 0 20px;max-width:100%}
+figure.shot img{display:block;max-width:100%;height:auto;border-radius:10px;
+  border:1px solid var(--line);box-shadow:var(--shadow)}
+figure.shot figcaption{font-size:12px;color:var(--ink-dim);margin-top:9px}
+.shotrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.shotrow figure.shot{flex:1 1 220px;min-width:180px}
+
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:66ch;margin-bottom:8px}
+.xcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.xcard .xh{font-family:"JetBrains Mono";font-weight:700;font-size:12.5px;color:var(--accent);margin-bottom:7px}
+.xcard p{font-size:13px;margin-bottom:0;color:var(--ink-dim)}
+
+footer{border-top:1px solid var(--line);padding-top:20px;color:var(--ink-dim);font-size:12.5px;max-width:64ch}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="toc">
+  <div class="toc-brand"><span class="toc-mark">MS</span><b>線上編輯器手冊</b></div>
+  <nav>
+    <span class="grp">開始</span>
+    <a href="#start">第一次打開怎麼做</a>
+    <a href="#header">頂列工具</a>
+    <span class="grp">組版面</span>
+    <a href="#sidebar">加一段／加一列</a>
+    <a href="#canvas">在畫布上直接編輯</a>
+    <a href="#role">切換欄位的語意角色</a>
+    <a href="#advanced">進階模式</a>
+    <a href="#theme">配色跟著 BN 主題走</a>
+    <span class="grp">交件</span>
+    <a href="#export">存檔與匯出</a>
+    <a href="#limits">已知限制</a>
+    <a href="../tools/ms-live.html">開啟 MS 線上編輯器 ↗</a>
+  </nav>
+</aside>
+<main>
+
+<div class="cover">
+  <span class="kicker">蝦皮大學課程活動素材工具</span>
+  <h1>MS 線上編輯器操作手冊</h1>
+  <p class="lede">直接在版面上打字、換語意角色、上傳圖，一次做完一整頁活動頁 MS。畫面全部是實機截圖，跟你打開工具看到的一模一樣。</p>
+  <div class="who"><span class="tag">蝦大（主力使用者）</span></div>
+</div>
+
+<section id="start">
+  <span class="stepnum">START</span>
+  <h2>第一次打開怎麼做</h2>
+  <p>全新打開（瀏覽器裡還沒有暫存內容）會自動帶入一套<strong>範例整頁</strong>（KV＋活動亮點＋票種說明＋活動流程＋賣家顧問＋活動資訊＋注意事項，共 7 段假字），方便你先看完整的一頁長什麼樣子，再把假字換成真正文案。已有上次內容時，重新整理會照原樣還原，不會被範例蓋掉。</p>
+</section>
+
+<section id="header">
+  <span class="stepnum">01</span>
+  <h2>頂列工具</h2>
+  <p class="lead">由左到右：</p>
+  <figure class="shot"><img src="docs/截圖/ms-01-header.png" alt="MS 線上編輯器頂列：回首頁、專案名稱、縮放、復原重做、配色主題、進階模式、開啟、清空頁面、存專案、整張PNG、匯出整包">
+  <figcaption>回首頁・專案名稱・縮放・復原／重做・配色主題・進階模式・開啟▾・清空頁面・存專案・整張PNG・匯出整包</figcaption></figure>
+  <ul>
+    <li><strong>專案名稱</strong>：就地輸入，同時也是「存專案／整張 PNG／匯出整包」三個輸出檔案的檔名。</li>
+    <li><strong>復原／重做</strong>：<kbd>Ctrl Z</kbd> / <kbd>Ctrl Shift Z</kbd>（或 <kbd>Ctrl Y</kbd>）。正在畫布上打字時按 <kbd>Ctrl Z</kbd> 不會觸發，交給瀏覽器原生的文字還原接手。</li>
+    <li><strong>配色主題</strong>：跟 BN 編輯器的 20 個主題連動，見下方「配色跟著 BN 主題走」。</li>
+    <li><strong>清空頁面</strong>（紅字）：跳確認、可復原。</li>
+  </ul>
+  <figure class="shot"><img src="docs/截圖/ms-02-openmenu.png" alt="點開開啟下拉選單，顯示開專案、範例整頁兩個選項">
+  <figcaption>點「開啟 ▾」展開的選單：開專案（讀 .json）、範例整頁</figcaption></figure>
+  <div class="box warn">
+    <span class="label">提醒</span>
+    <p>「開啟 ▾ → 開專案」選檔後<strong>直接覆蓋</strong>目前畫面，沒有二次確認——跟「清空頁面」不一樣，開專案前請先確定目前內容已經存檔。</p>
+  </div>
+</section>
+
+<section id="sidebar">
+  <span class="stepnum">02</span>
+  <h2>加一段／加一列</h2>
+  <p class="lead">左欄只做一件事：加。兩個分頁對應兩個層級：</p>
+  <figure class="shot" style="max-width:280px"><img src="docs/截圖/ms-03-sidebar.png" alt="左欄加一段分頁：膠囊標題、KV主視覺、單欄無框活動亮點等區段卡片，上方常用／全部切換">
+  <figcaption>「加一段」分頁：常用／全部切換，點卡片即加入</figcaption></figure>
+  <ul>
+    <li><strong>加一段</strong>：點了會插在目前選取那一段的後面，沒選取就加到最後；KV 比較特別，永遠排最上面，一頁只能有一個。最上面另外有一區「不屬於任何一段」（目前是「膠囊標題」，可重複加、可單獨存在於任何位置）。</li>
+    <li><strong>加一列</strong>：先在畫布上點選一段，這裡才會列出那一段可以加的列積木。如果那一段有「整張表」（完整樣態），點一下就整段換成那幾列（膠囊標題列不會被換掉）。KV 是整張圖，沒有「列」的概念。</li>
+  </ul>
+</section>
+
+<section id="canvas">
+  <span class="stepnum">03</span>
+  <h2>在畫布上直接編輯</h2>
+  <p class="lead">點選任何一個欄位，畫布與右欄同時呈現選取狀態：</p>
+  <figure class="shot"><img src="docs/截圖/ms-04-canvas-selected.png" alt="畫布選到一個欄位：上方麵包屑顯示路徑、右側浮動列工具列、右欄四層分組（欄位/格/列/段）、右上角頁面總覽縮圖">
+  <figcaption>由上而下：麵包屑路徑（可點擊跳層）・頁面總覽縮圖（右上，可收合、可點擊快速導覽）・浮動列工具列（上移/下移/複製/刪除）・右欄四層分組</figcaption></figure>
+  <ul>
+    <li><strong>文字</strong>：點哪裡就能編輯哪裡；貼上會自動去除原格式；欄位打到全空再按一次 <kbd>Backspace</kbd>／<kbd>Delete</kbd> 會把欄位整個刪掉（刪到整列只剩最後一欄、且是無框列時連列一起刪）。</li>
+    <li><strong>圖片</strong>：空框點一下選檔，或直接拖放圖片檔上去；已有圖的框改成拖曳移動，四角把手等比縮放（20%～300%），右欄也有「－／＋／⟲」按鈕可以不用滑鼠。</li>
+  </ul>
+</section>
+
+<section id="role">
+  <span class="stepnum">04</span>
+  <h2>切換欄位的語意角色</h2>
+  <p class="lead">選到欄位時，右欄最上面會出現一排可點的樣式列，每列用<strong>實際字級字重</strong>畫樣本字，右邊標真正的規格：</p>
+  <figure class="shot" style="max-width:340px"><img src="docs/截圖/ms-05-insp-atom.png" alt="右欄選取的欄位群組：活動大標語72Bold、白色說明文字38Regular、條列項目28Regular、小字備註29Regular、膠囊64Bold樣式列表">
+  <figcaption>點任一列即換成該角色，盡量把既有文字帶過去；收合的「更多樣式」可展開看更多選項</figcaption></figure>
+  <p>這些數字是逐層量 PSD 校準出來的，<strong>只能挑角色、不能自由調字級字重</strong>——要更多排版自由度，請用「加一列」換列積木，或打開進階模式。</p>
+</section>
+
+<section id="advanced">
+  <span class="stepnum">05</span>
+  <h2>進階模式</h2>
+  <p class="lead">預設關閉，日常只需要「加一段、加一列、打字、換角色」。打開後（狀態會記住）：</p>
+  <div class="shotrow">
+    <figure class="shot"><img src="docs/截圖/ms-07-advanced-sidebar.png" alt="左欄加一列底部出現進階：空白容器分隔線，下方是滿版一格、逐欄一格等容器卡片">
+    <figcaption>左欄「加一列」底部多出「進階：空白容器」區塊</figcaption></figure>
+    <figure class="shot"><img src="docs/截圖/ms-08-advanced-rightpanel.png" alt="右欄這一格多出置中、標籤底色按鈕；這一列多出換成別的容器的清單">
+    <figcaption>右欄「這一格」多出細節開關；「這一列」多出「換成別的容器」清單</figcaption></figure>
+  </div>
+  <p class="muted">「換成別的容器」會讓內容重新排過，跟「加一列」套現成樣式不同，請謹慎使用。</p>
+</section>
+
+<section id="theme">
+  <span class="stepnum">06</span>
+  <h2>配色跟著 BN 主題走</h2>
+  <p class="lead">頂列配色主題選取器直接讀 BN 編輯器那 20 個主題：</p>
+  <figure class="shot"><img src="docs/截圖/ms-06-theme.png" alt="點開配色主題面板，顯示20格顏色縮圖可選，選了立即套用到整頁">
+  <figcaption>選一個，整頁 12 個顏色（頁底、表格線、標題、內文、強調藍字、膠囊底／字、badge、大標語）立刻換掉，畫布／縮圖／匯出全部一致；選「預設配色」就退回原本校準色</figcaption></figure>
+  <p class="muted">左右欄工具外殼顏色不受影響，只有「紙面」本身換色。</p>
+</section>
+
+<section id="export">
+  <span class="stepnum">07</span>
+  <h2>存檔與匯出</h2>
+  <div class="cardgrid">
+    <div class="xcard"><div class="xh">存專案</div><p>下載 .json，含版面與圖片。給之後回來繼續編輯用，換電腦打開也完整。</p></div>
+    <div class="xcard"><div class="xh">整張 PNG</div><p>一張拼接好的整頁長圖。臨時要一張預覽或提案時最快。</p></div>
+    <div class="xcard"><div class="xh">匯出整包</div><p>zip：每段一張 JPG＋一張整張 PNG＋project.json。正式交件用這個。</p></div>
+  </div>
+  <p>編輯過程會自動暫存（約 400 毫秒寫入一次），頁尾「● 已暫存於這台電腦」就是這個狀態。但這只是本機暫存，換電腦或清瀏覽器資料就會不見，重要進度請記得按「存專案」。</p>
+  <figure class="shot"><img src="docs/截圖/ms-09-confirm.png" alt="清空整個頁面確認對話框：所有區段都會被移掉，清掉之後還可以用復原">
+  <figcaption>「清空頁面」的確認對話框（工具自己畫的，不是瀏覽器原生 confirm）</figcaption></figure>
+</section>
+
+<section id="limits">
+  <span class="stepnum">08</span>
+  <h2>已知限制</h2>
+  <ul>
+    <li><strong>2026-09-29 起不再匯出 Excel 工單</strong>。如果流程上仍需要正式工單檔案，這支工具目前不提供，請洽專案負責人員。</li>
+    <li>「開啟 ▾ → 開專案」沒有覆蓋確認，選了就直接蓋掉畫面。</li>
+    <li>拖放只支援「把圖片拖到圖片欄位／KV」；不支援拖曳排序區段或列（用浮動列工具列的上移／下移），也不支援把 .json 直接拖進畫布開檔。</li>
+    <li>部分視覺仍在逐步校準：表格線色、部分字級、較新列型／區段都還沒一一對過 PSD。</li>
+  </ul>
+</section>
+
+<footer>蝦皮大學課程活動素材工具・內部使用・畫面截自實際工具（2026-10）</footer>
+</main>
+</div>
+</body>
+</html>

@@ -27,6 +27,9 @@
   'check':'M20 6 9 17l-5-5',
   'close':'M18 6 6 18M6 6l12 12',
   'table':'M3 4h18v16H3z|M3 9h18M9 9v11',
+  'align-left':'M3 6h18M3 12h12M3 18h16',
+  'align-center':'M3 6h18M6 12h12M4 18h16',
+  'align-right':'M3 6h18M9 12h12M5 18h16',
   'home':'M3 10.2 12 3l9 7.2V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z|M9.3 21v-7.2h5.4V21'
 };
   XD.icon = function(name, opts){

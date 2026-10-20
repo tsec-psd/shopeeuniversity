@@ -115,6 +115,7 @@ header h1{min-width:0}
       background:var(--ui-surface);border:1px solid var(--ui-line2);color:var(--ui-dim)}
 .chip:hover{color:#fff}
 .chip.on,.chip.on:hover{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff;font-weight:700}
+.chip.alchip{display:inline-flex;align-items:center;gap:4px}
 .btnrow{display:flex;gap:5px;flex-wrap:wrap}
 .btnrow button{height:26px;padding:0 10px;font-size:11.5px}
 .btnrow button.danger{background:#3A2020;border-color:#5A2C2C;color:#E5544B}
@@ -788,6 +789,26 @@ header h1{min-width:0}
     '<div class="sg sg-' + lv + '"><div class="sg-label">' + ZICON[lv] + '<span>' + label + '</span>' +
     (extra ? '<small>' + extra + '</small>' : '') + '</div><div class="sg-body">' + body + '</div></div>';
 
+  /* 文字對齊：「這個欄位」與「整個區段」共用同一組三顆鈕（資料在 atom.al，見 atoms.js） */
+  const AL_LABEL = { left: '靠左', center: '置中', right: '靠右' };
+  const alignBtns = (attr, cur) => XD.ALIGNS.map(k =>
+    '<button class="chip alchip' + (k === cur ? ' on' : '') + '" data-' + attr + '="' + k +
+    '" title="文字' + AL_LABEL[k] + '">' + XD.icon('align-' + k, { size: 14 }) + AL_LABEL[k] + '</button>').join('');
+  /* 整段套用的範圍：區段內所有能對齊的欄位，膠囊標題除外（「統一文案向左」不該把標題也拉走） */
+  function secAlignAtoms(sec) {
+    const out = [];
+    const take = c => { if (!c) return; if (c.sub) c.sub.forEach(take); else (c.atoms || []).forEach(a => out.push(a)); };
+    ((sec && sec.rows) || []).forEach(r => { take(r.lead); (r.cells || []).forEach(take); });
+    return out.filter(a => XD.canAlign(a) && a.t !== 'pill');
+  }
+  /* 沒設過的欄位，亮起來的是它畫面上實際的對齊（照版型），不是空著讓人猜 */
+  function shownAlign(addr, atom) {
+    if (XD.ALIGNS.indexOf(atom.al) >= 0) return atom.al;
+    const el = document.querySelector('#paper [data-aw="' + CSS.escape(addr) + '"]');
+    const ta = el && el.firstElementChild ? getComputedStyle(el.firstElementChild).textAlign : '';
+    return ta === 'center' ? 'center' : (ta === 'right' || ta === 'end') ? 'right' : 'left';
+  }
+
   /* 這一列是白底表格格還是藍底無框列——角色清單照這個過濾 */
   const faceOfRow = row => ((PRESETS[(row || {}).preset] || {}).mode === 'plain') ? 'plain' : 'card';
 
@@ -908,6 +929,9 @@ header h1{min-width:0}
           role.styles.map(s => '<button class="chip' + (s[0] === hitA.atom.t ? ' on' : '') +
             '" data-style="' + s[0] + '">' + esc(s[1]) + '</button>').join('') + '</div></div>';
       }
+      if (XD.canAlign(hitA.atom))
+        body += '<div class="subpick"><i>文字對齊</i><div class="chips">' +
+          alignBtns('al', shownAlign(SEL.atom, hitA.atom)) + '</div></div>';
       body += '<div class="metaline">' +
         (def.max ? '最長一行 <span class="' + (over ? 'over' : '') + '">' +
           (Number.isInteger(longest) ? longest : longest.toFixed(1)) + ' / ' + def.max + ' 字</span>' : '') +
@@ -984,6 +1008,12 @@ header h1{min-width:0}
       const sdef = SDEFS[sec.type];
       groups.push(group('sec', '這個區段', '<div class="metaline"><b>' + esc(msNo(sec) + '　' + sec.title) + '</b>' +
         (sdef.kv ? '' : '　欄軌 ' + (sdef.cols || []).join(' ／ ')) + '</div>' +
+        (secAlignAtoms(sec).length ? (() => {
+          const sa = secAlignAtoms(sec);
+          const common = sa.every(a => a.al && a.al === sa[0].al) ? sa[0].al : '';
+          return '<div class="subpick"><i>整段文字對齊（膠囊標題除外）</i><div class="chips">' +
+                 alignBtns('secal', common) + '</div></div>';
+        })() : '') +
         '<div class="btnrow"><button data-act="sup">' + ICON.chevU + '上移</button>' +
         '<button data-act="sdn">' + ICON.chevD + '下移</button>' +
         '<button class="danger" data-act="sdel">' + ICON.del + '刪掉整個區段</button></div>'));
@@ -1515,6 +1545,15 @@ header h1{min-width:0}
     if (b.dataset.style) return setRole(b.dataset.style);   /* 符號／框型：直接指定 atom 型別 */
     if (b.dataset.addrole) return addAtomTo(SEL.cell, b.dataset.addrole);
     if (b.dataset.swap) return rowAct('swap', b.dataset.swap);
+    if (b.dataset.al || b.dataset.secal) {      /* 文字對齊：這個欄位／整個區段 */
+      const k = b.dataset.al || b.dataset.secal;
+      const list = b.dataset.al
+        ? [(SEL.atom && locAtom(SEL.atom) || {}).atom].filter(a => a && XD.canAlign(a))
+        : secAlignAtoms(secOf(SEL.sec));
+      if (!list.length || XD.ALIGNS.indexOf(k) < 0) return;
+      list.forEach(a => { a.al = k; });
+      commit(); render(); return;
+    }
     const act = b.dataset.act;
     if (!act) return;
     if (act === 'more' || act === 'less') { showMore = (act === 'more'); return paintInsp(); }

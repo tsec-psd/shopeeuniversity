@@ -99,6 +99,16 @@
       : '<div class="' + box + '"' + im + '>' + placeholder + '</div>';
   }
 
+  /* ---------- 文字對齊（atom.al＝'left'|'center'|'right'） ----------
+     使用者 2026-10-20 要的「文字統一向左／置中／向右」。沒設＝照版型（無框列置中、
+     表格靠左…），設了才在 .aw 掛 al-* class，實際樣式在 paper.css。
+     只有文字類與條列能對齊；圖片、講者、裝飾運算符沒有「一行字」可以對。 */
+  XD.ALIGNS = ['left', 'center', 'right'];
+  XD.canAlign = a => {
+    const d = XD.ATOMS[(a || {}).t] || {};
+    return !!(d.cls || d.list) && !d.photo && !d.deco;
+  };
+
   /* ---------- 預覽渲染 ----------
      di   ＝ 欄位位址 [iid|rowId|ci|si|ai]，有值才畫移除鈕
      live ＝ 線上編輯模式：文字類掛 contenteditable、圖片類掛 data-img（點了換圖）。
@@ -139,7 +149,8 @@
     /* 右上角那顆 ✕ 只給工單生成器（不能打字，需要一個點的目標）。
        線上編輯器（live）不畫——積在每個欄位角上很吵，而且常壓到內容；
        那邊改成「欄位空了按 Backspace／Delete 就删掉」。 */
-    return '<div class="aw"' + (di ? ' data-aw="' + di + '"' : '') + '>' + core +
+    const al = XD.canAlign(a) && XD.ALIGNS.indexOf(a.al) >= 0 ? ' al-' + a.al : '';
+    return '<div class="aw' + al + '"' + (di ? ' data-aw="' + di + '"' : '') + '>' + core +
            (di && !live ? '<button class="adel" data-di="' + di + '" title="移除這個欄位">✕</button>' : '') + '</div>';
   };
 
@@ -221,8 +232,10 @@
                  : from.spk  ? [a.brand, a.name].filter(Boolean).join(' ')
                  : String(a.v == null ? '' : a.v);
     const keepImg = from.photo && to.photo ? a.img : null;
+    const keepAl = a.al;                       // 換角色不該把使用者設好的對齊洗掉
     for (const k of Object.keys(a)) delete a[k];
     a.t = t;
+    if (keepAl && XD.canAlign(a)) a.al = keepAl;
     if (to.list) {
       const items = asText.split('\n').map(s => s.trim()).filter(Boolean);
       a.items = items.length ? items : [to.ph];

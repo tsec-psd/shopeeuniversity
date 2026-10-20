@@ -95,6 +95,20 @@ ul.a-bul-ok li:before{content:"✓";font-weight:700;color:var(--c-blue)}
 ul.a-bul-ng li{opacity:.72}
 ul.a-bul-ng li:before{content:"✗";font-weight:700;color:var(--c-accent)}
 
+/* 文字對齊（atom.al，見 atoms.js 的 XD.canAlign）：沒設＝照版型，設了才有 al-* class。
+   align-self:stretch：置中格（.cell.ctr）會把 .aw 縮成內容寬再擺中間，不撐開的話
+   「靠左」只會在縮過的盒子裡靠左，整塊看起來還是置中。
+   條列的項目符號是 li 左緣的絕對定位，置中／靠右時改成整條 li 縮成內容寬再移動，
+   符號才會跟著字走，不會留在最左邊。 */
+.aw.al-left,.aw.al-center,.aw.al-right{align-self:stretch}
+.aw.al-left>*{text-align:left}
+.aw.al-center>*{text-align:center}
+.aw.al-right>*{text-align:right}
+.aw.al-left>.a-pill{margin-left:0}
+.aw.al-right>.a-pill{margin-right:0}
+.aw.al-center>ul.a-bul{align-items:center}
+.aw.al-right>ul.a-bul{align-items:flex-end}
+
 /* 講者：頭像圈是 .avatar 的一個變體（av-speaker），跟照片檔名／圖示／圖片共用
    同一套上傳／裁切/縮放樣式，見下面 .avatar.av-speaker */
 .spk{display:flex;flex-direction:column;align-items:center;gap:8px}

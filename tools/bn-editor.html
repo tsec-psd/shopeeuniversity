@@ -476,7 +476,7 @@
           </div>
           <div class="field">
             <div class="field-label"><span>AR 文案</span><span class="cc" id="ccAr"></span></div>
-            <input class="fi" id="inAr" type="text" placeholder="AR 版位專用，5 字內">
+            <input class="fi" id="inAr" type="text" placeholder="AR 版位專用，6 字內">
             <div class="ar-split" id="arSplitRow" style="display:none">
               <span class="mini hint">斷行</span>
               <button type="button" data-arsplit="less"></button>
@@ -650,7 +650,9 @@
      勾選都沒被存下來」而且完全沒有跡象。拆開存之後，照片存不下最多就是照片沒存到，
      其餘狀態照常，而且會明確跳一則提示，不會無聲失敗。 */
   const PHOTO_STORE = 'xd_bn_photo_v1';
-  const MAX = { title: 8, sub: 7, cta: 4, small: 12, ar: 5 };
+  /* AR 由 5 字放寬到 6 字（使用者 2026-10-20：「ARBN原本是限制5字 要改成6字內 邏輯不變」）——
+     斷行規則（未滿 4 字一排、含金額一排、奇數字可選上少／上多）完全沒動，6 字就是上3下3。 */
+  const MAX = { title: 8, sub: 7, cta: 4, small: 12, ar: 6 };
   /* 文字字級＝定位框高 × 這個比例。定位框位置與大小都不動，只有字變小；
      .slot 本來就 align-items:center，所以字會留在框的垂直中線上＝往中心縮。
      小字一直是 85%；主標 2026-09-11 由 100% 改成 90%；
@@ -924,7 +926,7 @@
   function freshState() {
     return {
       title: '主標文案', sub: '副標文案', cta: '報名去', small: '',
-      /* AR 版位不跟其他版位共用文案（工單是獨立一格「AR案型」），上下兩排、共 5 字內。
+      /* AR 版位不跟其他版位共用文案（工單是獨立一格「AR案型」），上下兩排、共 6 字內。
          arSplit＝奇數字時上排要拿少的('less'，例如 5 字＝上2下3)還是多的('more'，上3下2)。 */
       arText: '', arSplit: 'less',
       on: PACK.boards.filter(b => hasContent(b.id)).map(b => b.id),

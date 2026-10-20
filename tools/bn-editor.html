@@ -2641,13 +2641,20 @@
     }).join('；') + '。';
   }
 
-  /* ---- 「套用至所有版位」：有手動版位才問，三選一 ---- */
+  /* ---- 「套用至所有版位」：有手動版位才問，三選一 ----
+     套用完成（含「本來就都跟著整體設定」）就直接關掉彈窗——使用者 2026-10-20：
+     「套用至所有版位後仍會停在這個畫面 希望套用完後可以直接關閉視窗」。
+     只有「取消」留在彈窗裡（那是還沒決定，不是做完了）。 */
   let PH_CONFIRM_SLOTS = [];
   function closePhConfirm() { $('#phConfirm').hidden = true; }
   $('#btnPhotoApplyAll').onclick = () => {
     const st = S(), slots = panelSelectedSlots(st).filter(i => photoUrl(st, i));
     const rows = slots.map(i => ({ i:i, n:boardsWithOverride(st, i).length }));
-    if (!rows.some(x => x.n)) { XD.toast('所選人物的所有版位本來就跟著整體設定，不用再套用'); return; }
+    if (!rows.some(x => x.n)) {
+      closePhotoEditor();
+      XD.toast('已套用至所有版位（所選人物的版位本來就都跟著整體設定）');
+      return;
+    }
     PH_CONFIRM_SLOTS = slots;
     $('#phConfirmText').innerHTML = rows.map(x => '<b>' + esc(photoSlotName(st, x.i)) +
       '：' + x.n + ' 個版位</b>').join('<br>') +
@@ -2662,14 +2669,14 @@
       summary.push(photoSlotName(st, i) + ' ' + boardsWithOverride(st, i).length + ' 個');
       photos[i] = Object.assign({}, ph, { boards:{} });
     });
-    closePhConfirm();
+    closePhConfirm(); closePhotoEditor();
     H.set(Object.assign({}, st, { photos:photos }), { key:'photoApplyAll:group' });
     XD.toast('已套用至所有版位（' + summary.join('、') + '，可用 Ctrl+Z 復原）');
   };
   $('#phcSafe').onclick = () => {
     const st = S(), summary = PH_CONFIRM_SLOTS.map(i =>
       photoSlotName(st, i) + ' ' + boardsWithOverride(st, i).length + ' 個').join('、');
-    closePhConfirm();
+    closePhConfirm(); closePhotoEditor();
     /* 未手動調整的版位本來就即時跟著整體設定走，不用再寫一次狀態；
        這個選項的意義是「確認過了，而且不要動我手動調過的那幾塊」。 */
     XD.toast('未手動調整的版位已套用整體設定；保留 ' + summary);

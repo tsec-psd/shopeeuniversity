@@ -3,10 +3,10 @@
 把 MS 線上編輯器同步到「MS 獨立 repo」（specs/013）。
 
     這個 repo（V1）               ->  MS 獨立 repo 的本機 clone
-    兩支工具＋兩個入口（設計師用）     只有 MS（給蝦大用）
+    兩支工具＋首頁（設計師用）         只有 MS、沒有首頁（給蝦大用）
 
 **V1 是唯一的開發來源**，MS repo 只是它的子集合。不要直接在 MS repo 裡改檔案，
-下一次同步會整個蓋掉（腳本看到 MS repo 有沒 commit 的修改就會停下來）。
+下一次同步會整個蓋掉（腳本看到不是同步產生的修改就會停下來）。
 
 用法：
     python tools/sync_ms_repo.py                  # 同步到預設位置（V1 旁邊的 MS-repo 資料夾）
@@ -19,7 +19,9 @@
 href/src、css 的 url() 一路找下去（js 不追，裡面的路徑是程式組的）。所以 ms-live
 多載一支 core/*.js，下次同步就會自動帶上，不用回來改這支腳本。
 
-首頁不另外維護一份：直接拿 V1 的 index.html，刪掉 BN-ONLY 記號之間的整段。
+MS repo 沒有工具選擇頁（使用者 2026-10-20：「純MS編輯器的感覺可以不用首頁了 直接進工具就好」）：
+- 根目錄 index.html 是這支腳本產生的轉址頁，一打開就進 tools/ms-live.html。
+- ms-live.html 裡 V1-ONLY 記號之間的整段（目前是「回首頁」鈕）同步時刪掉。
 """
 import os
 import posixpath
@@ -39,7 +41,8 @@ DEFAULT_DEST = os.path.join(os.path.dirname(ROOT), 'MS-repo')
 PREVIEW_DEST = os.path.join(ROOT, 'output', 'ms-repo-preview')
 
 HOME = 'index.html'
-ENTRIES = ['tools/ms-live.html', 'MS線上編輯器使用說明.html']
+TOOL = 'tools/ms-live.html'
+ENTRIES = [TOOL, 'MS線上編輯器使用說明.html']
 # 追連結追到這些就停下來：代表 MS 那邊有東西連到 BN，同步過去就會把 BN 一起帶走
 FORBIDDEN = ['tools/bn-editor.html', 'BN編輯器使用說明.html', 'img/']
 MANIFEST = '.ms-sync-manifest'
@@ -47,14 +50,32 @@ MANIFEST = '.ms-sync-manifest'
 # README 刻意不寫開發 repo 的名字：MS repo 是給蝦大的，不要從這裡指回 BN 所在的 repo
 README = """# 蝦大 MS 線上編輯器
 
-線上使用：開這個 repo 的 GitHub Pages 網址（Settings → Pages 顯示的那一個）。
+線上使用：開這個 repo 的 GitHub Pages 網址（Settings → Pages 顯示的那一個），會直接進編輯器。
 
 ⚠ 這裡的檔案是從開發用的 repo 以 `sync_ms_repo.py` 同步產生的，**不要直接在這裡改**——
 下一次同步會整個蓋掉。要改請回開發 repo 改完、commit，再重新同步。
 """
+# 首頁＝轉址頁。meta refresh 兜底（關掉 JS 也能進），location.replace 不留一筆「上一頁」。
+# 檔尾的 body 結束標籤要留著（Live Server 的坑，見 CLAUDE.md「不要做的事」）。
+HOME_HTML = """<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MS 線上編輯器</title>
+<meta http-equiv="refresh" content="0; url=tools/ms-live.html">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121214;
+  color:#9A9AA2;font:14px/1.7 system-ui,sans-serif}a{color:#EE4D2D}</style>
+<body>
+<p>正在開啟 <a href="tools/ms-live.html">MS 線上編輯器</a>…</p>
+<script>location.replace('tools/ms-live.html' + location.search + location.hash);</script>
+</body>
+</html>
+"""
 EXTRA = {'.nojekyll': b'', 'README.md': README.encode('utf-8')}
 
-MARK = re.compile(r'^\s*(?:/\*|<!--)\s*BN-ONLY:(start|end)\s*(?:\*/|-->)\s*$')
+MARK = re.compile(r'^\s*(?:/\*|<!--)\s*V1-ONLY:(start|end)\s*(?:\*/|-->)\s*$')
+# 要刪 V1-ONLY 段落的檔案 -> 刪完之後不准再出現的字串（出現就代表有東西沒包進記號）
+STRIP = {TOOL: ('V1-ONLY', 'href="../index.html"', 'bn-editor')}
 REF_HTML = re.compile(r'\b(?:href|src)="([^"]+)"')
 # 字型檔名帶括號（ShopeeNotoSans(content)-Bold.woff2），有引號時不能用「切到 ) 為止」
 REF_CSS = re.compile(r'url\(\s*(?:"([^"]+)"|\'([^\']+)\'|([^\'")\s]+))\s*\)')
@@ -65,33 +86,33 @@ class SyncError(Exception):
     pass
 
 
-# ---------------------------------------------------------------- 首頁
-def strip_bn(text):
-    """刪掉 BN-ONLY:start ~ BN-ONLY:end（含記號本身）。記號必須獨佔一行、成對、不巢狀。"""
+# ---------------------------------------------------------------- 刪 V1-ONLY 段落
+def strip_v1(text, name='', leaks=('V1-ONLY',)):
+    """刪掉 V1-ONLY:start ~ V1-ONLY:end（含記號本身）。記號必須獨佔一行、成對、不巢狀。"""
     out, inside, pairs = [], False, 0
     for i, line in enumerate(text.splitlines(True), 1):
         m = MARK.match(line.rstrip('\r\n'))
         if m:
             if m.group(1) == 'start':
                 if inside:
-                    raise SyncError('index.html 第 %d 行：上一段 BN-ONLY 還沒結束又開始一段' % i)
+                    raise SyncError('%s 第 %d 行：上一段 V1-ONLY 還沒結束又開始一段' % (name, i))
                 inside = True
                 pairs += 1
             else:
                 if not inside:
-                    raise SyncError('index.html 第 %d 行：BN-ONLY 結束記號沒有對應的開始' % i)
+                    raise SyncError('%s 第 %d 行：V1-ONLY 結束記號沒有對應的開始' % (name, i))
                 inside = False
             continue
         if not inside:
             out.append(line)
     if inside:
-        raise SyncError('index.html：最後一段 BN-ONLY 沒有結束記號')
+        raise SyncError('%s：最後一段 V1-ONLY 沒有結束記號' % name)
     if not pairs:
-        raise SyncError('index.html 找不到任何 BN-ONLY 記號')
+        raise SyncError('%s 找不到任何 V1-ONLY 記號' % name)
     res = ''.join(out)
-    for leak in ('bn-editor', 'BN-ONLY'):
+    for leak in leaks:
         if leak in res:
-            raise SyncError('刪完 BN-ONLY 後首頁仍含「%s」：有 BN 的東西沒包進記號' % leak)
+            raise SyncError('%s 刪完 V1-ONLY 後仍含「%s」：有只屬於設計師端的東西沒包進記號' % (name, leak))
     return res
 
 
@@ -134,10 +155,8 @@ def is_forbidden(rel):
 
 def collect():
     """回傳 {發佈路徑: bytes}，就是 MS repo 該有的全部檔案。"""
-    with open(os.path.join(ROOT, HOME), encoding='utf-8', newline='') as f:
-        home = strip_bn(f.read())
-    files = {HOME: home.encode('utf-8')}
-    todo = [(r, HOME) for r in refs(HOME, home)] + [(e, '（起點）') for e in ENTRIES]
+    files = {HOME: HOME_HTML.encode('utf-8')}
+    todo = [(r, HOME) for r in refs(HOME, HOME_HTML)] + [(e, '（起點）') for e in ENTRIES]
     while todo:
         rel, src = todo.pop()
         if rel in files:
@@ -148,6 +167,8 @@ def collect():
             raise SyncError('%s 連到的 %s 不存在（或大小寫／正規化不符）' % (src, rel))
         with open(os.path.join(ROOT, *rel.split('/')), 'rb') as f:
             data = f.read()
+        if rel in STRIP:
+            data = strip_v1(data.decode('utf-8'), rel, STRIP[rel]).encode('utf-8')
         files[rel] = data
         if rel.endswith(('.html', '.css')):
             todo.extend((r, rel) for r in refs(rel, data.decode('utf-8')))

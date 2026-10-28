@@ -8,6 +8,39 @@
 <link rel="stylesheet" href="../core/tokens.css">
 <link rel="stylesheet" href="../core/ui.css">
 <link rel="stylesheet" href="../core/paper.css">
+<script>
+/* 開機載入進度（specs/015）：品牌字型 Regular＋Bold 共 16MB，第一次打開要等好幾秒
+   （GitHub Pages 實測：一般網路 4 秒、20Mbps 16 秒）。這裡在 head 就先用 fetch 串流
+   同一個網址，只為了算進度——Chrome 會讓之後 CSS 的字型請求共用這一次下載
+   （實測 Font 請求 0 bytes），不會下載兩次。
+   路徑必須跟 core/tokens.css 的 @font-face 一致（tests/static_checks.py 會比對）。
+   Medium 不在這裡：開機畫面用不到它，用到時瀏覽器自己會去載。 */
+window.XD_BOOT = (function () {
+  var FONTS = ['../fonts/ShopeeNotoSans(content)-Regular.woff2',
+               '../fonts/ShopeeNotoSans(content)-Bold.woff2'];
+  var st = { loaded: 0, total: 0, known: 0, n: FONTS.length, bytes: true }, subs = [];
+  function emit() { subs.forEach(function (f) { try { f(st); } catch (e) {} }); }
+  var streams = Promise.all(FONTS.map(function (u) {
+    return fetch(u).then(function (r) {
+      var len = +r.headers.get('Content-Length') || 0;
+      if (!len) st.bytes = false;
+      st.total += len; st.known++; emit();
+      if (!r.ok || !r.body || !r.body.getReader) { st.bytes = false; emit(); return; }
+      /* 沒有長度也照樣讀完：讀到一半丟著不管，共用同一次下載的 CSS 字型請求可能跟著卡住 */
+      var rd = r.body.getReader();
+      return (function pump() {
+        return rd.read().then(function (x) {
+          if (x.done) return;
+          st.loaded += x.value.length; emit();
+          return pump();
+        });
+      })();
+    });
+  })).catch(function () { st.bytes = false; emit(); });   /* file:// 或斷線：改成不定進度條 */
+  return { FONTS: FONTS, state: st, streams: streams,
+           onProgress: function (f) { subs.push(f); f(st); } };
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../core/xd-core.js"></script>
@@ -274,7 +307,42 @@ header h1{min-width:0}
 .btnrow button.addchip:hover{border-color:var(--ui-accent);color:var(--ui-accent);
   background:var(--ui-accent-dim)}
 .chip{height:30px;padding:0 13px;font-size:12.5px}
+/* 開機載入遮罩（specs/015）：品牌字型到之前蓋住編輯器，避免換字型時整頁跳動、
+   也避免字型還沒到就先打字匯出。底色立刻蓋上；進度卡延遲 1 秒才淡入——快取命中時
+   位元組 60ms 就到，但兩支字型解碼還要約 0.5 秒，這段只看到一片底色，不會閃一張卡。 */
+#bootOverlay{position:fixed;inset:0;z-index:100100;display:grid;place-items:center;
+  background:var(--ui-bg)}
+@keyframes bootIn{from{opacity:0}to{opacity:1}}
+#bootOverlay .boot-card{width:min(380px,calc(100% - 32px));display:grid;gap:10px;
+  justify-items:center;text-align:center;animation:bootIn .25s ease 1s both}
+#bootOverlay .boot-title{font-size:18px;font-weight:700;color:var(--ui-text)}
+#bootOverlay .boot-msg{font-size:13px;color:var(--ui-dim)}
+#bootOverlay .boot-bar{width:100%;height:6px;margin-top:6px;border-radius:3px;
+  background:var(--ui-surface);overflow:hidden}
+#bootOverlay .boot-bar i{display:block;height:100%;width:0;border-radius:3px;
+  background:var(--ui-accent);transition:width .2s}
+#bootOverlay .boot-bar.indet i{width:35%;animation:bootIndet 1.2s ease-in-out infinite}
+@keyframes bootIndet{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+#bootOverlay .boot-num{min-height:18px;font-size:12.5px;color:var(--ui-text);
+  font-variant-numeric:tabular-nums}
+#bootOverlay .boot-hint{font-size:12px;color:var(--ui-dim2)}
+#bootOverlay #bootSkip{margin-top:6px}
+@media (prefers-reduced-motion: reduce){
+  #bootOverlay .boot-card{animation:none}
+  #bootOverlay .boot-bar.indet i{animation:none;width:100%;opacity:.5}
+}
 </style>
+
+<div id="bootOverlay">
+  <div class="boot-card">
+    <span class="boot-title">MS 線上編輯器</span>
+    <span class="boot-msg">正在載入字型…</span>
+    <div class="boot-bar" role="progressbar" aria-label="字型載入進度" aria-valuemin="0" aria-valuemax="100"><i id="bootBar"></i></div>
+    <span class="boot-num" id="bootNum"></span>
+    <span class="boot-hint">第一次打開比較久，之後會快很多</span>
+    <button id="bootSkip" type="button" hidden>先開始編輯（字型在背景繼續載入）</button>
+  </div>
+</div>
 
 <header class="tool-header">
 <!-- V1-ONLY:start -->
@@ -1735,18 +1803,60 @@ header h1{min-width:0}
     }
   }, 400);
 
+  /* ============ 開機：等品牌字型（specs/015） ============
+     進度來自 head 的 XD_BOOT（fetch 串流量位元組）；真正「可以用了」以
+     document.fonts.load 兩個字重都 loaded 為準。
+     （量過：紙面各層都有寫死行高，換字型前後 #paper 高度不變，不用重算 #zoomwrap。） */
+  const BOOT_FACES = ['400 16px "Shopee Noto Sans content"', '700 16px "Shopee Noto Sans content"'];
+  function bootGate() {
+    const ov = $('#bootOverlay');
+    const B = window.XD_BOOT;
+    const face = f => (document.fonts && document.fonts.load)
+      ? document.fonts.load(f).then(a => a.length > 0 && a.every(x => x.status === 'loaded'), () => false)
+      : Promise.resolve(false);
+    const fontsOk = Promise.all([B ? B.streams : null].concat(BOOT_FACES.map(face)))
+      .then(r => r.slice(1).every(Boolean));
+    if (!ov) return fontsOk.then(ok => ok ? 'ok' : 'fail');
+
+    const track = ov.querySelector('.boot-bar'), bar = $('#bootBar'), num = $('#bootNum');
+    const MB = n => (n / 1048576).toFixed(1);
+    if (B) B.onProgress(s => {
+      const det = s.bytes && s.known === s.n && s.total > 0;
+      track.classList.toggle('indet', !det);
+      if (!det) { bar.style.width = ''; num.textContent = ''; track.removeAttribute('aria-valuenow'); return; }
+      /* 下載完到字型解碼完還有一小段，100% 留給真正可以用的那一刻 */
+      const pct = Math.min(99, Math.floor(s.loaded / s.total * 100));
+      bar.style.width = pct + '%'; track.setAttribute('aria-valuenow', pct);
+      num.textContent = MB(Math.min(s.loaded, s.total)) + ' / ' + MB(s.total) + ' MB';
+    });
+    const skipT = setTimeout(() => { $('#bootSkip').hidden = false; }, 10000);
+    return new Promise(res => {
+      let closed = false;
+      const close = how => {
+        if (closed) return; closed = true; clearTimeout(skipT);
+        bar.style.width = '100%'; ov.remove(); res(how);
+      };
+      $('#bootSkip').onclick = () => close('skip');
+      fontsOk.then(ok => {
+        if (closed) { if (!ok) XD.toast('品牌字型沒有載入成功，畫面先用系統字型顯示'); return; }
+        close(ok ? 'ok' : 'fail');
+      });
+    });
+  }
+
   /* ============ 開機 ============ */
   (function boot() {
     const saved = XD.store.get(KEY);
     const savedImg = XD.store.get(KEY_IMG);
     if (savedImg) Object.keys(savedImg).forEach(k => { XD.IMAGES[k] = savedImg[k]; });
+    let restored = false;
     /* 存過就照存的來——包含「上次自己按了清空」留下的空頁；
        只有真的第一次開（完全沒有這支 key）才給範例整頁。 */
     if (saved && saved.sections) {
       PAGE = { sections: saved.sections };
       setProjectName(saved.name || '');
       setTheme(saved.theme || '', false);
-      if (saved.sections.length) XD.toast('已還原上次的內容');
+      restored = saved.sections.length > 0;
     } else {
       PAGE = { sections: PACK.templateDefault() };
       setProjectName('');
@@ -1756,6 +1866,11 @@ header h1{min-width:0}
     XD.bindUndoKeys(H, ok => { if (ok) restore(); });
     paintUndo();
     render();
+    /* 「已還原」等遮罩拿掉才說，不然被蓋在遮罩底下沒人看到 */
+    bootGate().then(how => {
+      if (how === 'fail') XD.toast('品牌字型沒有載入成功，畫面先用系統字型顯示');
+      else if (restored) XD.toast('已還原上次的內容');
+    });
   })();
 
   window.__api = {

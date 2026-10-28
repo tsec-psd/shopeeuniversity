@@ -90,9 +90,18 @@
       return true;
     }
 
+    /* 整份換掉並清空前後歷史：新手導覽結束、換回使用者原本的頁面時用
+       （導覽在範例資料上做的示範操作，不該留在 Ctrl+Z 裡）。 */
+    function reset(next) {
+      state = clone(next);
+      past.length = 0; future.length = 0;
+      lastMark = null; batchDepth = 0; batchBase = null; batchTouched = false;
+      notify({ type: '@@RESET' });
+    }
+
     return {
       getState: () => state,
-      set, undo, redo, beginBatch, endBatch,
+      set, undo, redo, beginBatch, endBatch, reset,
       canUndo: () => past.length > 0,
       canRedo: () => future.length > 0,
       depth: () => ({ past: past.length, future: future.length }),

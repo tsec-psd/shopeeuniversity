@@ -188,3 +188,46 @@ button:focus-visible,a.btn:focus-visible,.btn:focus-within{outline:2px solid var
    不要再加「窄視窗把標籤收成純 icon」的規則——那會重演使用者抱怨的
    「全部清除／下載暫存檔不見了」。 */
 @media(max-width:1100px){header.tool-header{gap:5px;padding:0 6px}.tool-header #src{display:none}}
+
+/* ---------- 新手導覽（core/tour.js，specs/016） ----------
+   打亮框用超大 box-shadow 把四周壓暗；.tour-block 吃掉所有點擊（導覽只看不操作）。
+   z-index 低於 .xd-modal 以外的所有工具 UI，但高於畫布上的浮動列工具條與頁面總覽。 */
+.tour-root{position:fixed;inset:0;z-index:9000;pointer-events:none;font-size:var(--fs-ui-md)}
+.tour-block{position:fixed;inset:0;pointer-events:auto;background:transparent;transition:background .2s}
+.tour-root.dim .tour-block{background:rgba(0,0,0,.62)}
+.tour-spot{position:fixed;border-radius:var(--ui-r2);border:2px solid var(--ui-accent);
+  box-shadow:0 0 0 9999px rgba(0,0,0,.62);pointer-events:none;
+  transition:left .25s,top .25s,width .25s,height .25s}
+.tour-spot.none{display:none}
+.tour-card{position:fixed;left:0;top:0;width:340px;max-width:calc(100vw - 24px);padding:16px 18px 14px;
+  background:var(--ui-panel);color:var(--ui-text);border:1px solid var(--ui-line2);border-radius:var(--ui-r3);
+  box-shadow:var(--ui-elev2);pointer-events:auto;transition:left .25s,top .25s}
+.tour-step{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ui-accent);margin-bottom:6px}
+.tour-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.tour-body{font-size:13px;line-height:1.75;color:var(--ui-dim)}
+.tour-body b{color:var(--ui-text)}
+.tour-bar{height:3px;margin:14px 0 12px;border-radius:var(--ui-r1);background:var(--ui-line2);overflow:hidden}
+.tour-bar i{display:block;height:100%;background:var(--ui-accent);transition:width .25s}
+.tour-foot{display:flex;align-items:center;gap:8px}
+.tour-foot button{height:30px;padding:0 14px;font-size:12.5px}
+.tour-foot .tour-skip{margin-right:auto;padding:0;background:none;border-color:transparent;color:var(--ui-dim)}
+.tour-foot .tour-skip:hover{background:none;color:var(--ui-text)}
+.tour-art,.tour-later,.tour-meta{display:none}
+.tour-card.intro{width:420px;padding:26px 28px 20px;text-align:center}
+.tour-card.intro .tour-step,.tour-card.intro .tour-bar,.tour-card.intro .tour-skip,
+.tour-card.intro .tour-prev{display:none}
+.tour-card.intro .tour-art{display:block;margin:0 auto 18px}
+.tour-card.intro .tour-title{font-size:20px;margin-bottom:8px}
+.tour-card.intro .tour-later{display:inline-flex}
+.tour-card.intro .tour-foot{justify-content:center;gap:10px;margin-top:20px}
+.tour-card.intro .tour-foot button{height:36px;padding:0 20px;font-size:13px}
+.tour-card.intro .tour-meta{display:block;margin-top:12px;font-size:11.5px;color:var(--ui-dim2)}
+.tour-cursor{position:fixed;left:0;top:0;width:26px;height:30px;opacity:0;pointer-events:none;
+  transition:opacity .2s;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.tour-cursor.on{opacity:1}
+.tour-cursor svg{position:absolute;left:-3px;top:-2px}
+.tour-ripple{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;
+  border:2px solid #fff;opacity:0}
+.tour-ripple.go{animation:tourRipple .45s ease-out}
+@keyframes tourRipple{from{transform:scale(.3);opacity:.9}to{transform:scale(1.4);opacity:0}}
+@media (prefers-reduced-motion: reduce){.tour-spot,.tour-card,.tour-bar i{transition:none}}

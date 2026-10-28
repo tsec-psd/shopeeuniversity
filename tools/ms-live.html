@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <title>MS 線上編輯器</title>
 <!-- 載入順序契約：tokens.css → ui.css → paper.css → xd-core → icons → tool-menus → atoms → flow-engine
-     → export-png → export-package → history → packs → 頁面腳本
+     → export-png → export-package → history → tour → packs → 頁面腳本
      ⚠ 2026-09-29 起這頁不載 core/workorder.js 與 ExcelJS：使用者指示「不用匯出工單了」，
        #btnXlsx 是這頁對 workorder 的唯一用途。workorder.js 本身留著（OLD/ms-editor.html
        與 tests/probes/ms-workorder.html 的往返測試還在用）。 -->
@@ -51,6 +51,7 @@ window.XD_BOOT = (function () {
 <script src="../core/export-png.js"></script>
 <script src="../core/export-package.js"></script>
 <script src="../core/history.js"></script>
+<script src="../core/tour.js"></script>
 <script src="../packs/ms/presets.js"></script>
 <script src="../packs/bn/themes.js"></script>
 <style>
@@ -327,6 +328,23 @@ header h1{min-width:0}
   font-variant-numeric:tabular-nums}
 #bootOverlay .boot-hint{font-size:12px;color:var(--ui-dim2)}
 #bootOverlay #bootSkip{margin-top:6px}
+/* 導覽開場插圖：用色塊拼一個縮小的編輯器（左欄／藍色紙面／右欄），顏色直接吃紙面 token */
+.tart{display:grid;grid-template-columns:52px 1fr 64px;gap:6px;width:300px;height:142px;padding:8px;
+  border-radius:12px;background:var(--ui-bg);border:1px solid var(--ui-line2)}
+.tart-l,.tart-r{display:flex;flex-direction:column;gap:5px;padding:5px;border-radius:6px;background:var(--ui-surface)}
+.tart i{display:block}
+.tart-l i,.tart-r i{height:16px;border-radius:4px;background:var(--ui-surface2)}
+.tart-r i.on{background:var(--ui-accent)}
+.tart-p{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;border-radius:4px;
+  background:var(--c-page)}
+.tart-p .pill{width:46%;height:13px;border-radius:99px;background:var(--c-pill-bg)}
+.tart-p .sl{width:72%;height:9px;border-radius:2px;background:var(--c-slogan)}
+.tart-p .sl.s{width:56%}
+.tart-p .tx{width:62%;height:4px;border-radius:2px;background:#fff;opacity:.85}
+.tart-p .tx.s{width:46%}
+.tart-p .tb{width:92%;display:grid;grid-template-columns:30% 1fr;gap:2px;margin-top:3px}
+.tart-p .tb i{height:9px;background:var(--c-card)}
+.tart-p .tb i:nth-child(odd){background:var(--c-lab)}
 @media (prefers-reduced-motion: reduce){
   #bootOverlay .boot-card{animation:none}
   #bootOverlay .boot-bar.indet i{animation:none;width:100%;opacity:.5}
@@ -360,7 +378,7 @@ header h1{min-width:0}
       <div id="themeCells"></div>
     </div>
   </div>
-<button class="icon-button" id="btnAdv" aria-label="進階模式" aria-pressed="false" title="進階：打開才會出現空白容器、換容器、格的切分——那些是設計師在用的"><span class="ui-icon" data-icon="sliders"></span></button><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="開啟" aria-expanded="false" aria-controls="fileMenu"><span class="ui-icon" data-icon="folder-open"></span>開啟</button><div class="ui-popup" id="fileMenu" hidden><label class="btn" title="開啟先前存的 .json 專案"><span class="ui-icon" data-icon="folder-open"></span> 開專案<input type="file" id="fProj" accept=".json"></label><button id="btnDemo"><span class="ui-icon" data-icon="table"></span> 範例整頁</button></div></div><a class="btn icon-button" href="../MS線上編輯器使用說明.html" target="_blank" rel="noopener" title="使用說明" aria-label="使用說明"><span class="ui-icon" data-icon="help"></span></a><button class="danger" id="btnClear" title="清空整頁內容"><span class="ui-icon" data-icon="trash"></span> 清空頁面</button><button id="btnSaveProj" title="存下 .json 專案檔"><span class="ui-icon" data-icon="save"></span> 存專案</button><button id="btnPng" title="只要一張整張的時候用"><span class="ui-icon" data-icon="image"></span> 整張 PNG</button><button class="primary" id="btnZip"><span class="ui-icon" data-icon="package"></span> 匯出整包</button>
+<button class="icon-button" id="btnAdv" aria-label="進階模式" aria-pressed="false" title="進階：打開才會出現空白容器、換容器、格的切分——那些是設計師在用的"><span class="ui-icon" data-icon="sliders"></span></button><div class="ui-menu"><button class="ui-menu-toggle chevron" aria-label="開啟" aria-expanded="false" aria-controls="fileMenu"><span class="ui-icon" data-icon="folder-open"></span>開啟</button><div class="ui-popup" id="fileMenu" hidden><label class="btn" title="開啟先前存的 .json 專案"><span class="ui-icon" data-icon="folder-open"></span> 開專案<input type="file" id="fProj" accept=".json"></label><button id="btnDemo"><span class="ui-icon" data-icon="table"></span> 範例整頁</button></div></div><div class="ui-menu"><button class="ui-menu-toggle icon-button" id="btnHelp" title="新手導覽／操作手冊／教學簡報" aria-label="新手導覽／操作手冊／教學簡報" aria-expanded="false" aria-controls="helpMenu"><span class="ui-icon" data-icon="help"></span></button><div class="ui-popup" id="helpMenu" hidden><button id="btnTour" type="button"><span class="ui-icon" data-icon="play-circle"></span> 新手導覽（1 分鐘）</button><a class="btn" href="../MS線上編輯器使用說明.html" target="_blank" rel="noopener"><span class="ui-icon" data-icon="help"></span> 完整操作手冊</a><a class="btn" id="lnkSlides" href="https://docs.google.com/presentation/d/1MDSXQ_Rti_Ur5wyR9cpxirEDpyQQRUX6VdtCsQpKZrA/edit" target="_blank" rel="noopener"><span class="ui-icon" data-icon="presentation"></span> 教學簡報</a></div></div><button class="danger" id="btnClear" title="清空整頁內容"><span class="ui-icon" data-icon="trash"></span> 清空頁面</button><button id="btnSaveProj" title="存下 .json 專案檔"><span class="ui-icon" data-icon="save"></span> 存專案</button><button id="btnPng" title="只要一張整張的時候用"><span class="ui-icon" data-icon="image"></span> 整張 PNG</button><button class="primary" id="btnZip"><span class="ui-icon" data-icon="package"></span> 匯出整包</button>
 </header>
 
 <main>
@@ -410,6 +428,7 @@ header h1{min-width:0}
      蝦大的工作只有四件：加一段、加一列、打字、換語意角色；
      剩下的是設計師遇到 preset 沒涵蓋的排法才進來補。 */
   let ADV = XD.store.get('ms_live_adv', false);
+  let TOURING = null;     /* 新手導覽進行中：存著使用者原本的內容（見「新手導覽」） */
   let imgWarned = false;
   /* 選取狀態：四層，都是位址字串（atom 的位址不含講者的第 6 段，那段另外存） */
   let SEL = { sec: null, row: null, cell: null, atom: null, spk: null };
@@ -1790,6 +1809,7 @@ header h1{min-width:0}
      版面／文字（小）一定存得下；圖片（大）另外一支 key 盡力而為，
      存不下就只提醒一次，不讓它擋掉正常的自動暫存。 */
   const save = XD.debounce(() => {
+    if (TOURING) return;      /* 導覽中畫面是範例資料，不能蓋掉使用者存在瀏覽器裡的內容 */
     try { localStorage.setItem('xd_' + KEY, JSON.stringify({ sections: PAGE.sections, name: PROJ.name,
       theme: PROJ.theme || '' })); }
     catch (err) { return; }
@@ -1844,6 +1864,197 @@ header h1{min-width:0}
     });
   }
 
+
+  /* ============ 新手導覽（specs/016） ============
+     參考同事 SKBN 編輯器的導覽：一步一步打亮功能＋說明卡，有示範的步驟由假游標在
+     範例資料上「真的」操作（點卡片、打字、換角色）。引擎在 core/tour.js，這裡只有步驟。
+     - 第一次打開（字型載完之後）自動跑一次；之後按頂列「使用教學」重看；網址加 ?tour 強制再跑。
+     - 導覽期間畫面換成「範例整頁」，save() 停住（TOURING）；結束時整份換回使用者原本的頁面，
+       Ctrl+Z 歷史也清掉——示範操作不該留在使用者的復原紀錄裡。 */
+  const TOUR_KEY = 'ms_live_tour_v1';
+  const NOSEL = () => ({ sec: null, row: null, cell: null, atom: null, spk: null });
+  function tourBegin() {
+    TOURING = { sections: XD.clone(PAGE.sections), name: PROJ.name, theme: PROJ.theme,
+                sel: SEL, tab: TAB, scroll: $('#stage').scrollTop };
+    closeThemeGrid();
+    PAGE = { sections: PACK.templateDefault() };
+    setProjectName(''); setTheme('', false);
+    SEL = NOSEL(); TAB = 'sec';
+    render(); $('#stage').scrollTop = 0;
+  }
+  function tourEnd() {
+    const t = TOURING; if (!t) return;
+    TOURING = null;
+    closeThemeGrid();
+    PAGE = { sections: t.sections };
+    setProjectName(t.name); setTheme(t.theme, false);
+    SEL = t.sel; TAB = t.tab;
+    H.reset(PAGE); paintUndo(); render();
+    $('#stage').scrollTop = t.scroll;
+    XD.store.set(TOUR_KEY, 1);
+    save();
+  }
+
+  /* 步驟用的小工具：一律用「現在畫面上的元素」，工具一重畫就重抓 */
+  const tSec = type => { const s = PAGE.sections.find(x => x.type === type);
+    return s ? $('#paper .sec[data-iid="' + s.iid + '"]') : null; };
+  const tAw = (t, secType) => $$('#paper [data-aw]').find(el => {
+    const h = locAtom(el.dataset.aw);
+    return h && h.atom.t === t && (!secType || h.sec.type === secType); }) || null;
+  const tSelAw = () => SEL.atom ? $('#paper [data-aw="' + CSS.escape(SEL.atom) + '"]') : null;
+  function tPick(el) {                      /* 跟點一下一樣的選取（不用游標，給 before 用） */
+    const h = el && locAtom(el.dataset.aw); if (!h) return;
+    SEL = { sec: h.sec.iid, row: h.row.id, cell: cellAddrOf(el.dataset.aw), atom: el.dataset.aw, spk: null };
+    markSel(); paintPane(); paintInsp();
+  }
+  function tPickSec(type) {
+    const s = PAGE.sections.find(x => x.type === type); if (!s) return;
+    SEL = Object.assign(NOSEL(), { sec: s.iid }); markSel(); paintPane(); paintInsp();
+  }
+  function tSetText(el, v) { if (!el) return; el.innerText = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+  const tView = el => { if (el) el.scrollIntoView({ block: 'center' }); };
+  function tOpenGrid() { $('#themeGrid').hidden = false; $('#themeBtn').setAttribute('aria-expanded', 'true'); }
+  const tSloganEd = () => { const h = tAw('slogan', 'highlight'); return h && h.querySelector('[data-ed]'); };
+  let tSlogan = null;                        /* 第一步示範打字前的原文（動畫最後放回去用） */
+  /* 會改到範例資料的步驟：進來先存一份，離開時整份放回去。示範播到一半按下一步，
+     後面的步驟才不會看到半截的字、被換掉的角色或靠右的文字。 */
+  let tSnap = null;
+  const tSave = () => { tSnap = XD.clone(PAGE.sections); };
+  function tRestore() {
+    if (!tSnap) return;
+    PAGE.sections = tSnap; tSnap = null;
+    commit(); render();
+  }
+  const TOUR_ART =
+    '<div class="tart" aria-hidden="true"><div class="tart-l"><i></i><i></i><i></i><i></i></div>' +
+    '<div class="tart-p"><i class="pill"></i><i class="sl"></i><i class="sl s"></i><i class="tx"></i>' +
+    '<i class="tx s"></i><div class="tb"><i></i><i></i><i></i><i></i></div></div>' +
+    '<div class="tart-r"><i class="on"></i><i></i><i></i></div></div>';
+
+  const TOUR_STEPS = [
+    { intro: true, target: null,
+      title: '歡迎使用 MS 線上編輯器',
+      body: '帶你 1 分鐘上手：加一段、打字、換樣式、匯出。' },
+
+    { target: () => tSec('highlight'), place: 'right', pad: 4,
+      before() {
+        SEL = NOSEL(); markSel(); paintPane(); paintInsp(); tView(tSec('highlight'));
+        const h = tAw('slogan', 'highlight'); tSlogan = h ? locAtom(h.dataset.aw).atom.v : null;
+        tSave();
+      },
+      after: tRestore,
+      anim: a => a.tap(() => tAw('slogan', 'highlight'), 300)
+        .then(() => a.type(tSloganEd, '雙11 賣家衝刺課'))
+        .then(() => a.wait(1600))
+        .then(() => { tSetText(tSloganEd(), tSlogan || ''); a.hide(); return a.wait(500); }),
+      title: '版面就是成品',
+      body: '看到什麼，匯出就是什麼。<b>點一段字，直接打字</b>就能改。' },
+
+    { target: '.tool-header .proj-name', place: 'bottom', pad: 4,
+      after() { setProjectName(''); },
+      anim: a => a.type(() => $('#projName'), '雙11賣家衝刺課')
+        .then(() => a.wait(1400))
+        .then(() => { setProjectName(''); a.hide(); return a.wait(400); }),
+      title: '專案名稱',
+      body: '也是匯出檔案的檔名，開始做之前先改好。' },
+
+    { target: () => [$('#left'), $('#stage')], pad: 2,
+      before() { TAB = 'sec'; tPickSec('highlight'); tView(tSec('highlight')); tSave(); },
+      after: tRestore,
+      anim: a => { tPickSec('highlight'); TAB = 'sec'; paintPane();
+        return a.tap(() => $('#pane [data-sec="flow"]'), 1700)
+          .then(() => a.tap(() => $('#btnUndo'), 900)); },
+      title: '加一段',
+      body: '點左邊的卡片，新的一段會加在<b>選取那一段的後面</b>。加錯了按復原就好。' },
+
+    { target: () => [$('#left'), $('#stage')], pad: 2,
+      before() { tPickSec('highlight'); TAB = 'sec'; paintPane(); tView(tSec('highlight')); tSave(); },
+      anim: a => { TAB = 'sec'; paintPane();
+        return a.tap(() => tSec('highlight'), 500)
+          .then(() => a.tap(() => $('#tabs [data-t="row"]'), 700))
+          .then(() => a.tap(() => $('#pane [data-add]:not(.fullcard)'), 1700))
+          .then(() => a.tap(() => $('#btnUndo'), 900)); },
+      after() { TAB = 'sec'; tRestore(); },
+      title: '加一列',
+      body: '先點一段，再到「加一列」挑一種列，就加進那一段。' },
+
+    { target: () => [$('#inspBody .stylelist'), tSelAw()], pad: 4,
+      before() { TAB = 'sec'; paintPane(); const el = tAw('hbody', 'highlight') || tSelAw(); tPick(el); tView(el); tSave(); },
+      after: tRestore,
+      anim: a => a.tap(() => $('#inspBody [data-role="slogan"]'), 1300)
+        .then(() => a.tap(() => $('#inspBody [data-role="pnote"]'), 1300))
+        .then(() => a.tap(() => $('#inspBody [data-role="pbody"]'), 900)),
+      title: '換樣式：挑一個角色',
+      body: '字級字重都照設計稿校好了，<b>點一下就換，文字保留</b>。想要更大或更小，就換角色。' },
+
+    { target: () => { const c = $('#inspBody .alchip'); return [c && c.closest('.subpick'), tSelAw()]; }, pad: 4,
+      before() { if (!tSelAw()) { const el = tAw('hbody', 'highlight'); tPick(el); tView(el); } tSave(); },
+      after: tRestore,
+      anim: a => a.tap(() => $('#inspBody [data-al="left"]'), 1100)
+        .then(() => a.tap(() => $('#inspBody [data-al="right"]'), 1100))
+        .then(() => a.tap(() => $('#inspBody [data-al="center"]'), 800)),
+      title: '文字對齊',
+      body: '這一塊字可以靠左、置中、靠右；右欄下方「這個區段」可以整段一起改。' },
+
+    { target: '#rowbar', place: 'right', pad: 6,
+      before() { if (!tSelAw()) { const el = tAw('hbody', 'highlight'); tPick(el); tView(el); } tSave(); },
+      after: tRestore,
+      anim: a => { const keep = SEL.atom;
+        return a.tap(() => $('#rowbar [data-act="rdup"]'), 1300)
+          .then(() => a.tap(() => $('#rowbar [data-act="rdel"]'), 900, () => {
+            const el = keep && $('#paper [data-aw="' + CSS.escape(keep) + '"]'); if (el) tPick(el); })); },
+      title: '這一列的工具',
+      body: '選到一列時會出現在旁邊：<b>上移、下移、複製、刪除</b>。段落順序用這裡調，不能用拖的。' },
+
+    { target: () => [$('#themeBtn'), $('#themeGrid')], place: 'bottom', pad: 6,
+      before() { SEL = NOSEL(); markSel(); paintInsp(); tOpenGrid(); },
+      after() { setTheme('', false); closeThemeGrid(); },
+      anim: a => { tOpenGrid();
+        return a.tap(() => $$('#themeCells .theme-cell')[6], 1300, tOpenGrid)
+          .then(() => a.tap(() => $$('#themeCells .theme-cell')[12], 1300, tOpenGrid))
+          .then(() => a.tap(() => $('#themeDefault'), 900, tOpenGrid)); },
+      title: '換配色',
+      body: '跟 BN 編輯器同一套 20 個主題，<b>點一格整頁一起換</b>，匯出的圖也一樣。' },
+
+    { target: '#minimap', place: 'left', pad: 4,
+      before() { closeThemeGrid(); },
+      anim: a => {
+        const press = fy => {
+          const b = $('#miniBody'); if (!b) return a.wait(300);
+          const r = b.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height * fy;
+          if (!a.shown()) a.show(x + 90, y + 60);
+          return a.move(x, y, 700).then(() => {
+            a.ripple();
+            b.dispatchEvent(new MouseEvent('mousedown', { clientX: x, clientY: y, bubbles: true, cancelable: true }));
+            window.dispatchEvent(new MouseEvent('mouseup', { clientX: x, clientY: y }));
+            return a.wait(1100);
+          });
+        };
+        return press(.8).then(() => press(.12)); },
+      title: '頁面總覽',
+      body: '整頁的縮圖，<b>點一下就跳到那一段</b>。標題列可以收起來。' },
+
+    { target: () => [$('#btnSaveProj'), $('#btnPng'), $('#btnZip')], place: 'bottom', pad: 6,
+      anim: a => a.point(() => $('#btnZip'), 1000).then(() => a.point(() => $('#btnSaveProj'), 1000)),
+      title: '存檔與匯出',
+      body: '交件按<b>「匯出整包」</b>：每段一張圖＋整頁長圖＋專案檔。<br>' +
+            '要接著改按「存專案」——自動暫存只在這台電腦的這個瀏覽器。' },
+
+    { target: () => [$('#btnUndo'), $('#btnRedo')], place: 'bottom', pad: 6,
+      title: '按錯了？',
+      body: '<b>Ctrl+Z</b> 復原、Ctrl+Shift+Z 重做，連「清空頁面」都救得回來。<br>' +
+            '注意：「開啟 → 開專案」會直接蓋掉目前畫面，開之前先存。' },
+
+    { target: '#btnHelp', place: 'bottom', pad: 6,
+      title: '導覽結束',
+      body: '按「完成」回到你的頁面開始做吧！<br>之後隨時可以按這顆 <b>?</b> 重看導覽，或打開操作手冊、教學簡報。' },
+  ];
+  const TOUR = XD.tour({
+    steps: TOUR_STEPS, onStart: tourBegin, onEnd: tourEnd,
+    intro: { art: TOUR_ART, meta: '共 ' + TOUR_STEPS.length + ' 步・之後隨時可以按頂列的 ? 重看' },
+  });
+  $('#btnTour').onclick = () => TOUR.start();
+
   /* ============ 開機 ============ */
   (function boot() {
     const saved = XD.store.get(KEY);
@@ -1870,6 +2081,8 @@ header h1{min-width:0}
     bootGate().then(how => {
       if (how === 'fail') XD.toast('品牌字型沒有載入成功，畫面先用系統字型顯示');
       else if (restored) XD.toast('已還原上次的內容');
+      /* 第一次打開跑導覽（字型到了才跑，示範的畫面才是真的樣子） */
+      if (!XD.store.get(TOUR_KEY, 0) || /[?&]tour\b/.test(location.search)) TOUR.start();
     });
   })();
 
@@ -1885,6 +2098,7 @@ header h1{min-width:0}
     setKvImage, setAtomImage, shrink, clampPhotoT,
     get projectName() { return PROJ.name; },
     get theme() { return PROJ.theme; },
+    tour: TOUR, tourKey: TOUR_KEY,
     loadTemplate: () => { PAGE.sections = PACK.templateDefault(); commit(); render(); },
     clearAll: () => { PAGE.sections = []; commit(); render(); },
   };

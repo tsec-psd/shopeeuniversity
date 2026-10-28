@@ -10,9 +10,11 @@
        steps: [...],
        onStart() {},            // 開始前：換上範例資料（可回傳 Promise）
        onEnd() {},              // 結束時：還原使用者原本的內容
+       onDecline() {},          // ask() 問了、使用者選「先不用」（什麼都沒換過）
        intro: { art: 'HTML', meta: '共 N 步…' },
      });
-     tour.start();
+     tour.start();   // 直接開始（使用者自己按「新手導覽」）
+     tour.ask();     // 只跳出開場卡問要不要看；按了「開始導覽」才換範例資料、往下走
 
    step 欄位：
      target   CSS 選擇器／回傳元素（或元素陣列）的函式／null（畫面正中間的說明卡）
@@ -57,6 +59,7 @@
     const STEPS = cfg.steps;
     let root, block, spot, card, cursor;
     let idx = 0, active = false, busy = false, raf = 0, targets = null, animToken = 0;
+    let asking = false;     /* ask() 開的開場卡：還沒換範例資料，畫面底下是使用者自己的內容 */
 
     function build() {
       if (root) return;
@@ -83,7 +86,10 @@
       card.querySelector('.tour-skip').onclick = () => end();
       card.querySelector('.tour-later').onclick = () => end();
       card.querySelector('.tour-prev').onclick = () => go(idx - 1);
-      card.querySelector('.tour-next').onclick = () => { if (idx >= STEPS.length - 1) end(); else go(idx + 1); };
+      card.querySelector('.tour-next').onclick = () => {
+        if (asking) return accept();
+        if (idx >= STEPS.length - 1) end(); else go(idx + 1);
+      };
     }
 
     /* ---------- 假游標 ---------- */
@@ -269,19 +275,36 @@
       else e.preventDefault();
     }
 
+    function open() {
+      root.hidden = false;
+      active = true; idx = 0; targets = null;
+      window.addEventListener('keydown', onKey, true);
+      cancelAnimationFrame(raf); loop();
+      go(0);
+    }
     function start() {
       if (active) return Promise.resolve();
       build();
-      return Promise.resolve(cfg.onStart ? cfg.onStart() : null).then(() => {
-        root.hidden = false;
-        active = true; idx = 0; targets = null;
-        window.addEventListener('keydown', onKey, true);
-        cancelAnimationFrame(raf); loop();
-        go(0);
-      });
+      return Promise.resolve(cfg.onStart ? cfg.onStart() : null).then(open);
+    }
+    /* 第一次打開用：只跳開場卡問一句，選「先不用」就什麼都不動 */
+    function ask() {
+      if (active) return;
+      build();
+      asking = true;
+      open();
+    }
+    function accept() {
+      if (!asking || busy) return;
+      asking = false; busy = true;
+      Promise.resolve(cfg.onStart ? cfg.onStart() : null)
+        .then(() => { busy = false; go(1); })
+        .catch(e => { console.warn('[tour]', e); busy = false; });
     }
     function end() {
       if (!active) return;
+      const declined = asking;
+      asking = false;
       stopAnim();
       const s = STEPS[idx];
       if (s && s.after) { try { s.after(); } catch (e) { console.warn('[tour]', e); } }
@@ -289,12 +312,14 @@
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKey, true);
       root.hidden = true;
-      if (cfg.onEnd) cfg.onEnd();
+      if (declined) { if (cfg.onDecline) cfg.onDecline(); }
+      else if (cfg.onEnd) cfg.onEnd();
     }
 
     return {
-      start, end, steps: STEPS, waitFor, sleep,
+      start, ask, end, steps: STEPS, waitFor, sleep,
       get active() { return active; },
+      get asking() { return asking; },
       get index() { return idx; },
       get busy() { return busy; },
       next() { card.querySelector('.tour-next').click(); },

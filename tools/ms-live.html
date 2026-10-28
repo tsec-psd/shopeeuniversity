@@ -1868,7 +1868,9 @@ header h1{min-width:0}
   /* ============ 新手導覽（specs/016） ============
      參考同事 SKBN 編輯器的導覽：一步一步打亮功能＋說明卡，有示範的步驟由假游標在
      範例資料上「真的」操作（點卡片、打字、換角色）。引擎在 core/tour.js，這裡只有步驟。
-     - 第一次打開（字型載完之後）自動跑一次；之後按頂列「使用教學」重看；網址加 ?tour 強制再跑。
+     - 第一次打開（字型載完之後）只跳開場卡「問」要不要看（使用者 2026-10-28：「導覽頁不要自動跑
+       第一次載入才問要不要看導覽」）——問的時候畫面還是使用者自己的內容，按「開始導覽」才換範例；
+       選「先不用」就記住、不再問。之後從頂列 ? 選單重看；網址加 ?tour 直接開始。
      - 導覽期間畫面換成「範例整頁」，save() 停住（TOURING）；結束時整份換回使用者原本的頁面，
        Ctrl+Z 歷史也清掉——示範操作不該留在使用者的復原紀錄裡。 */
   const TOUR_KEY = 'ms_live_tour_v1';
@@ -1934,7 +1936,7 @@ header h1{min-width:0}
   const TOUR_STEPS = [
     { intro: true, target: null,
       title: '歡迎使用 MS 線上編輯器',
-      body: '帶你 1 分鐘上手：加一段、打字、換樣式、匯出。' },
+      body: '要不要花 1 分鐘看一下怎麼用？<br>導覽用範例頁示範，不會動到你的內容。' },
 
     { target: () => tSec('highlight'), place: 'right', pad: 4,
       before() {
@@ -2051,6 +2053,7 @@ header h1{min-width:0}
   ];
   const TOUR = XD.tour({
     steps: TOUR_STEPS, onStart: tourBegin, onEnd: tourEnd,
+    onDecline: () => XD.store.set(TOUR_KEY, 1),
     intro: { art: TOUR_ART, meta: '共 ' + TOUR_STEPS.length + ' 步・之後隨時可以按頂列的 ? 重看' },
   });
   $('#btnTour').onclick = () => TOUR.start();
@@ -2081,8 +2084,9 @@ header h1{min-width:0}
     bootGate().then(how => {
       if (how === 'fail') XD.toast('品牌字型沒有載入成功，畫面先用系統字型顯示');
       else if (restored) XD.toast('已還原上次的內容');
-      /* 第一次打開跑導覽（字型到了才跑，示範的畫面才是真的樣子） */
-      if (!XD.store.get(TOUR_KEY, 0) || /[?&]tour\b/.test(location.search)) TOUR.start();
+      /* 網址帶 ?tour 直接開始；第一次打開只問要不要看（字型到了才問，示範的畫面才是真的樣子） */
+      if (/[?&]tour\b/.test(location.search)) TOUR.start();
+      else if (!XD.store.get(TOUR_KEY, 0)) TOUR.ask();
     });
   })();
 
